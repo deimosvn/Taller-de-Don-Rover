@@ -1,4 +1,4 @@
-# IXCHEL — The Classroom Space Mission
+# El Taller de Don Rover — The Classroom Space Mission
 
 **Un salón. Varias tripulaciones. Un planeta por salvar.**
 
