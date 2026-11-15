@@ -712,7 +712,7 @@ export class HostEngine {
         return this.generator?.stage === 'error' ? this.generateMission() : err('IX está generando la misión con datos de la NASA…');
       case 'briefing':
         this.setPhase('discovery', PACES[this.pace].discovery);
-        this.pushIx('info', 'Transmisiones enviadas: cada especialidad debe descifrar la suya.');
+        this.pushIx('info', 'Tareas enviadas: cada especialidad camina a su estación en Marte y hace su minijuego.');
         return OK;
       case 'discovery':
         this.startChallenge();

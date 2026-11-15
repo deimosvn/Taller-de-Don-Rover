@@ -7,9 +7,9 @@ import type { BadgeId, IntelCard, PlayerView, QuizView, Tier } from '../../../sh
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
 import { Confetti, Icon, RoleChip } from '../../components/ui';
 import { HealthCard, ScienceCard } from '../../components/nasa';
-import { minigameFor } from '../../../shared/minigames';
+import { MISSION_PROBLEMS, minigameFor } from '../../../shared/minigames';
 import { Minigame } from './minigames';
-import { RoleTask } from './RoleTask';
+import { GoToStation, RoleTask } from './RoleTask';
 import { ProblemCard } from './MissionProblem';
 import { hostNow, useTicker } from '../../lib/clock';
 import { vibrate } from '../../lib/pwa';
@@ -532,7 +532,7 @@ function ClassProgress({ view }: { view: PlayerView }) {
   );
 }
 
-function Emergency({ view, act, net }: { view: PlayerView; act: Act; net: PlayerNet | null }) {
+function Emergency({ view, act, net, open3d }: { view: PlayerView; act: Act; net: PlayerNet | null; open3d?: () => void }) {
   const ev = view.event;
   if (!ev) {
     return (
@@ -588,7 +588,21 @@ function Emergency({ view, act, net }: { view: PlayerView; act: Act; net: Player
       </div>
     );
   }
-  if (ev.stage === 'action') return <TapGame view={view} net={net} />;
+  if (ev.stage === 'action') {
+    // La acción de emergencia se hace en su estación del mundo 3D.
+    if (open3d)
+      return (
+        <Center>
+          <div className="stamp bad">🚨 {ev.title}</div>
+          <p className="lead">
+            {ev.action.emoji} {ev.action.verb}
+          </p>
+          <GoToStation place={view.mission ? MISSION_PROBLEMS[view.mission.id].place : 'la colonia'} onGo={open3d} />
+          <ClassProgress view={view} />
+        </Center>
+      );
+    return <TapGame view={view} net={net} />;
+  }
   return (
     <Center>
       {ev.saved && <Confetti count={40} />}
@@ -783,7 +797,7 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
         <>
           <Explore3D open3d={open3d} text={view.task ? `Tu estación está en ${view.task.place}.` : 'Recorre la colonia.'} />
           <div className="screen">
-            <RoleTask view={view} net={net} />
+            <RoleTask view={view} net={net} onGo={open3d} />
             {view.intel && view.intel.map((c) => <IntelCardView key={c.role} card={c} />)}
           </div>
         </>
@@ -796,7 +810,7 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
         </>
       );
     case 'event':
-      return <Emergency view={view} act={act} net={net} />;
+      return <Emergency view={view} act={act} net={net} open3d={open3d} />;
     case 'results':
       return <Outcome view={view} />;
     case 'debrief':

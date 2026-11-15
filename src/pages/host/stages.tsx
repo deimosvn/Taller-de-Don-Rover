@@ -104,9 +104,9 @@ export function CrewsStage({ view }: { view: HostView }) {
   return (
     <div className="crews-stage">
       <div className="stage-head">
-        <p className="eyebrow">Crew assignment</p>
-        <h2 className="sticker">¡Tripulaciones listas!</h2>
-        <p>Cada tripulación cuida un sector de la colonia. Los cuatro roles reciben información distinta: nadie puede resolver la misión solo.</p>
+        <p className="eyebrow">Tripulación asignada</p>
+        <h2 className="sticker">{view.crews.length > 1 ? '¡Tripulaciones listas!' : '¡Tripulación lista!'}</h2>
+        <p>La tripulación cuida un sector de la colonia. Cada especialidad recibe información distinta: nadie puede resolver la misión solo.</p>
       </div>
       <div className="crews-layout">
       <div className="crews-planet">
@@ -170,9 +170,10 @@ export function BriefingStage({ view }: { view: HostView }) {
         <span className="chip ix">
           🤖 {m.aiPlanned ? 'Generada por IX con IA y datos de la NASA' : 'Generada por IX con datos de la NASA'}
         </span>
+        {view.nasa?.science?.highlight && <ScienceCard highlight={view.nasa.science.highlight} studies={view.nasa.science.studies} ai={view.nasa.science.ai} compact />}
       </div>
       <div className="brief-right">
-        <p className="eyebrow">New mission unlocked · {def.code}</p>
+        <p className="eyebrow">Nueva misión · {def.code}</p>
         <h1 className="sticker brief-title" style={{ '--mc': def.color } as CSSProperties}>
           {def.title}
         </h1>
@@ -199,7 +200,6 @@ export function BriefingStage({ view }: { view: HostView }) {
             </div>
           </div>
         </div>
-        {view.nasa?.science?.highlight && <ScienceCard highlight={view.nasa.science.highlight} studies={view.nasa.science.studies} ai={view.nasa.science.ai} />}
         <div className="twists">
           <span className="eyebrow">3 acontecimientos inesperados</span>
           <div className="twist-cards">
@@ -252,9 +252,8 @@ export function DiscoveryStage({ view }: { view: HostView }) {
         <p className="eyebrow">Exploración · tareas conectadas</p>
         <h2 className="sticker">Cada especialidad, una tarea</h2>
         <p>
-          Cada quien va a su estación en el mundo 3D. Las tareas están conectadas: el escudo de Hábitat protege los paneles de Energía, la energía mueve las
-          bombas de Soporte vital, el agua llega a los cultivos de Astrobiología y la comida fresca da fuerza a Hábitat. Al terminar su tarea, cada quien
-          recibe su transmisión secreta.
+          Cada quien camina a su estación en el mundo 3D para hacer su minijuego. Las tareas están encadenadas (↓): el escudo protege los paneles, la energía
+          mueve las bombas y el agua llega a los cultivos. Al terminar, cada quien recibe su transmisión secreta.
         </p>
       </div>
       <div className="discovery-body">
@@ -264,7 +263,7 @@ export function DiscoveryStage({ view }: { view: HostView }) {
               <div className="decode-head">
                 <b>{c.name}</b>
                 <small>
-                  {c.status.decoded}/{c.status.members} transmisiones
+                  {c.status.decoded}/{c.status.members} tareas completas
                 </small>
               </div>
               {TASK_CHAIN.map((r, i) => {
@@ -311,7 +310,7 @@ export function ChallengeStage({ view }: { view: HostView }) {
   return (
     <div className="challenge">
       <div className="stage-head">
-        <p className="eyebrow">Crew challenge · {locked}/{view.crews.length} decisiones</p>
+        <p className="eyebrow">Reto de la tripulación · {locked}/{view.crews.length} {view.crews.length === 1 ? 'decisión' : 'decisiones'}</p>
         <h2 className="sticker">{m.puzzleTitle}</h2>
         <p>
           {m.puzzleQuestion} Nadie tiene toda la información: combinen sus datos y voten en su celular. Cuando toda la tripulación vota lo mismo, la decisión se
@@ -627,9 +626,9 @@ export function DebriefStage({ view }: { view: HostView }) {
       </div>
       <div className="campaign panel">
         <div>
-          <span className="eyebrow">The space campaign · Capítulo 1: Marte</span>
+          <span className="eyebrow">Campaña espacial · Capítulo 1: Marte</span>
           <p>
-            {done.size}/6 misiones completadas · Próximo: <b>{d.nextTeaser}</b>
+            {done.size}/{MISSION_ORDER.length} misiones completadas · Próximo: <b>{d.nextTeaser}</b>
           </p>
         </div>
         <div className="campaign-patches">

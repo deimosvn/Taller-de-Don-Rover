@@ -1230,3 +1230,95 @@
   background: #55db7a;
   box-shadow: 0 0 8px #55db7a;
 }
+
+/* ---------- ir a la misión: flecha guía hacia la estación ---------- */
+.wp-go {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #2a120d;
+  font: 600 0.86rem var(--font-display);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    transform 0.15s;
+}
+.wp-go:hover {
+  transform: translateY(-1px);
+}
+.wp-go:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.wp-go.on {
+  background: var(--glass);
+  color: var(--txt);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.wp-guide {
+  position: absolute;
+  left: 50%;
+  top: 26%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 18px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  text-align: center;
+  pointer-events: none;
+  max-width: min(320px, calc(100% - 32px));
+}
+.wp-guide b {
+  font: 700 1.2rem var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.wp-guide small {
+  color: var(--txt-soft);
+  font-size: 0.82rem;
+}
+.wp-guide-arrow {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #2a120d;
+  font-size: 2.2rem;
+  line-height: 1;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent);
+  transition: transform 0.3s ease;
+}
+.wp-guide-pin {
+  font-size: 2.4rem;
+  animation: wpGuideBounce 1s ease-in-out infinite alternate;
+}
+.wp-guide.arrived {
+  border-color: var(--accent);
+}
+@keyframes wpGuideBounce {
+  to {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wp-guide-pin {
+    animation: none;
+  }
+  .wp-guide-arrow {
+    transition: none;
+  }
+}

@@ -5,6 +5,9 @@
 // Durante la misión aparece una estación con brújula: en la exploración, la de la tarea de su
 // especialidad (conectada con las de sus compañeros); en el reto, la del problema de la historia;
 // y en la emergencia, la del minijuego de su especialidad.
+//
+// Los minijuegos solo se abren en la estación: el alumno tiene que caminar hasta ella e
+// interactuar. "Ir a la misión" no abre nada: solo enciende la flecha que lo guía.
 
 import { useEffect, useMemo, useState } from 'react';
 import { MISSIONS, ROLES } from '../../../shared/content';
@@ -23,7 +26,14 @@ interface Props {
   view: PlayerView;
   net: PlayerNet | null;
   onClose: () => void;
+  /** Encender la flecha guía desde el inicio (viene del botón "Ir a la misión" del panel). */
+  guide?: boolean;
 }
+
+/** A esta distancia (m) de la estación aparece su botón de interactuar (alcance 3.4 del catálogo + radio de la consola). */
+const NEAR = 4.4;
+/** Si se aleja más que esto con el minijuego abierto, se cierra: hay que estar en la estación. */
+const FAR = 14;
 
 /** ¿El juego necesita al alumno en su pantalla de misión? */
 function needsYou(v: PlayerView): { text: string; tone: 'alert' | 'info' } | null {
@@ -41,7 +51,7 @@ function needsYou(v: PlayerView): { text: string; tone: 'alert' | 'info' } | nul
   }
 }
 
-export default function PlayWorld({ view, net, onClose }: Props) {
+export default function PlayWorld({ view, net, onClose, guide: guideInit = false }: Props) {
   const [engine, setEngine] = useState<WorldEngine | null>(null);
   const [world, setWorld] = useState<WorldSnapshot | null>(() => net?.world ?? null);
   const snapshot = world ?? DEMO_SNAPSHOT;
@@ -96,6 +106,7 @@ export default function PlayWorld({ view, net, onClose }: Props) {
 
   const [panel, setPanel] = useState<'story' | 'twist' | 'task' | null>(null);
   const [bearing, setBearing] = useState<Bearing | null>(null);
+  const [guide, setGuide] = useState(guideInit);
   const missionId = view.mission?.id ?? null;
   const prob = missionId ? MISSION_PROBLEMS[missionId] : null;
   const def = missionId ? MISSIONS[missionId] : null;
@@ -151,70 +162,80 @@ export default function PlayWorld({ view, net, onClose }: Props) {
     else if (panel === 'task' && !taskOpen) setPanel(null);
   }, [panel, action, taskOpen]);
 
+  // El minijuego es de la estación: si el alumno se aleja, se cierra.
+  useEffect(() => {
+    if (panel && bearing && bearing.distance > FAR) setPanel(null);
+  }, [panel, bearing]);
+
+  // Sin estación activa no hay a dónde guiar.
+  useEffect(() => {
+    if (!active) setGuide(false);
+  }, [active]);
+
   const onInteract = (ev: InteractEvent) => {
     if (ev.defId !== 'prop.station') return false;
     setPanel(action ? 'twist' : taskOpen ? 'task' : storyOpen ? 'story' : null);
+    setGuide(false);
     return true;
   };
 
   const need = needsYou(view);
+  const go = () => setGuide(true);
   const bannerKey = action ? 'twist' : taskOpen && task && !task.done ? `task:${task.title}` : need ? `need:${need.text}` : storyOpen && !solved && prob ? `story:${prob.title}` : '';
   const banner: WorldBanner | null = useMemo(
     () =>
       action
-        ? { text: `🚨 ${evTitle}: ${evEmoji} ${evVerb}`, tone: 'alert', action: 'Resolver', onAction: () => setPanel('twist') }
+        ? { text: `🚨 ${evTitle}: ${evEmoji} ${evVerb}`, tone: 'alert', action: 'Ir a la misión', onAction: go }
         : taskOpen && task && !task.done && taskRole
-          ? { text: `${taskRole.emoji} Tu tarea: ${task.title}. Ve a tu estación (${task.place}) o hazla desde aquí.`, tone: 'info', action: 'Hacer tarea', onAction: () => setPanel('task') }
+          ? { text: `${taskRole.emoji} Tu tarea: ${task.title}. Camina a tu estación (${task.place}) e interactúa con ella.`, tone: 'info', action: 'Ir a la misión', onAction: go }
           : need
-          ? { text: need.text, tone: need.tone, action: 'Ir a la misión', onAction: onClose }
+          ? { text: need.text, tone: need.tone, action: 'Abrir panel', onAction: onClose }
           : storyOpen && !solved && prob
-            ? { text: `${prob.emoji} ${prob.title}: ve a la estación (${prob.place}) o resuélvelo desde aquí.`, tone: 'info', action: 'Resolver', onAction: () => setPanel('story') }
+            ? { text: `${prob.emoji} ${prob.title}: camina a la estación (${prob.place}) e interactúa con ella.`, tone: 'info', action: 'Ir a la misión', onAction: go }
             : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [bannerKey],
   );
 
-  const objective =
-    taskOpen && task && taskRole ? (
-      <>
-        <button className="wp-quest" onClick={() => setPanel('task')}>
-          <span>
-            {taskRole.emoji} {task.title}
-          </span>
-          <b>{task.done ? '✅' : `${Math.round(task.progress * 100)}%`}</b>
-        </button>
-        {bearing && (
-          <p className="wp-compass" title="Estación de tu tarea">
-            {bearing.distance > 5 ? (
-              <>
-                <i style={{ transform: `rotate(${bearing.angle}rad)` }}>↑</i>
-                Tu estación en {task.place} · {Math.round(bearing.distance)} m
-              </>
-            ) : (
-              <>📍 Llegaste a tu estación</>
-            )}
-          </p>
+  const near = Boolean(bearing && bearing.distance <= NEAR);
+  const target = taskOpen && task && taskRole
+    ? { label: `${taskRole.emoji} ${task.title}`, place: task.place, badge: task.done ? '✅' : `${Math.round(task.progress * 100)}%` }
+    : active && prob
+      ? { label: action ? `${evEmoji} ${evVerb}` : `${prob.emoji} ${prob.title}`, place: prob.place, badge: action ? null : solved ? '✅' : `${Math.round((view.problem?.crew ?? 0) * 100)}%` }
+      : null;
+
+  const objective = target ? (
+    <>
+      <div className="wp-quest">
+        <span>{target.label}</span>
+        {target.badge && <b>{target.badge}</b>}
+      </div>
+      <button className={`wp-go ${guide ? 'on' : ''}`} onClick={() => setGuide((g) => !g)} aria-pressed={guide}>
+        🧭 {guide ? 'Ocultar flecha' : 'Ir a la misión'}
+      </button>
+    </>
+  ) : null;
+
+  // Flecha guía: apunta a la estación (respecto de la cámara) hasta que el alumno llega.
+  const arrow =
+    target && bearing && (guide || near) ? (
+      <div className={`wp-guide ${near ? 'arrived' : ''}`} role="status" aria-live="polite">
+        {near ? (
+          <>
+            <span className="wp-guide-pin" aria-hidden="true">📍</span>
+            <b>Llegaste a la estación</b>
+            <small>Interactúa con ella ({'E'} o toca el botón) para empezar.</small>
+          </>
+        ) : (
+          <>
+            <span className="wp-guide-arrow" aria-hidden="true" style={{ transform: `rotate(${bearing.angle - Math.PI / 2}rad)` }}>
+              ➜
+            </span>
+            <b>{Math.round(bearing.distance)} m</b>
+            <small>Ve a {target.place}</small>
+          </>
         )}
-      </>
-    ) : active && prob ? (
-      <>
-        <button className="wp-quest" onClick={() => setPanel(action ? 'twist' : 'story')}>
-          <span>{action ? `${evEmoji} ${evVerb}` : `${prob.emoji} ${prob.title}`}</span>
-          {!action && <b>{solved ? '✅' : `${Math.round((view.problem?.crew ?? 0) * 100)}%`}</b>}
-        </button>
-        {bearing && (
-          <p className="wp-compass" title="Estación del problema">
-            {bearing.distance > 5 ? (
-              <>
-                <i style={{ transform: `rotate(${bearing.angle}rad)` }}>↑</i>
-                Estación en {prob.place} · {Math.round(bearing.distance)} m
-              </>
-            ) : (
-              <>📍 Llegaste a la estación</>
-            )}
-          </p>
-        )}
-      </>
+      </div>
     ) : null;
 
   return (
@@ -229,6 +250,7 @@ export default function PlayWorld({ view, net, onClose }: Props) {
         }}
       >
         <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Panel de misión" banner={banner} objective={objective} onInteract={onInteract}>
+          {!panel && arrow}
           {panel === 'task' && taskOpen && (
             <section className="wp-panel wp-problem" role="dialog" aria-label="Tu tarea">
               <header>
@@ -237,7 +259,7 @@ export default function PlayWorld({ view, net, onClose }: Props) {
                   ✕
                 </button>
               </header>
-              <RoleTask view={view} net={net} />
+              <RoleTask view={view} net={net} playable />
             </section>
           )}
           {panel && panel !== 'task' && (panel === 'story' || action) && (

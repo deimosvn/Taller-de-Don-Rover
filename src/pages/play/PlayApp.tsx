@@ -67,6 +67,8 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
   const [toast, setToast] = useState<{ text: string; kind: 'hint' | 'error' } | null>(null);
   // El juego es en 3D: el alumno está en Marte desde el principio (el panel de misión se abre encima).
   const [show3d, setShow3d] = useState(SUPPORTS_3D);
+  // Al volver al mundo desde "Ir a la misión", la flecha guía ya aparece encendida.
+  const [guide, setGuide] = useState(false);
   const [card, setCard] = useState(true);
   const netRef = useRef<PlayerNet | null>(null);
   const profileRef = useRef(profile);
@@ -385,7 +387,19 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
 
       <main className="play-main" key={view?.phase ?? 'none'}>
         {view ? (
-          <PhaseScreen view={view} act={act} net={netRef.current} open3d={() => setShow3d(true)} />
+          <PhaseScreen
+            view={view}
+            act={act}
+            net={netRef.current}
+            open3d={
+              SUPPORTS_3D
+                ? () => {
+                    setGuide(true);
+                    setShow3d(true);
+                  }
+                : undefined
+            }
+          />
         ) : (
           <div className="play-center">
             <IXOrb size={110} mood="talk" />
@@ -404,7 +418,15 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
 
       {show3d && view && (
         <Suspense fallback={WORLD_LOADING}>
-          <PlayWorld view={view} net={netRef.current} onClose={() => setShow3d(false)} />
+          <PlayWorld
+            view={view}
+            net={netRef.current}
+            guide={guide}
+            onClose={() => {
+              setGuide(false);
+              setShow3d(false);
+            }}
+          />
         </Suspense>
       )}
       {show3d && !view && SUPPORTS_3D && (

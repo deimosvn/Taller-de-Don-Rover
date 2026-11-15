@@ -2472,3 +2472,196 @@ details summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* ================================================================== */
+/* Consola durante la misión: todo cabe en la ventana del proyector     */
+/* ================================================================== */
+
+/* La tripulación vive en el panel lateral: el escenario gana toda la altura. */
+.console {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.rail {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.rail > * {
+  flex: none;
+}
+.rail .ixfeed {
+  flex: 1 0 150px;
+}
+.rail .crewstrip {
+  padding: 0;
+  flex-direction: column;
+  overflow: visible;
+}
+.rail .crew-mini {
+  flex: none;
+  max-width: none;
+  padding: 10px 12px;
+  background: rgba(43, 16, 11, 0.55);
+}
+.rail .crew-mini-avatars {
+  height: auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.rail .mini-av {
+  width: auto;
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+}
+.mini-av small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.crew-mini-status {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Exploración: una sola tripulación usa todo el ancho y las barras se ven. */
+.decode-grid {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.task-row {
+  grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr) 3rem;
+}
+.task-row b {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reto: la tarjeta de la tripulación ocupa el ancho disponible. */
+.vote-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+/* Evento: sin altura mínima que obligue a una segunda barra de desplazamiento. */
+.event-stage {
+  min-height: 0;
+}
+
+/* Pantallas bajas (laptops de 768 px, proyectores 1280×800): todo más compacto. */
+@media (max-height: 880px) and (min-width: 1101px) {
+  .console-top {
+    padding: 6px 20px;
+  }
+  .room-code b {
+    font-size: 1.35rem;
+  }
+  .console-main {
+    padding: 10px 16px;
+    gap: 12px;
+  }
+  .dock {
+    padding: 8px 20px 10px;
+  }
+  .rail {
+    gap: 10px;
+  }
+  .status {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+  .status-head h3 {
+    font-size: 1.2rem;
+  }
+  .status-meters {
+    gap: 6px;
+  }
+  .status-line {
+    padding: 6px 10px;
+  }
+  .ixfeed {
+    padding: 10px 12px;
+  }
+  .stage-head {
+    margin-bottom: 10px;
+  }
+  .stage-head h2 {
+    font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+  }
+  .stage-head p {
+    font-size: 0.95rem;
+  }
+  .crews-planet,
+  .brief-planet {
+    height: clamp(220px, 44vh, 400px);
+  }
+  .brief-title {
+    font-size: clamp(2rem, 3.6vw, 3rem);
+  }
+  .brief-es {
+    font-size: 1.1rem;
+  }
+  .ix-say {
+    font-size: 1rem;
+    min-height: 0;
+    margin: 10px 0;
+    padding: 10px 12px;
+  }
+  .twists {
+    margin-top: 10px;
+  }
+  .twist {
+    padding: 8px 10px;
+  }
+  .event-overlay {
+    padding: 16px;
+    gap: 10px;
+  }
+  .alarm-title h1 {
+    font-size: clamp(2rem, 3.6vw, 3rem);
+  }
+  .siren {
+    font-size: 2.2rem;
+  }
+  .event-narrative {
+    font-size: 1.05rem;
+  }
+  .res-planet {
+    height: clamp(200px, 32vh, 320px);
+  }
+  .deb-head h1 {
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+  }
+  .gauge-ring {
+    width: 70px;
+    height: 70px;
+  }
+  .debrief {
+    gap: 10px;
+  }
+  .campaign {
+    padding: 8px 14px;
+    gap: 8px 16px;
+  }
+  .learn {
+    padding: 10px 12px;
+  }
+}
+
+/* Briefing: el planeta y el estudio de la NASA a la izquierda, la historia a la derecha. */
+.briefing {
+  align-items: start;
+  min-height: 0;
+}
+.brief-left {
+  align-items: stretch;
+}
+.brief-left > .chip {
+  align-self: center;
+}
+@media (max-height: 880px) and (min-width: 1101px) {
+  .brief-planet {
+    height: clamp(190px, 30vh, 340px);
+  }
+}

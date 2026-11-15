@@ -1627,3 +1627,18 @@
   z-index: 5;
   white-space: nowrap;
 }
+
+/* ---------------- ir a la estación (el minijuego se juega en el mundo 3D) ---------------- */
+.go-station {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.go-station p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  line-height: 1.35;
+}

@@ -59,8 +59,26 @@ export function TaskChain({ view }: { view: PlayerView }) {
   );
 }
 
-/** La tarea con su minijuego (en la estación del mundo 3D o en la pantalla de la misión). */
-export function RoleTask({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
+/** Botón que lleva al mundo 3D con la flecha hacia la estación (no abre el minijuego). */
+export function GoToStation({ place, onGo }: { place: string; onGo: () => void }) {
+  return (
+    <div className="go-station">
+      <p>
+        📍 El minijuego está en la estación de <b>{place}</b>. Camina hasta ella en Marte e interactúa para empezar.
+      </p>
+      <button className="btn mars block" onClick={onGo}>
+        🧭 Ir a la misión
+      </button>
+    </div>
+  );
+}
+
+/**
+ * La tarea con su minijuego. El minijuego solo se juega en la estación del mundo 3D
+ * (`playable`); en el panel de misión aparece el botón que guía hasta ella. Si el
+ * dispositivo no puede mostrar 3D (`onGo` ausente), se juega aquí mismo.
+ */
+export function RoleTask({ view, net, playable = false, onGo }: { view: PlayerView; net: PlayerNet | null; playable?: boolean; onGo?: () => void }) {
   const send = useTaskSender(net);
   const t = view.task;
   if (!t || !view.mission) return null;
@@ -97,6 +115,8 @@ export function RoleTask({ view, net }: { view: PlayerView; net: PlayerNet | nul
       <TaskChain view={view} />
       {t.done ? (
         <p className="role-task-done">✅ ¡Tarea completa! Ya tienes tu transmisión secreta: compártela con tu tripulación.</p>
+      ) : t.open && !playable && onGo ? (
+        <GoToStation place={t.place} onGo={onGo} />
       ) : t.open ? (
         <Minigame key={`${view.mission.id}:${t.role}`} spec={taskSpec(view.mission.id, t.role)} color={r.color} dark={r.dark} onPoints={send} />
       ) : (
