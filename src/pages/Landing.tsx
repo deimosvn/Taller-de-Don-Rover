@@ -256,6 +256,12 @@ export function Landing() {
                 <Icon name="install" size={16} /> Instalar app
               </button>
             )}
+            <a className="btn small cream" href="#/donrover">
+              🤖 Don Rover físico
+            </a>
+            <a className="btn small cream" href="#/entrenador">
+              Entrenador
+            </a>
             <a className="btn small cream" href="#/libre">
               Jugar ahora
             </a>
@@ -294,6 +300,16 @@ export function Landing() {
               <small>Recolecta recursos y construye tu base en Marte · solo o con amigos por enlace</small>
             </span>
             <span className="hero-free-go">Jugar →</span>
+          </a>
+          <a className="hero-free" href="#/entrenador">
+            <span className="hero-free-icon ix" aria-hidden="true">
+              🎓
+            </span>
+            <span>
+              <b>Entrenador de misión con IA</b>
+              <small>Retos a tu medida con física real y datos de la NASA: energía, aire, agua, comida y radiación</small>
+            </span>
+            <span className="hero-free-go">Entrenar →</span>
           </a>
           <p className="hero-hint">
             <Icon name="map" size={16} /> Arrastra el planeta para girarlo · rueda o pellizco para acercarte

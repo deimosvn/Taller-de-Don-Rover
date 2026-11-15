@@ -26,6 +26,18 @@ export async function nasaStudies(ntrs: string, osdr: string, n = 6): Promise<Na
   return Array.isArray(data?.studies) ? data.studies : [];
 }
 
+export interface NasaSource {
+  name: string;
+  ok: boolean;
+  ms: number;
+}
+
+/** Comprueba en vivo la conexión con las tres fuentes de la NASA (null = sin función /api/nasa). */
+export async function nasaCheck(): Promise<{ key: boolean; sources: NasaSource[] } | null> {
+  const data = await get<{ key: boolean; sources: NasaSource[] }>('op=check', 12000);
+  return data && Array.isArray(data.sources) ? { key: Boolean(data.key), sources: data.sources } : null;
+}
+
 let weatherCache: { at: number; value: SpaceWeather | null } | null = null;
 
 /** Clima espacial real de DONKI (últimos días), con nivel de riesgo. */

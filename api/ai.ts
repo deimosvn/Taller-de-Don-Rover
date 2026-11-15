@@ -50,7 +50,75 @@ interface Task {
   schema: Record<string, unknown>;
 }
 
+const TRAINER_SIMS = ['solar', 'oxygen', 'water', 'greenhouse', 'shield', 'landing'];
+
+const TRAINER_SYSTEM = `Eres IX, la IA entrenadora del Taller de Don Rover: un entrenador de misión para astronautas junior (8 a 16 años) que aprenden a dirigir una base en Marte.
+Tu trabajo: elegir UNO de los retos de "options" para este astronauta y presentarlo. Cada reto es un simulador con física real; los números ya los fijó el motor del juego.
+Cómo elegir (personaliza de verdad):
+- Mira "skills": prioriza lo que nunca ha entrenado o donde su última nota fue baja; si domina algo, no lo repitas salvo que sea de su especialidad.
+- Mira "base": si a su base le falta energía, agua, aire, comida o blindaje, elige el reto que le enseña a resolver justo eso.
+- Mira "weather" (clima espacial real de la NASA, DONKI): si el Sol está activo, el reto de blindaje es urgente.
+- No elijas el reto "last" si hay otra opción razonable.
+Cómo escribir (español de México, tono de videojuego, cálido y emocionante):
+- "sim": exactamente el valor "sim" de la opción elegida.
+- "title": máximo 7 palabras.
+- "briefing": máximo 55 palabras, hablándole de tú y por su nombre. Cuenta la situación de la colonia como una historia. Usa SOLO los números que aparecen en "objective" de la opción elegida; no inventes cifras, fechas ni datos científicos.
+- "why": máximo 28 palabras: por qué elegiste este reto para esta persona (su historial, su base o el clima espacial real).
+- "tip": máximo 24 palabras: una pista para pensar el problema, sin dar la respuesta ni valores concretos.
+Investigación real:
+- "studies" trae estudios reales de la NASA (NTRS y OSDR, en inglés) con el campo "sim" al que pertenecen. Si hay alguno del reto elegido, úsalo: "study_id" (su id exacto), "study_title_es" (título traducido, máximo 14 palabras) y "study_summary_es" (qué investigaron, para jóvenes, máximo 40 palabras, solo con información de su resumen). Si no hay ninguno del reto elegido, deja los tres campos vacíos.`;
+
+const COACH_SYSTEM = `Eres IX, la IA entrenadora del Taller de Don Rover. Un astronauta junior (8 a 16 años) acaba de correr un simulador de su base en Marte y recibes sus decisiones y el resultado que calculó el motor de física.
+Escribe su retroalimentación personal en español de México, cálida y concreta:
+- "feedback": máximo 50 palabras, de tú y por su nombre. Di qué decisión suya explica el resultado (usa sus controles y las medidas recibidas) y la idea científica detrás. No inventes números: usa solo los que recibes. Si falló, anímalo sin regañar.
+- "next_step": máximo 20 palabras: qué probar en el siguiente intento (sin dar valores exactos).
+- "question": una pregunta para pensar que conecte con la vida real o con una misión de la NASA, máximo 22 palabras.`;
+
+const ASK_SYSTEM = `Eres Don Rover, el rover-mascota del Taller de Don Rover: un juego educativo donde niñas y niños dirigen una colonia en Marte. Hablas por las bocinas del salón, así que tu respuesta se va a escuchar en voz alta.
+Tu trabajo: responder la pregunta de un alumno (o del profe) y explicar conceptos de ciencia y del espacio para su edad (ageGroup), en español de México.
+Reglas:
+- "answer": máximo 70 palabras, frases cortas que se entiendan al oírlas (sin listas, sin emojis, sin símbolos ni fórmulas escritas; di los números con palabras sencillas). Usa una comparación con algo de la vida diaria.
+- Usa solo ciencia verdadera. Si "facts" trae datos de la NASA relacionados, apóyate en ellos. Si no estás seguro, dilo y sugiere cómo averiguarlo.
+- Si preguntan por la misión en curso ("context"), puedes dar pistas que hagan pensar, pero NUNCA digas cuál opción elegir ni la respuesta del reto de la tripulación.
+- Si la pregunta no es apropiada para un salón, pide datos personales o es ofensiva, contesta con amabilidad que eso no lo puedes responder y propone una pregunta sobre Marte. Nunca pidas ni repitas datos personales.
+- Si la pregunta no tiene que ver con ciencia o con el juego, contesta breve y amable, y conecta con algo de Marte o del espacio.
+- "face": la expresión de Don Rover al decirlo (happy, wow, think, sad, alert o neutral).
+- "follow_up": una pregunta corta (máximo 14 palabras) para que la clase siga pensando.
+- "on_topic": true si es sobre ciencia, el espacio o el juego.`;
+
 const SCHEMAS: Record<string, Record<string, unknown>> = {
+  ask: {
+    type: 'object',
+    properties: {
+      answer: { type: 'string' },
+      face: { type: 'string', enum: ['happy', 'wow', 'think', 'sad', 'alert', 'neutral'] },
+      follow_up: { type: 'string' },
+      on_topic: { type: 'boolean' },
+    },
+    required: ['answer', 'face', 'follow_up', 'on_topic'],
+    additionalProperties: false,
+  },
+  trainer: {
+    type: 'object',
+    properties: {
+      sim: { type: 'string', enum: TRAINER_SIMS },
+      title: { type: 'string' },
+      briefing: { type: 'string' },
+      why: { type: 'string' },
+      tip: { type: 'string' },
+      study_id: { type: 'string' },
+      study_title_es: { type: 'string' },
+      study_summary_es: { type: 'string' },
+    },
+    required: ['sim', 'title', 'briefing', 'why', 'tip', 'study_id', 'study_title_es', 'study_summary_es'],
+    additionalProperties: false,
+  },
+  coach: {
+    type: 'object',
+    properties: { feedback: { type: 'string' }, next_step: { type: 'string' }, question: { type: 'string' } },
+    required: ['feedback', 'next_step', 'question'],
+    additionalProperties: false,
+  },
   plan: {
     type: 'object',
     properties: {
@@ -198,6 +266,18 @@ Si el texto es ofensivo, inapropiado o contiene datos personales, marca appropri
         schema: SCHEMAS.logs,
       };
     }
+    case 'ask': {
+      const question = clean(input.question, 400);
+      if (!question) return 'Falta la pregunta.';
+      const payload = {
+        question,
+        ageGroup: clean(input.ageGroup, 40) || '8 a 14 años',
+        context: input.context && typeof input.context === 'object' ? input.context : null,
+        facts: Array.isArray(input.facts) ? input.facts.slice(0, 8) : [],
+        history: Array.isArray(input.history) ? input.history.slice(-4) : [],
+      };
+      return { system: ASK_SYSTEM, content: JSON.stringify(payload).slice(0, 8000), schema: SCHEMAS.ask };
+    }
     case 'debrief': {
       const age = clean(input.ageGroup, 40) || '8 a 14 años';
       return {
@@ -211,6 +291,17 @@ Español claro y cálido para niñas y niños de ${age}. Usa SOLO la informació
         schema: SCHEMAS.debrief,
       };
     }
+    case 'trainer': {
+      const options = Array.isArray(input.options) ? input.options.slice(0, 6) : [];
+      if (!options.length) return 'Faltan los retos a elegir.';
+      return {
+        system: TRAINER_SYSTEM,
+        content: JSON.stringify({ ...input, options, studies: Array.isArray(input.studies) ? input.studies.slice(0, 6) : [] }).slice(0, 20_000),
+        schema: SCHEMAS.trainer,
+      };
+    }
+    case 'coach':
+      return { system: COACH_SYSTEM, content: JSON.stringify(input).slice(0, 8_000), schema: SCHEMAS.coach };
     default:
       return 'Tarea desconocida.';
   }

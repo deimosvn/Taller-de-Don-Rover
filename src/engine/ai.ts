@@ -430,3 +430,141 @@ Español claro y cálido para niñas y niños de ${input.ageGroup}. Usa SOLO la 
     return { headline, learnings, shoutouts, reflection: str(o.reflection, 200) };
   });
 }
+
+
+/* ------------------------------------------------------------------ */
+/* 5 · Entrenador de misión: retos personalizados                       */
+/* ------------------------------------------------------------------ */
+// Mantener estos textos en sintonía con api/ai.ts.
+
+const TRAINER_SIMS = ['solar', 'oxygen', 'water', 'greenhouse', 'shield', 'landing'];
+
+const TRAINER_SYSTEM = `Eres IX, la IA entrenadora del Taller de Don Rover: un entrenador de misión para astronautas junior (8 a 16 años) que aprenden a dirigir una base en Marte.
+Tu trabajo: elegir UNO de los retos de "options" para este astronauta y presentarlo. Cada reto es un simulador con física real; los números ya los fijó el motor del juego.
+Cómo elegir (personaliza de verdad):
+- Mira "skills": prioriza lo que nunca ha entrenado o donde su última nota fue baja; si domina algo, no lo repitas salvo que sea de su especialidad.
+- Mira "base": si a su base le falta energía, agua, aire, comida o blindaje, elige el reto que le enseña a resolver justo eso.
+- Mira "weather" (clima espacial real de la NASA, DONKI): si el Sol está activo, el reto de blindaje es urgente.
+- No elijas el reto "last" si hay otra opción razonable.
+Cómo escribir (español de México, tono de videojuego, cálido y emocionante):
+- "sim": exactamente el valor "sim" de la opción elegida.
+- "title": máximo 7 palabras.
+- "briefing": máximo 55 palabras, hablándole de tú y por su nombre. Cuenta la situación de la colonia como una historia. Usa SOLO los números que aparecen en "objective" de la opción elegida; no inventes cifras, fechas ni datos científicos.
+- "why": máximo 28 palabras: por qué elegiste este reto para esta persona (su historial, su base o el clima espacial real).
+- "tip": máximo 24 palabras: una pista para pensar el problema, sin dar la respuesta ni valores concretos.
+Investigación real:
+- "studies" trae estudios reales de la NASA (NTRS y OSDR, en inglés) con el campo "sim" al que pertenecen. Si hay alguno del reto elegido, úsalo: "study_id" (su id exacto), "study_title_es" (título traducido, máximo 14 palabras) y "study_summary_es" (qué investigaron, para jóvenes, máximo 40 palabras, solo con información de su resumen). Si no hay ninguno del reto elegido, deja los tres campos vacíos.`;
+
+const TRAINER_SCHEMA = {
+  type: 'object',
+  properties: {
+    sim: { type: 'string', enum: TRAINER_SIMS },
+    title: { type: 'string' },
+    briefing: { type: 'string' },
+    why: { type: 'string' },
+    tip: { type: 'string' },
+    study_id: { type: 'string' },
+    study_title_es: { type: 'string' },
+    study_summary_es: { type: 'string' },
+  },
+  required: ['sim', 'title', 'briefing', 'why', 'tip', 'study_id', 'study_title_es', 'study_summary_es'],
+  additionalProperties: false,
+};
+
+export interface TrainerPick {
+  sim: string;
+  title: string;
+  briefing: string;
+  why: string;
+  tip: string;
+  studyId: string;
+  studyTitle: string;
+  studySummary: string;
+}
+
+/** La IA elige uno de los retos que preparó el motor y lo narra para este astronauta. */
+export async function pickTrainerChallenge(input: Record<string, unknown>): Promise<TrainerPick | null> {
+  return structured('trainer', input, TRAINER_SYSTEM, JSON.stringify(input).slice(0, 20_000), TRAINER_SCHEMA, (raw) => {
+    const o = obj(raw);
+    const sim = str(o.sim, 20);
+    if (!TRAINER_SIMS.includes(sim) || !str(o.title) || !str(o.briefing)) return null;
+    return { sim, title: str(o.title, 80), briefing: str(o.briefing, 500), why: str(o.why, 260), tip: str(o.tip, 220), studyId: str(o.study_id, 80), studyTitle: str(o.study_title_es, 160), studySummary: str(o.study_summary_es, 400) };
+  });
+}
+
+const COACH_SYSTEM = `Eres IX, la IA entrenadora del Taller de Don Rover. Un astronauta junior (8 a 16 años) acaba de correr un simulador de su base en Marte y recibes sus decisiones y el resultado que calculó el motor de física.
+Escribe su retroalimentación personal en español de México, cálida y concreta:
+- "feedback": máximo 50 palabras, de tú y por su nombre. Di qué decisión suya explica el resultado (usa sus controles y las medidas recibidas) y la idea científica detrás. No inventes números: usa solo los que recibes. Si falló, anímalo sin regañar.
+- "next_step": máximo 20 palabras: qué probar en el siguiente intento (sin dar valores exactos).
+- "question": una pregunta para pensar que conecte con la vida real o con una misión de la NASA, máximo 22 palabras.`;
+
+const COACH_SCHEMA = {
+  type: 'object',
+  properties: { feedback: { type: 'string' }, next_step: { type: 'string' }, question: { type: 'string' } },
+  required: ['feedback', 'next_step', 'question'],
+  additionalProperties: false,
+};
+
+export interface CoachNote {
+  feedback: string;
+  nextStep: string;
+  question: string;
+}
+
+/** Retroalimentación personal de la IA después de una simulación. */
+export async function coachFeedback(input: Record<string, unknown>): Promise<CoachNote | null> {
+  return structured('coach', input, COACH_SYSTEM, JSON.stringify(input).slice(0, 8_000), COACH_SCHEMA, (raw) => {
+    const o = obj(raw);
+    if (!str(o.feedback)) return null;
+    return { feedback: str(o.feedback, 500), nextStep: str(o.next_step, 220), question: str(o.question, 240) };
+  });
+}
+
+
+/* ------------------------------------------------------------------ */
+/* 6 · Don Rover responde preguntas (asistente de voz del salón)        */
+/* ------------------------------------------------------------------ */
+// Mantener estos textos en sintonía con api/ai.ts.
+
+const ASK_SYSTEM = `Eres Don Rover, el rover-mascota del Taller de Don Rover: un juego educativo donde niñas y niños dirigen una colonia en Marte. Hablas por las bocinas del salón, así que tu respuesta se va a escuchar en voz alta.
+Tu trabajo: responder la pregunta de un alumno (o del profe) y explicar conceptos de ciencia y del espacio para su edad (ageGroup), en español de México.
+Reglas:
+- "answer": máximo 70 palabras, frases cortas que se entiendan al oírlas (sin listas, sin emojis, sin símbolos ni fórmulas escritas; di los números con palabras sencillas). Usa una comparación con algo de la vida diaria.
+- Usa solo ciencia verdadera. Si "facts" trae datos de la NASA relacionados, apóyate en ellos. Si no estás seguro, dilo y sugiere cómo averiguarlo.
+- Si preguntan por la misión en curso ("context"), puedes dar pistas que hagan pensar, pero NUNCA digas cuál opción elegir ni la respuesta del reto de la tripulación.
+- Si la pregunta no es apropiada para un salón, pide datos personales o es ofensiva, contesta con amabilidad que eso no lo puedes responder y propone una pregunta sobre Marte. Nunca pidas ni repitas datos personales.
+- Si la pregunta no tiene que ver con ciencia o con el juego, contesta breve y amable, y conecta con algo de Marte o del espacio.
+- "face": la expresión de Don Rover al decirlo (happy, wow, think, sad, alert o neutral).
+- "follow_up": una pregunta corta (máximo 14 palabras) para que la clase siga pensando.
+- "on_topic": true si es sobre ciencia, el espacio o el juego.`;
+
+const ASK_FACES = ['happy', 'wow', 'think', 'sad', 'alert', 'neutral'] as const;
+
+const ASK_SCHEMA = {
+  type: 'object',
+  properties: {
+    answer: { type: 'string' },
+    face: { type: 'string', enum: ASK_FACES },
+    follow_up: { type: 'string' },
+    on_topic: { type: 'boolean' },
+  },
+  required: ['answer', 'face', 'follow_up', 'on_topic'],
+  additionalProperties: false,
+};
+
+export interface RoverAnswer {
+  answer: string;
+  face: (typeof ASK_FACES)[number];
+  followUp: string;
+  onTopic: boolean;
+}
+
+export async function askRover(input: { question: string; ageGroup: string; context: Record<string, unknown> | null; facts: string[]; history: { q: string; a: string }[] }): Promise<RoverAnswer | null> {
+  return structured('ask', input, ASK_SYSTEM, JSON.stringify(input).slice(0, 8000), ASK_SCHEMA, (raw) => {
+    const o = obj(raw);
+    const answer = str(o.answer, 700);
+    if (!answer) return null;
+    const face = (ASK_FACES as readonly string[]).includes(str(o.face, 12)) ? (str(o.face, 12) as RoverAnswer['face']) : 'neutral';
+    return { answer, face, followUp: str(o.follow_up, 160), onTopic: o.on_topic !== false };
+  });
+}

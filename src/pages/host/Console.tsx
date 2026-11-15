@@ -12,6 +12,8 @@ import type { NetStatus } from '../../net/hostNet';
 import { Report } from './Report';
 import { Scanner } from './Scanner';
 import { SettingsModal } from './SettingsModal';
+import { useRoverNarrator } from '../../rover/narrator';
+import { RoverCaptions, RoverPanel } from '../../rover/RoverPanel';
 
 /** La colonia en 3D en el proyector (three.js se descarga solo al abrirla). */
 const HostWorld = lazy(() => import('./HostWorld'));
@@ -172,6 +174,8 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useWakeLock(true);
   usePhaseSounds(view);
+  // Don Rover: narra la misión, responde preguntas y mueve la cara de la placa.
+  useRoverNarrator(view);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -293,12 +297,14 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
           {stage}
         </section>
         <aside className="rail">
+          <RoverPanel />
           <StatusPanel view={view} />
           {view.crews.length > 0 && view.phase !== 'lobby' && <CrewStrip view={view} />}
           <IxFeed view={view} />
         </aside>
       </main>
 
+      <RoverCaptions />
       <footer className="dock">
         <div className="dock-left">
           {view.phase === 'lobby' && (

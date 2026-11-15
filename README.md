@@ -26,6 +26,7 @@ Es una **PWA que corre en el navegador**. El navegador del profesor (la pantalla
 11. [Base de datos (Supabase)](#base-de-datos-supabase)
 12. [Mundo 3D (Three.js)](#mundo-3d-threejs)
 13. [Modo libre](#modo-libre)
+    · [Don Rover: asistente de voz y placa con pantalla](#don-rover-asistente-de-voz-y-placa-con-pantalla)
 14. [Minijuegos](#minijuegos)
 15. [PWA y modo sin conexión](#pwa-y-modo-sin-conexión)
 16. [Almacenamiento local](#almacenamiento-local)
@@ -49,6 +50,8 @@ Es una **PWA que corre en el navegador**. El navegador del profesor (la pantalla
 | Modo libre | `#/libre` | Sin código de clase: explorar Marte, recolectar recursos y construir módulos de la colonia, solo o con amigos por enlace o QR. |
 | Explorador del mundo | `#/mundo` | El planeta 3D por sí solo, para recorrerlo libremente. |
 | Laboratorio de minijuegos | `#/minijuegos` | Todos los minijuegos para probarlos sin una partida. |
+| Entrenador de misión | `#/entrenador` | Retos personalizados con IA y física real de Marte: energía, oxígeno, agua, invernadero, blindaje y aterrizaje. |
+| Don Rover físico | `#/donrover` | Asistente de voz con una placa de pantalla redonda (BIGTREETECH KNOMI): instalar el firmware, conectarla y probarla. |
 
 **Seis misiones:** M-01 *Greenhouse Rescue*, M-02 *The Water Crisis*, M-03 *Darkness Protocol*, M-04 *The Unknown Signal*, M-05 *Habitat Zero* y M-06 *The Final Colony*.
 
@@ -158,6 +161,8 @@ El enrutador usa el hash de la URL (`src/lib/route.ts`), así que funciona en cu
 | `#/libre` | `pages/free/FreePlay.tsx` | `sala` = código de sala (5 caracteres) · `modo` |
 | `#/mundo` | `world/react/WorldExplorer.tsx` | — |
 | `#/minijuegos` | `pages/play/MinigameLab.tsx` | — |
+| `#/entrenador` | `pages/trainer/Trainer.tsx` | — |
+| `#/donrover` | `pages/rover/RoverSetup.tsx` | — |
 
 ---
 
@@ -272,6 +277,9 @@ Tareas (todas con `output_config.format = json_schema` y `effort: 'low'` para re
 | `narrative` | Misión, tripulación y hasta 4 estudios NTRS/OSDR | `briefing`, `crew_lines`, 3 `twists` y `science` (estudio elegido, resumido para niñas y niños) |
 | `logs` | Hasta 40 bitácoras | `stars` (1 a 3), `comment` y `appropriate` por tripulación |
 | `debrief` | Resultados y objetivos de aprendizaje | `headline`, 3 `learnings`, `shoutouts` y `reflection` |
+| `trainer` | Historial del astronauta, base, clima espacial y retos candidatos del motor | Reto elegido, título, briefing, por qué y pista (los números los pone la física) |
+| `coach` | Decisiones del alumno y resultado del simulador | Retroalimentación, siguiente paso y una pregunta |
+| `ask` | Pregunta a Don Rover, edad del grupo, misión en curso y datos de la NASA | `answer` (para decirse en voz alta), `face`, `follow_up`, `on_topic` |
 
 En el servidor se usa la beta **`server-side-fallback-2026-07-01`** con `fallbacks: 'default'`: si un filtro de seguridad rechaza la petición, la API la reintenta con otro modelo. Si la API no acepta esa beta, la función la desactiva y sigue sin ella. Las respuestas con `stop_reason` `refusal` o `max_tokens` se descartan y el motor usa su plantilla.
 
@@ -303,7 +311,7 @@ Son funciones serverless de Vercel (Node, ESM). A propósito no importan nada de
 ```http
 GET  /api/ai                          → { ok, enabled, model }
 POST /api/ai { task, input }          → { ok, data, model } | { ok:false, error }
-     task ∈ plan | narrative | logs | debrief
+     task ∈ plan | narrative | logs | debrief | trainer | coach | ask
 ```
 
 Códigos de error: `400` datos inválidos · `403` origen no permitido · `405` método no permitido · `429` límite de uso · `502` clave inválida o error de la API · `503` falta `ANTHROPIC_API_KEY`. Tiempo máximo: 60 s.
@@ -394,6 +402,31 @@ Para conectarla: en Vercel, **Storage → Supabase → Connect Project**, y lueg
 **Controles del astronauta:** `WASD`/flechas para caminar · `Mayús` para correr · `Espacio` para saltar · `V` para cambiar entre 1.ª y 3.ª persona · `E` para interactuar · `1`–`4` para los gestos · arrastrar para mirar · rueda para el zoom. En el celular hay joystick y botones en pantalla.
 
 ---
+
+## Don Rover: asistente de voz y placa con pantalla
+
+Don Rover es el asistente del salón. **Habla por las bocinas** de la computadora del profe, **escucha con su micrófono** y, si hay una placa **BIGTREETECH KNOMI v1** (ESP32 con pantalla redonda) conectada, su cara aparece en ella y **mueve la boca** mientras habla. Sin placa, la misma cara se ve en el panel de la consola.
+
+| Qué hace | Cómo |
+| --- | --- |
+| Narra la misión | Cada fase, el briefing de IX, la pregunta del reto, las emergencias, los resultados y el debrief (se puede apagar). |
+| Da las pistas de IX | Cada pista nueva de la bitácora se dice en voz alta con cara de "pensando". |
+| Responde preguntas | Botón 🎙️ (o el botón de la placa sostenido): reconoce la voz en español (Chrome/Edge), Claude contesta para la edad del grupo con la misión como contexto y datos de la NASA, sin revelar la respuesta del reto. Sin IA, contesta con su base de conocimiento. También se puede escribir (⌨️). |
+| Accesibilidad | Subtítulos grandes de todo lo que dice, voz más lenta o más rápida, volumen, elegir la voz, botón físico para que repita (toque corto) y respeta `prefers-reduced-motion`. |
+| Placa | Expresiones según la misión, el código de la sala mientras abordan, el tiempo que queda como anillo (verde → ámbar → rojo) y saludo a cada alumno que entra. |
+
+**Conexión con la placa** (`src/rover/link.ts`): USB con Web Serial (lo más confiable), Wi-Fi en la misma red (WebSocket `ws://<ip>:81` o `POST /cmd`) o el canal en la nube de Supabase `donrover-bot-<ID>` (cuando la plataforma está en HTTPS y el navegador no deja hablar con la red local). La consola se reconecta sola al último camino que funcionó.
+
+**Firmware** (`firmware/donrover-knomi/`, PlatformIO + Arduino): se instala desde el navegador en `#/donrover` (esptool-js, imagen en `public/firmware/`) o con `pio run -t upload`. Detalles, pines y protocolo en [`firmware/donrover-knomi/README.md`](firmware/donrover-knomi/README.md).
+
+| Archivo | Para qué |
+| --- | --- |
+| `src/rover/link.ts` | Enlace con la placa (USB, Wi-Fi, nube), latido y reconexión |
+| `src/rover/voice.ts` | Voz (síntesis), micrófono (reconocimiento), subtítulos y boca |
+| `src/rover/assistant.ts` | Preguntas con IA (tarea `ask`) y base de conocimiento sin IA |
+| `src/rover/narrator.ts` | Narración de la consola, cara y anillo de tiempo en la placa |
+| `src/rover/flasher.ts` | Instalador del firmware desde el navegador |
+| `src/rover/RoverFace.tsx`, `RoverPanel.tsx` | Cara en SVG (igual a la de la placa), panel, subtítulos y ajustes |
 
 ## Modo libre
 
@@ -505,7 +538,7 @@ Ver [`.env.example`](.env.example). Todas son opcionales.
 
 ```
 api/                 Funciones serverless de Vercel
-  ai.ts              Claude Opus 5.5 (plan, narrativa, bitácoras, debrief)
+  ai.ts              Claude Opus 5.5 (plan, narrativa, bitácoras, debrief, entrenador, preguntas a Don Rover)
   nasa.ts            NTRS + OSDR + DONKI con caché
   colonies.ts        Colonias e historial en Supabase Postgres
   realtime.ts        Configuración pública del canal de respaldo
@@ -521,11 +554,15 @@ src/
     host/            Consola del profesor (Setup, Console, etapas, mundo, reporte, ajustes)
     play/            App del alumno (avatar, tareas, problemas, minijuegos, mundo)
     free/            Modo libre
+    trainer/         Entrenador de misión (simuladores con física real)
+    rover/           Don Rover físico (instalar firmware, conectar y probar)
+  rover/             Asistente de voz Don Rover y enlace con la placa
   world/             Motor 3D (planeta, cámara, jugador, modelos, colonia, FX, estudio)
   styles/            CSS por área
 supabase/schema.sql  Esquema de las tablas
 pwa/sw.js            Plantilla del service worker
-public/              Manifiesto e íconos de la PWA
+public/              Manifiesto, íconos de la PWA y firmware de Don Rover (public/firmware/)
+firmware/            Firmware de la placa Don Rover (BIGTREETECH KNOMI v1, PlatformIO)
 scripts/             Generador de íconos
 vite.config.ts       Plugins: React, service worker y API en desarrollo
 vercel.json          Duración de funciones y cabeceras

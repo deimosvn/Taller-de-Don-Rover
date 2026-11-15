@@ -26,8 +26,9 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Funciones del servidor (base de datos e IA): siempre a la red, nunca a la caché.
-  if (url.origin === self.location.origin && url.pathname.includes('/api/')) return;
+  // Funciones del servidor (base de datos e IA) y firmware de Don Rover: siempre a la red,
+  // nunca a la caché (el firmware cambia sin cambiar de nombre).
+  if (url.origin === self.location.origin && (url.pathname.includes('/api/') || url.pathname.includes('/firmware/'))) return;
 
   // Navegación: red primero (para recibir actualizaciones) y, sin conexión, la app guardada.
   if (req.mode === 'navigate') {
