@@ -1,102 +1,242 @@
-// Problemas de la emergencia global y los minijuegos para repararlos.
+// Minijuegos de la emergencia global: cada especialidad hace una tarea realista de su
+// sistema (limpiar paneles, regular la presión, sellar fugas, orientar la antena…) en vez de
+// tocar un botón muchas veces. Lo bien que la haga se convierte en "acciones" para el motor,
+// así que las reglas, la meta y el balance del juego no cambian.
 //
-// Durante la emergencia aparecen problemas por toda la colonia 3D (paneles con polvo, fugas,
-// grietas, cultivos marchitos…). Cada uno lo repara una especialidad: el alumno camina hasta
-// él con su astronauta, lo revisa y juega un minijuego. Lo bien que lo juegue se convierte en
-// "acciones" para el motor, así que las reglas, la meta y el balance del juego no cambian.
-//
-//   sweep ..... manejar a Don Rover sobre los paneles para barrer el polvo
-//   pipes ..... girar piezas de tubería (o de cable) hasta que el flujo llegue al otro lado
-//   garden .... darle a cada planta lo que pide (agua, luz o un domo contra el polvo)
-//   weld ...... recorrer una grieta con el dedo para soldarla
-//   balance ... repartir la energía para que cada sistema quede en su zona verde
-//   catch ..... atrapar lo bueno (hielo, datos) y esquivar lo malo (sales, ruido)
-//   sort ...... mandar cada muestra a su lado (agua limpia o contaminada, señal o ruido)
-//   rhythm .... tocar al ritmo de una máquina (generador de oxígeno, radiador, bomba)
-//   stack ..... apilar capas bien alineadas (muro aislante, impresora 3D, escudo)
-//   tune ...... igualar tu onda con la señal (orientar el plato de la antena)
-//
-// Los datos científicos están aquí, en un solo lugar.
+// Los datos científicos de cada tarea están aquí, en un solo lugar, para reemplazarlos o
+// enriquecerlos con la base de datos de la NASA cuando esté conectada (ver `science`).
 
-import type { IncidentKind, MissionId, RoleId } from './types';
+import type { MissionId, RoleId } from './types';
 
-export type MinigameKind = 'sweep' | 'pipes' | 'garden' | 'weld' | 'balance' | 'catch' | 'sort' | 'rhythm' | 'stack' | 'tune';
+export type MinigameKind = 'scrub' | 'gauge' | 'targets' | 'aim' | 'dose' | 'wires' | 'pattern';
+
+/** Indicador con zona segura, en unidades reales. Mantener presionado lo mueve hacia `push`. */
+export interface GaugeSpec {
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  /** Zona segura (verde). */
+  low: number;
+  high: number;
+  start: number;
+  /** Hacia dónde mueve la aguja el botón. */
+  push: 'up' | 'down';
+  /** Rapidez del botón y de la deriva natural (unidades por segundo). */
+  rate: number;
+  drift: number;
+  /** Texto del botón. */
+  button: string;
+  decimals?: number;
+}
+
+export type TargetTheme = 'leak' | 'sprout' | 'heat' | 'pot' | 'crack' | 'hatch';
+export type AimTheme = 'sun' | 'earth';
+export type DoseTheme = 'drip' | 'led';
+export type WiresTheme = 'power' | 'assembly' | 'grid';
+export type PatternTheme = 'signal' | 'pumps';
 
 export interface MinigameSpec {
   kind: MinigameKind;
-  /** Variante visual y de textos dentro del tipo de juego. */
-  theme: string;
-  /** El problema que se ve en el mundo 3D. */
-  incident: IncidentKind;
-  /** Nombre corto del problema ("Paneles cubiertos de polvo"). */
-  problem: string;
   /** Instrucción corta y concreta (qué hacer con el dedo). */
   how: string;
-  /** Dato real relacionado. */
+  /** Dato real relacionado (se mostrará el de la base de datos de la NASA cuando exista). */
   science: string;
   /** De dónde viene el dato. */
   source: string;
+  gauge?: GaugeSpec;
+  targets?: TargetTheme;
+  aim?: AimTheme;
+  dose?: DoseTheme;
+  wires?: WiresTheme;
+  pattern?: PatternTheme;
 }
 
-const spec = (kind: MinigameKind, theme: string, incident: IncidentKind, problem: string, how: string, science: string, source: string): MinigameSpec => ({
-  kind,
-  theme,
-  incident,
-  problem,
-  how,
-  science,
-  source,
-});
-
-const DUST = 'Las tormentas de polvo de Marte pueden cubrir todo el planeta durante semanas y tapar la luz del Sol.';
-const ROVERS = 'Los rovers Spirit y Opportunity perdían energía por el polvo en sus paneles; a veces el viento marciano los limpiaba solo.';
-const WATER = 'En la Estación Espacial Internacional se recupera cerca del 98 % del agua: cada gota se vuelve a usar.';
-const LEAK = 'En 2020, los astronautas de la Estación Espacial encontraron una fuga de aire viendo hacia dónde flotaban unas hojitas de té.';
-const VEGGIE = 'Las plantas en el espacio crecen con luces LED rojas y azules: son los colores que más usan para la fotosíntesis.';
-const POWER = 'La Estación Espacial reparte la energía de sus paneles solares entre todos sus módulos con una red de cables y baterías.';
+const SCRUB_PANELS: MinigameSpec = {
+  kind: 'scrub',
+  how: 'Frota la pantalla para quitar el polvo de cada panel solar.',
+  science: 'Los rovers Spirit y Opportunity perdían energía por el polvo en sus paneles; a veces el viento marciano los limpiaba solo.',
+  source: 'NASA · Mars Exploration Rovers',
+};
 
 export const MINIGAMES: Record<MissionId, Record<RoleId, MinigameSpec>> = {
   greenhouse: {
-    power: spec('sweep', 'panels', 'dust', 'Paneles cubiertos de polvo', 'Arrastra a Don Rover sobre los paneles para barrer el polvo antes de que vuelva el viento.', ROVERS, 'NASA · Mars Exploration Rovers'),
-    life: spec('pipes', 'water', 'leak', 'Riego sin agua', 'Toca las piezas para girarlas hasta que el agua llegue del tanque a los cultivos.', WATER, 'NASA · Soporte vital de la EEI'),
-    bio: spec('garden', 'storm', 'wilt', 'Brotes en peligro', 'Elige la herramienta que pide cada brote (agua, luz o domo) y tócalo.', DUST, 'NASA · Tormentas de polvo en Marte'),
-    habitat: spec('weld', 'hatch', 'crack', 'Compuerta con fuga', 'Recorre la grieta con el dedo, de punta a punta, para soldarla.', 'Los hábitats espaciales mantienen dentro una presión de aire parecida a la del nivel del mar en la Tierra.', 'NASA · Estación Espacial Internacional'),
+    power: SCRUB_PANELS,
+    life: {
+      kind: 'gauge',
+      how: 'Mantén presionado para bombear y deja el flujo dentro de la zona verde.',
+      science: 'En la Estación Espacial Internacional se recupera cerca del 98 % del agua: cada gota se vuelve a usar.',
+      source: 'NASA · Sistema de soporte vital de la EEI',
+      gauge: { label: 'Flujo de riego', unit: 'L/min', min: 0, max: 10, low: 4, high: 6, start: 2.5, push: 'up', rate: 3.2, drift: 1.6, button: 'Bombear', decimals: 1 },
+    },
+    bio: {
+      kind: 'targets',
+      targets: 'sprout',
+      how: 'Toca cada brote antes de que lo alcance la nube de polvo para cubrirlo.',
+      science: 'Las tormentas de polvo de Marte pueden cubrir todo el planeta durante semanas y tapar la luz del Sol.',
+      source: 'NASA · Tormentas de polvo en Marte',
+    },
+    habitat: {
+      kind: 'targets',
+      targets: 'hatch',
+      how: 'Toca las compuertas que silban para sellarlas antes de que se escape el aire.',
+      science: 'Los hábitats espaciales mantienen dentro una presión de aire parecida a la del nivel del mar en la Tierra.',
+      source: 'NASA · Estación Espacial Internacional',
+    },
   },
   water: {
-    power: spec('balance', 'pumps', 'overload', 'Bombas sin energía', 'Sube o baja cada barra para que las tres bombas queden en su zona verde aunque la demanda cambie.', 'Derretir hielo y bombear agua necesita energía: en una base espacial el agua y la energía están conectadas.', 'NASA · Recursos en Marte'),
-    life: spec('catch', 'ice', 'leak', 'Reserva de agua vacía', 'Mueve el tanque para atrapar bloques de hielo y esquivar las rocas con sales.', 'En Marte hay hielo en los polos y enterrado bajo el suelo; la sonda Phoenix lo encontró a pocos centímetros en 2008.', 'NASA · Phoenix Mars Lander'),
-    bio: spec('sort', 'water', 'wilt', 'Agua con percloratos', 'Desliza cada gota hacia el lado correcto: limpia al tanque, con sales al filtro.', 'La sonda Phoenix encontró percloratos en el suelo marciano: hay que quitarlos antes de beber o regar.', 'NASA · Phoenix Mars Lander'),
-    habitat: spec('pipes', 'patch', 'crack', 'Tubería rota', 'Gira las piezas de tubería hasta cerrar el circuito y que el agua deje de escaparse.', WATER, 'NASA · Soporte vital de la EEI'),
+    power: {
+      kind: 'pattern',
+      pattern: 'pumps',
+      how: 'Mira el orden en que se encienden las bombas y repítelo.',
+      science: 'Las máquinas de la colonia se encienden en un orden fijo para no sobrecargar la red eléctrica, igual que en las naves reales.',
+      source: 'NASA · Procedimientos de la EEI',
+    },
+    life: {
+      kind: 'gauge',
+      how: 'Mantén presionado para cerrar las válvulas y sube la presión hasta la zona verde.',
+      science: 'En la Estación Espacial Internacional se recupera cerca del 98 % del agua: cada gota se vuelve a usar.',
+      source: 'NASA · Sistema de soporte vital de la EEI',
+      gauge: { label: 'Presión de la red de agua', unit: 'kPa', min: 0, max: 400, low: 200, high: 260, start: 90, push: 'up', rate: 110, drift: 55, button: 'Cerrar válvulas' },
+    },
+    bio: {
+      kind: 'dose',
+      dose: 'drip',
+      how: 'Mantén presionado para regar cada planta y suelta dentro de la franja verde.',
+      science: 'En la Estación Espacial, el experimento Veggie cultiva lechugas en "almohadas" que reciben solo el agua necesaria.',
+      source: 'NASA · Experimento Veggie',
+    },
+    habitat: {
+      kind: 'targets',
+      targets: 'leak',
+      how: 'Toca cada grieta de la tubería para ponerle un parche.',
+      science: 'En 2020, los astronautas de la Estación Espacial encontraron una fuga de aire viendo hacia dónde flotaban unas hojitas de té.',
+      source: 'NASA · Estación Espacial Internacional',
+    },
   },
   darkness: {
-    power: spec('balance', 'priorities', 'overload', 'Red eléctrica sobrecargada', 'Reparte la poca energía: cada sistema debe quedar en su zona verde. El soporte vital nunca se apaga.', 'Marte recibe menos de la mitad de la luz solar que la Tierra, por eso cada rayo cuenta.', 'NASA · Datos de Marte'),
-    life: spec('rhythm', 'scrubber', 'overload', 'Aire con mucho CO₂', 'Toca justo cuando el anillo llegue al círculo para que el generador limpie el aire.', 'En la Estación Espacial, una máquina retira el dióxido de carbono que exhalan los astronautas para que el aire sea seguro.', 'NASA · Soporte vital de la EEI'),
-    bio: spec('garden', 'led', 'wilt', 'Cultivos a oscuras', 'Elige la herramienta que pide cada bandeja (agua, luz LED o abono) y tócala.', VEGGIE, 'NASA · Experimento Veggie'),
-    habitat: spec('stack', 'insulation', 'cold', 'Muros perdiendo calor', 'Toca para soltar cada bloque aislante justo encima del anterior.', 'La temperatura promedio en Marte es de unos −60 °C: un hábitat sin aislamiento perdería su calor muy rápido.', 'NASA · Datos de Marte'),
+    power: {
+      kind: 'aim',
+      aim: 'sun',
+      how: 'Desliza para girar los paneles y seguir al Sol entre el polvo.',
+      science: 'Marte recibe menos de la mitad de la luz solar que la Tierra, por eso cada rayo cuenta.',
+      source: 'NASA · Datos de Marte',
+    },
+    life: {
+      kind: 'gauge',
+      how: 'Mantén presionado para limpiar el aire y baja el CO₂ hasta la zona verde.',
+      science: 'En la Estación Espacial, una máquina retira el dióxido de carbono que exhalan los astronautas para que el aire sea seguro.',
+      source: 'NASA · Soporte vital de la EEI',
+      gauge: { label: 'CO₂ en el aire', unit: '%', min: 0, max: 1.2, low: 0.1, high: 0.4, start: 0.85, push: 'down', rate: 0.36, drift: 0.16, button: 'Limpiar aire', decimals: 2 },
+    },
+    bio: {
+      kind: 'dose',
+      dose: 'led',
+      how: 'Mantén presionado para encender las luces de cada bandeja y suelta en la franja verde.',
+      science: 'Las plantas en el espacio crecen con luces LED rojas y azules: son los colores que más usan para la fotosíntesis.',
+      source: 'NASA · Experimento Veggie',
+    },
+    habitat: {
+      kind: 'targets',
+      targets: 'heat',
+      how: 'La cámara térmica muestra por dónde se escapa el calor: toca cada mancha roja para aislarla.',
+      science: 'La temperatura promedio en Marte es de unos −60 °C: un hábitat sin aislamiento perdería su calor muy rápido.',
+      source: 'NASA · Datos de Marte',
+    },
   },
   signal: {
-    power: spec('catch', 'data', 'static', 'Datos perdidos', 'Mueve la antena para atrapar los paquetes de datos y esquivar el ruido.', 'Las naves en Marte se comunican con la Tierra mediante la Red del Espacio Profundo de la NASA.', 'NASA · Deep Space Network'),
-    life: spec('rhythm', 'radiator', 'overload', 'Transmisor sobrecalentado', 'Toca justo cuando el anillo llegue al círculo para soltar el calor por el radiador.', 'Las naves usan radiadores para soltar al espacio el calor que les sobra.', 'NASA · Control térmico de la EEI'),
-    bio: spec('sort', 'signal', 'static', 'Señal con ruido', 'Desliza cada pulso: los que siguen el patrón a la señal, los demás al ruido.', 'Un mensaje de radio tarda entre 3 y 22 minutos en viajar entre la Tierra y Marte.', 'NASA · Comunicaciones con Marte'),
-    habitat: spec('tune', 'dish', 'static', 'Antena desorientada', 'Arrastra para cambiar tu onda (frecuencia y altura) hasta que coincida con la señal.', 'La Red del Espacio Profundo de la NASA usa antenas de hasta 70 metros para escuchar a las naves que están en Marte.', 'NASA · Deep Space Network'),
+    power: {
+      kind: 'gauge',
+      how: 'Mantén presionado para cargar la antena sin pasarte de la zona verde.',
+      science: 'Las naves en Marte se comunican con la Tierra mediante la Red del Espacio Profundo de la NASA.',
+      source: 'NASA · Deep Space Network',
+      gauge: { label: 'Corriente de carga', unit: 'A', min: 0, max: 20, low: 9, high: 12, start: 3, push: 'up', rate: 6.5, drift: 3, button: 'Cargar', decimals: 1 },
+    },
+    life: {
+      kind: 'gauge',
+      how: 'Mantén presionado para enfriar el transmisor y mantenlo en la zona verde.',
+      science: 'Las naves usan radiadores para soltar al espacio el calor que les sobra.',
+      source: 'NASA · Control térmico de la EEI',
+      gauge: { label: 'Temperatura del transmisor', unit: '°C', min: 0, max: 100, low: 20, high: 35, start: 78, push: 'down', rate: 32, drift: 15, button: 'Enfriar' },
+    },
+    bio: {
+      kind: 'pattern',
+      pattern: 'signal',
+      how: 'Escucha y mira el patrón de pulsos de la señal y repítelo para descifrarla.',
+      science: 'Un mensaje de radio tarda entre 3 y 22 minutos en viajar entre la Tierra y Marte.',
+      source: 'NASA · Comunicaciones con Marte',
+    },
+    habitat: {
+      kind: 'aim',
+      aim: 'earth',
+      how: 'Desliza para apuntar el plato de la antena hacia la Tierra.',
+      science: 'La Red del Espacio Profundo de la NASA usa antenas de hasta 70 metros para escuchar a las naves que están en Marte.',
+      source: 'NASA · Deep Space Network',
+    },
   },
   habitat: {
-    power: spec('pipes', 'cables', 'overload', 'Módulo sin corriente', 'Gira las piezas de cable hasta que la energía llegue de la batería al módulo.', POWER, 'NASA · Sistema eléctrico de la EEI'),
-    life: spec('rhythm', 'pressure', 'leak', 'Módulo sin presión', 'Toca justo cuando el anillo llegue al círculo para bombear aire al módulo.', 'La Estación Espacial mantiene su aire a unos 101 kPa, casi la misma presión que al nivel del mar en la Tierra.', 'NASA · Estación Espacial Internacional'),
-    bio: spec('garden', 'move', 'wilt', 'Cultivos por mudar', 'Elige la herramienta que pide cada maceta antes de mudarla y tócala.', 'En la Estación Espacial ya se han cultivado lechugas, flores de zinnia y chiles.', 'NASA · Experimento Veggie'),
-    habitat: spec('stack', 'printer', 'crack', 'Módulo sin terminar', 'Toca para que la impresora suelte cada capa de regolito justo encima de la anterior.', 'La NASA ha probado hábitats impresos en 3D, como Mars Dune Alpha en Houston.', 'NASA · CHAPEA / Mars Dune Alpha'),
+    power: {
+      kind: 'wires',
+      wires: 'power',
+      how: 'Toca un conector y luego su pareja del mismo color para llevar energía al módulo.',
+      science: 'La Estación Espacial guarda la energía de sus paneles solares en baterías de iones de litio.',
+      source: 'NASA · Sistema eléctrico de la EEI',
+    },
+    life: {
+      kind: 'gauge',
+      how: 'Mantén presionado para presurizar el módulo hasta la zona verde sin pasarte.',
+      science: 'La Estación Espacial mantiene su aire a unos 101 kPa, casi la misma presión que al nivel del mar en la Tierra.',
+      source: 'NASA · Estación Espacial Internacional',
+      gauge: { label: 'Presión del módulo', unit: 'kPa', min: 0, max: 120, low: 96, high: 106, start: 40, push: 'up', rate: 26, drift: 9, button: 'Presurizar' },
+    },
+    bio: {
+      kind: 'targets',
+      targets: 'pot',
+      how: 'Toca cada maceta para llevarla al módulo nuevo antes de que se maltrate.',
+      science: 'En la Estación Espacial ya se han cultivado lechugas, flores de zinnia y chiles.',
+      source: 'NASA · Experimento Veggie',
+    },
+    habitat: {
+      kind: 'wires',
+      wires: 'assembly',
+      how: 'Toca una pieza y luego la que encaja con ella para ensamblar el módulo.',
+      science: 'La NASA ha probado hábitats impresos en 3D, como Mars Dune Alpha en Houston.',
+      source: 'NASA · CHAPEA / Mars Dune Alpha',
+    },
   },
   final: {
-    power: spec('balance', 'grid', 'overload', 'Red de la colonia inestable', 'Reparte la energía: cada sector debe quedar en su zona verde aunque la demanda cambie.', POWER, 'NASA · Sistema eléctrico de la EEI'),
-    life: spec('weld', 'airleak', 'leak', 'Fuga de aire', 'Recorre la grieta con el dedo para sellarla antes de que baje la presión.', LEAK, 'NASA · Estación Espacial Internacional'),
-    bio: spec('garden', 'storm', 'wilt', 'Cultivos en peligro', 'Elige la herramienta que pide cada cultivo (agua, luz o domo) y tócalo.', DUST, 'NASA · Tormentas de polvo en Marte'),
-    habitat: spec('stack', 'shield', 'crack', 'Escudo agrietado', 'Toca para soltar cada bloque de regolito justo encima del anterior.', 'Una capa de regolito (suelo marciano) sobre los refugios ayuda a proteger a los astronautas de la radiación.', 'NASA · Hábitats en Marte'),
+    power: {
+      kind: 'wires',
+      wires: 'grid',
+      how: 'Conecta cada fuente de energía con el sector que la necesita.',
+      science: 'La Estación Espacial reparte la energía de sus paneles solares entre todos sus módulos con una red de cables y baterías.',
+      source: 'NASA · Sistema eléctrico de la EEI',
+    },
+    life: {
+      kind: 'targets',
+      targets: 'leak',
+      how: 'Toca cada fuga de aire para sellarla antes de que la presión baje.',
+      science: 'En 2020, los astronautas de la Estación Espacial encontraron una fuga de aire viendo hacia dónde flotaban unas hojitas de té.',
+      source: 'NASA · Estación Espacial Internacional',
+    },
+    bio: {
+      kind: 'targets',
+      targets: 'sprout',
+      how: 'Toca cada cultivo en peligro para cubrirlo con su domo.',
+      science: 'Las tormentas de polvo de Marte pueden cubrir todo el planeta durante semanas y tapar la luz del Sol.',
+      source: 'NASA · Tormentas de polvo en Marte',
+    },
+    habitat: {
+      kind: 'targets',
+      targets: 'crack',
+      how: 'Toca cada grieta del escudo para reforzarla con regolito.',
+      science: 'Una capa de regolito (suelo marciano) sobre los refugios ayuda a proteger a los astronautas de la radiación.',
+      source: 'NASA · Hábitats en Marte',
+    },
   },
 };
 
 export function minigameFor(mission: MissionId | null | undefined, role: RoleId | null | undefined): MinigameSpec {
-  return MINIGAMES[mission ?? 'greenhouse']?.[role ?? 'power'] ?? MINIGAMES.greenhouse.power;
+  if (!mission || !role) return SCRUB_PANELS;
+  return MINIGAMES[mission]?.[role] ?? SCRUB_PANELS;
 }
-
-/** Puntos que necesita un problema para quedar reparado (≈ 15–20 s de buen juego). */
-export const INCIDENT_POINTS = 30;

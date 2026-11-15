@@ -22,6 +22,14 @@ export interface PlayerInputHost {
   firstPerson(): boolean;
   /** Avisa de actividad real del jugador. */
   activity(): void;
+  /** ¿Está activo el modo de minar y construir? */
+  building?(): boolean;
+  /** Acción sobre el mundo: primaria = minar, secundaria = construir. */
+  action?(kind: 'primary' | 'secondary', phase: 'down' | 'up' | 'tap', x: number, y: number): void;
+  /** El ratón pasa por encima (para resaltar el bloque apuntado). */
+  hover?(x: number, y: number): void;
+  /** Elegir una casilla de la barra de bloques (0–9). */
+  slot?(index: number): void;
 }
 
 const MOVE_KEYS: Record<string, [number, number]> = {
@@ -46,6 +54,8 @@ interface Drag {
   x: number;
   y: number;
   moved: number;
+  button: number;
+  at: number;
 }
 
 export class PlayerInput {
@@ -76,6 +86,9 @@ export class PlayerInput {
     on('pointercancel', this.onUp);
     on('lostpointercapture', (e) => this.drags.delete(e.pointerId));
     on('wheel', this.onWheel, { passive: false });
+    on('contextmenu', (e) => {
+      if (this.enabled) e.preventDefault();
+    });
     const win = <K extends keyof WindowEventMap>(type: K, fn: (e: WindowEventMap[K]) => void) => {
       window.addEventListener(type, fn as EventListener);
       this.off.push(() => window.removeEventListener(type, fn as EventListener));
@@ -151,7 +164,9 @@ export class PlayerInput {
     } catch {
       /* el puntero ya no existe */
     }
-    this.drags.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 });
+    this.drags.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0, button: e.button, at: performance.now() });
+    // Con el ratón capturado, los botones minan (izq.) y construyen (der.) al instante.
+    if (this.locked && this.host.building?.()) this.host.action?.(e.button === 2 ? 'secondary' : 'primary', 'down', e.clientX, e.clientY);
     if (this.drags.size === 2) {
       const [a, b] = [...this.drags.values()];
       this.pinch = Math.hypot(a.x - b.x, a.y - b.y);
@@ -161,7 +176,10 @@ export class PlayerInput {
   private onMove = (e: PointerEvent): void => {
     if (!this.enabled) return;
     const d = this.drags.get(e.pointerId);
-    if (!d) return;
+    if (!d) {
+      if (e.pointerType === 'mouse' && !this.locked) this.host.hover?.(e.clientX, e.clientY);
+      return;
+    }
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     d.x = e.clientX;
@@ -187,6 +205,17 @@ export class PlayerInput {
       this.host.element.releasePointerCapture(e.pointerId);
     } catch {
       /* ya liberado */
+    }
+    const building = this.enabled && e.type === 'pointerup' && Boolean(this.host.building?.());
+    if (building && this.locked) {
+      this.host.action?.(d.button === 2 ? 'secondary' : 'primary', 'up', e.clientX, e.clientY);
+      return;
+    }
+    const tap = d.moved < (e.pointerType === 'touch' ? 14 : 6) && performance.now() - d.at < 450 && this.drags.size === 0;
+    const lockable = e.pointerType === 'mouse' && this.host.firstPerson() && !this.locked;
+    if (building && tap && !lockable) {
+      this.host.action?.(d.button === 2 ? 'secondary' : 'primary', 'tap', e.clientX, e.clientY);
+      return;
     }
     // Un clic de ratón sin arrastrar, en primera persona, captura el ratón para mirar.
     if (this.enabled && e.type === 'pointerup' && e.pointerType === 'mouse' && d.moved < 4 && this.host.firstPerson() && !this.locked) {
@@ -231,8 +260,10 @@ export class PlayerInput {
     if (code === 'Space') {
       e.preventDefault();
       this.host.jump();
-    } else if (code === 'KeyV' || code === 'KeyC') {
+    } else if (code === 'KeyV' || (code === 'KeyC' && !this.host.building?.())) {
       this.host.toggleView();
+    } else if (this.host.building?.() && /^Digit\d$/.test(code)) {
+      this.host.slot?.((Number(code.slice(5)) + 9) % 10);
     } else if (code === 'KeyE' || code === 'Enter') {
       e.preventDefault();
       this.host.interact();
