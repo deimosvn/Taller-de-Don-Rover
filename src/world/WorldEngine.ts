@@ -1089,6 +1089,8 @@ export class WorldEngine {
     this.updateMarker();
     this.updateZone(dt);
 
+    // Las piedras solo se dibujan cerca del suelo: desde la órbita el planeta se ve limpio.
+    this.detail.mesh.visible = this.camera.position.length() - PLANET_RADIUS < 48;
     this.terrainUniforms.uTime.value = this.time;
     this.sky.uniforms.uTime.value = this.time;
     this.sky.mesh.position.copy(this.camera.position);

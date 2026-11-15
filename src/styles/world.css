@@ -538,14 +538,13 @@
 /* ---------- barra de bloques ---------- */
 .wp-build {
   position: absolute;
-  left: 50%;
+  left: 8px;
+  right: 8px;
   bottom: max(16px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
   display: grid;
   justify-items: center;
   gap: 8px;
-  max-width: calc(100% - 16px);
-  pointer-events: none;
+  pointer-events: none !important;
 }
 .wp-build > * {
   pointer-events: auto;
@@ -682,9 +681,36 @@
   height: 26px;
   margin-top: 5px;
 }
+/* Celular en vertical: la barra se parte en dos filas y los controles suben. */
+@media (max-width: 560px) {
+  .wp-hotbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 262px;
+    overflow: visible;
+  }
+  .wp.is-mouse .wp-hotbar {
+    max-width: 290px;
+  }
+  .wp.is-touch.is-build .wp-stick,
+  .wp.is-touch.is-build .wp-actions {
+    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 124px);
+  }
+  .wp.is-mouse.is-build .wp-keys,
+  .wp.is-mouse.is-build .wp-emote-bar {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 132px);
+  }
+  .wp-stick {
+    left: max(14px, env(safe-area-inset-left));
+  }
+  .wp-actions {
+    right: max(12px, env(safe-area-inset-right));
+  }
+}
 @media (max-width: 900px) and (orientation: landscape) {
   .wp.is-touch .wp-build {
-    max-width: calc(100% - 360px);
+    left: 180px;
+    right: 180px;
   }
   .wp.is-touch.is-build .wp-stick,
   .wp.is-touch.is-build .wp-actions {

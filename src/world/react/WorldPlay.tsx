@@ -49,14 +49,17 @@ const EMOTES: { anim: AnimName; emoji: string; label: string }[] = [
   { anim: 'point', emoji: '👉', label: 'Señalar' },
 ];
 
-const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+/** ¿Pantalla táctil? (celulares y tabletas: joystick y botones en vez de teclado). */
+const coarse = () =>
+  typeof matchMedia === 'function' &&
+  (matchMedia('(pointer: coarse)').matches || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0 && matchMedia('(hover: none)').matches));
 
 export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banner, build, actions, objective, notice, onEmote, children }: Props) {
   const [hud, setHud] = useState<PlayerHud | null>(null);
   const [zone, setZone] = useState<string | null>(null);
   const [card, setCard] = useState<WorldCard | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [touch] = useState(coarse);
+  const [touch, setTouch] = useState(coarse);
   // En ventanas pequeñas la ayuda empieza cerrada para no tapar el mundo.
   const [showKeys, setShowKeys] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
   const [showEmotes, setShowEmotes] = useState(false);
@@ -96,6 +99,14 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
   useEffect(() => {
     if (engine) engine.buildMode = building && touch ? mode : 'auto';
   }, [engine, building, touch, mode]);
+
+  // Si el navegador no avisó de la pantalla táctil, el primer toque activa los controles táctiles.
+  useEffect(() => {
+    if (touch) return;
+    const onTouch = () => setTouch(true);
+    window.addEventListener('touchstart', onTouch, { once: true, passive: true });
+    return () => window.removeEventListener('touchstart', onTouch);
+  }, [touch]);
 
   useEffect(() => {
     if (!toast) return;
