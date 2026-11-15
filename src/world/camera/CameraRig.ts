@@ -55,6 +55,8 @@ export interface RigCollider {
 export interface RigEnvironment {
   terrainRadius(dir: Vector3): number;
   colliders(): readonly RigCollider[];
+  /** ¿Hay un bloque opaco en este punto? (la cámara del jugador no los atraviesa). */
+  solidAt?(point: Vector3): boolean;
 }
 
 /** Algo que la cámara puede enfocar o seguir (una entidad, un lugar). */
@@ -473,7 +475,8 @@ export class CameraRig {
     }
     this.heading += angleDelta(this.heading, this.goalHeading) * (1 - Math.exp(-30 * dt));
     if (this.mode === 'third') {
-      this.lift = this.goalLift = p.alt + PLAYER_CAMERA.shoulder;
+      // Altura real sobre el terreno (salto + bloques bajo los pies).
+      this.lift = this.goalLift = Math.max(p.alt, p.feet.length() - this.env.terrainRadius(p.dir)) + PLAYER_CAMERA.shoulder;
       this.dist = Math.exp(damp(Math.log(this.dist), Math.log(this.tpDist), 5, dt));
       this.goalDist = this.dist;
       this.pitch = damp(this.pitch, this.goalPitch, 10, dt);
@@ -757,6 +760,15 @@ export class CameraRig {
       if (disc <= 0) continue;
       const hit = -b - Math.sqrt(disc);
       if (hit > 0 && hit < this.dist) limit = Math.min(limit, Math.max(this.minDist * 0.6, hit - t.colliderMargin));
+    }
+    // Bloques del modo libre: la cámara se queda del lado del jugador (dentro de su casa).
+    if (this.player && this.env.solidAt) {
+      for (let s = 0.35; s < this.dist; s += 0.22) {
+        if (this.env.solidAt(_v3.copy(this.target).addScaledVector(boom, s))) {
+          limit = Math.min(limit, Math.max(0.45, s - 0.3));
+          break;
+        }
+      }
     }
     if (limit === Infinity) {
       this.armLimit = this.relaxArm(dt);

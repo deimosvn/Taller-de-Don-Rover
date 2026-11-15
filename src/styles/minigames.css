@@ -14,7 +14,7 @@
   padding: 10px 14px;
   border-radius: 14px;
   background: var(--cream);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   box-shadow: 0 3px 0 var(--ink);
   font: 700 0.95rem/1.35 var(--font-display);
   text-align: center;
@@ -22,8 +22,8 @@
 .mg-stage {
   position: relative;
   border-radius: 20px;
-  border: 3px solid var(--ink);
-  box-shadow: 0 5px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   overflow: hidden;
   background: #2b2552;
   touch-action: none;
@@ -56,7 +56,7 @@
   flex-wrap: wrap;
   padding: 8px 12px;
   background: rgba(255, 248, 236, 0.95);
-  border-top: 3px solid var(--ink);
+  border-top: 2px solid var(--ink);
   font: 700 0.82rem var(--font-display);
 }
 .mg-hud.floating {
@@ -87,10 +87,10 @@
   margin: 4px 12px 12px;
   padding: 14px 12px;
   border-radius: 18px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--c, #ffc93c);
   color: var(--ink);
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   font: 800 1.15rem var(--font-display);
   touch-action: none;
   cursor: pointer;
@@ -542,7 +542,7 @@
   background: color-mix(in srgb, var(--p) 45%, #2b2552);
   color: #fff8ec;
   font: 800 1.8rem var(--font-display);
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   cursor: pointer;
   transition:
     background 0.12s,
@@ -554,7 +554,7 @@
   transform: scale(1.04);
   box-shadow:
     0 0 24px var(--p),
-    0 5px 0 var(--ink);
+    0 3px 0 var(--ink);
 }
 .pad:disabled {
   cursor: default;
@@ -570,7 +570,7 @@
 .mg-lab-pick select {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--cream);
   font: 700 0.95rem var(--font-display);
   color: var(--ink);

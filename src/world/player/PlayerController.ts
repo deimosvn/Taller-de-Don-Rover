@@ -7,6 +7,8 @@ import { Quaternion, Vector3 } from 'three';
 import type { RigCollider } from '../camera/CameraRig';
 import { PLANET_RADIUS } from '../core/config';
 import { angleDelta, clamp, tangentFrame, travel } from '../core/math';
+import type { BlockWorld } from '../blocks/BlockWorld';
+import { gridAxes } from '../blocks/grid';
 import type { AnimName } from '../models/astronaut';
 import { terrainRadius } from '../planet/heightfield';
 
@@ -22,6 +24,10 @@ export const PLAYER = {
   radius: 0.4,
   height: 1.75,
   turn: 11,
+  /** Escalón que se sube sin saltar (los bloques enteros hay que saltarlos). */
+  step: 0.42,
+  /** Altura del cuerpo frente a los bloques (un poco menos que el modelo, para caber bajo un techo). */
+  body: 1.68,
 } as const;
 
 export interface MoveInput {
@@ -46,6 +52,11 @@ const _c = new Vector3();
 const _d = new Vector3();
 const _east = new Vector3();
 const _north = new Vector3();
+const _prev = new Vector3();
+const _s = new Vector3();
+const _ga = new Vector3();
+const _gb = new Vector3();
+const FOOT = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)] as const);
 
 export class PlayerController {
   /** Dirección unitaria del punto del planeta donde está el jugador. */
@@ -72,6 +83,8 @@ export class PlayerController {
   private lastGround = 0;
   /** Distancia recorrida (para estadísticas y sonidos de pasos). */
   travelled = 0;
+  /** Bloques del modo libre: se pueden pisar y hacen de pared. */
+  blocks: BlockWorld | null = null;
 
   constructor(start: Vector3, heading: number) {
     this.dir.copy(start).normalize();
@@ -128,6 +141,7 @@ export class PlayerController {
     if (amount === 0 && this.grounded && this.vel.lengthSq() < 0.01) this.vel.set(0, 0, 0);
 
     // 2) Avanzar sobre la esfera y transportar los vectores tangentes.
+    _prev.copy(this.dir);
     const speed = this.vel.length();
     if (speed > 1e-5) {
       const before = _c.copy(up);
@@ -141,12 +155,14 @@ export class PlayerController {
 
     // 3) Choques con edificios, máquinas y otros astronautas.
     this.collide(colliders, characters);
+    if (this.blocks) this.collideBlocks(_prev);
 
     // 4) Salto y gravedad marciana.
-    const ground = terrainRadius(this.dir);
+    const feetR = this.lastGround + this.alt;
+    const ground = this.groundAt(feetR);
     if (this.grounded) {
-      // Si el suelo baja de golpe (borde de una meseta o un cráter) se cae en vez de pegarse.
-      const drop = this.lastGround - ground;
+      // Si el suelo baja de golpe (borde de una meseta, un cráter o un bloque) se cae en vez de pegarse.
+      const drop = feetR - ground;
       if (drop > 0.35) {
         this.grounded = false;
         this.alt = drop;
@@ -154,6 +170,9 @@ export class PlayerController {
       } else {
         this.alt = 0;
       }
+    } else {
+      // En el aire se conserva la altura real aunque cambie el suelo de debajo.
+      this.alt = feetR - ground;
     }
     if (this.jumpQueued) {
       this.jumpQueued = false;
@@ -165,6 +184,11 @@ export class PlayerController {
     }
     if (!this.grounded) {
       this.vy -= PLAYER.gravity * dt;
+      // Techo: un bloque justo encima de la cabeza detiene el salto.
+      if (this.vy > 0 && this.blocks) {
+        const head = ground + this.alt + PLAYER.body;
+        if (this.blocks.blocked(this.dir, head, head + 0.12 + this.vy * dt)) this.vy = 0;
+      }
       this.alt += this.vy * dt;
       if (this.alt <= 0) {
         this.alt = 0;
@@ -207,6 +231,60 @@ export class PlayerController {
       this.anim = this.emote ?? 'idle';
       this.stride = 1;
     }
+  }
+
+  /** Suelo bajo los pies: el terreno o la cara superior de un bloque que se pueda pisar. */
+  private groundAt(feetR: number): number {
+    let ground = terrainRadius(this.dir);
+    const b = this.blocks;
+    if (!b) return ground;
+    const max = feetR + PLAYER.step;
+    ground = Math.max(ground, b.top(this.dir, max));
+    const k = (PLAYER.radius * 0.7) / Math.max(1, feetR);
+    tangentFrame(this.dir, _east, _north);
+    for (let i = 0; i < 8; i += 2) {
+      _s.copy(this.dir).addScaledVector(_east, FOOT[i][0] * k).addScaledVector(_north, FOOT[i][1] * k);
+      ground = Math.max(ground, b.top(_s, max));
+    }
+    return ground;
+  }
+
+  /** ¿El cuerpo (del escalón a la cabeza) se mete en algún bloque estando en `dir`? */
+  private hitsBlocks(dir: Vector3, feetR: number): boolean {
+    const b = this.blocks!;
+    const r0 = feetR + PLAYER.step;
+    const r1 = feetR + PLAYER.body;
+    if (b.blocked(dir, r0, r1)) return true;
+    const k = (PLAYER.radius * 0.9) / Math.max(1, feetR);
+    tangentFrame(dir, _east, _north);
+    for (const [c, s] of FOOT) {
+      _s.copy(dir).addScaledVector(_east, c * k).addScaledVector(_north, s * k);
+      if (b.blocked(_s, r0, r1)) return true;
+    }
+    return false;
+  }
+
+  /** Paredes de bloques: si el paso choca, se intenta deslizar por los ejes de la rejilla. */
+  private collideBlocks(prev: Vector3): void {
+    const feetR = this.lastGround + this.alt;
+    if (!this.hitsBlocks(this.dir, feetR)) return;
+    // Si ya estaba dentro de un bloque (alguien construyó encima), se le deja salir.
+    if (this.hitsBlocks(prev, feetR)) return;
+    gridAxes(prev, _ga, _gb);
+    const dx = _a.copy(this.dir).sub(prev).dot(_ga);
+    const dz = _a.dot(_gb);
+    const tryAxis = (axis: Vector3, amount: number, other: Vector3): boolean => {
+      if (Math.abs(amount) < 1e-7) return false;
+      _b.copy(prev).addScaledVector(axis, amount).normalize();
+      if (this.hitsBlocks(_b, feetR)) return false;
+      this.dir.copy(_b);
+      this.vel.addScaledVector(other, -this.vel.dot(other));
+      return true;
+    };
+    const first = Math.abs(dx) >= Math.abs(dz);
+    if (first ? tryAxis(_ga, dx, _gb) || tryAxis(_gb, dz, _ga) : tryAxis(_gb, dz, _ga) || tryAxis(_ga, dx, _gb)) return;
+    this.dir.copy(prev);
+    this.vel.set(0, 0, 0);
   }
 
   /** Empuja al jugador fuera de los colisionadores (solo en horizontal, sin trepar). */

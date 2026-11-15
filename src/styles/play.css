@@ -49,7 +49,7 @@
   font-size: 3rem;
   letter-spacing: 0.4em;
   padding: 0.15em 0 0.15em 0.4em;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   border-radius: 18px;
   color: var(--ink);
   background: #fff;
@@ -484,13 +484,13 @@
   text-align: left;
   padding: 14px;
   border-radius: 18px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--cream);
   color: var(--ink);
   font: inherit;
   font-weight: 800;
   font-size: 1.05rem;
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   cursor: pointer;
   transition: transform 0.08s;
 }
@@ -721,12 +721,12 @@
   gap: 10px;
   padding: 12px;
   border-radius: 18px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--cream);
   color: var(--ink);
   text-align: left;
   font: inherit;
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   cursor: pointer;
   transition:
     transform 0.08s,
@@ -801,8 +801,8 @@
   padding: 22px 18px;
   border-radius: 24px;
   background: linear-gradient(160deg, #ff6b5b, #c2512e);
-  border: 3px solid var(--ink);
-  box-shadow: 0 6px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
   text-align: center;
   color: #fff;
   animation:
@@ -888,7 +888,7 @@
 .tap-btn:active {
   transform: translateY(8px) scale(0.98);
   box-shadow:
-    0 4px 0 var(--ink),
+    0 3px 0 var(--ink),
     0 0 0 18px color-mix(in srgb, var(--c) 35%, transparent);
 }
 .tap-emoji {
@@ -1041,8 +1041,8 @@
   border-radius: 16px;
   background: linear-gradient(135deg, #fff3cc, #ffe1dd);
   color: var(--ink);
-  border: 3px solid var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   animation: popIn 0.5s both;
 }
 .badge-pop > span {
@@ -1159,7 +1159,7 @@
   background: var(--cream);
   border-radius: 22px;
   padding: 12px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .ab-preview {
   position: relative;
@@ -1168,7 +1168,7 @@
   padding: 10px 0 2px;
   border-radius: 22px;
   background: radial-gradient(circle at 50% 30%, #8a3a22, #2b100b);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .ab-platform {
   position: absolute;
@@ -1185,7 +1185,7 @@
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--energy);
   box-shadow: 0 3px 0 var(--ink);
   display: grid;
@@ -1208,7 +1208,7 @@
   height: 38px;
   border-radius: 12px;
   background: var(--c);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   cursor: pointer;
   box-shadow: 0 3px 0 var(--ink);
 }
@@ -1283,7 +1283,7 @@
 @keyframes alertPulse {
   50% {
     box-shadow:
-      0 6px 0 var(--ink),
+      0 4px 0 var(--ink),
       0 0 44px rgba(255, 107, 91, 0.85);
   }
 }
@@ -1296,10 +1296,10 @@
   width: min(440px, calc(100% - 32px));
   margin: 18px auto 8px;
   padding: 14px 16px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg, #fff8ec 0%, #ffe3c8 100%);
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   color: var(--ink);
   text-align: left;
   font-family: var(--font-body);
@@ -1316,7 +1316,7 @@
   width: 54px;
   height: 54px;
   border-radius: 16px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--mars-400);
   font-size: 1.8rem;
 }
@@ -1334,4 +1334,37 @@
 }
 .world-btn {
   white-space: nowrap;
+}
+
+/* ---------------- sin código: modo libre ---------------- */
+.nocode {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 2px dashed rgba(42, 18, 13, 0.16);
+  display: grid;
+  gap: 6px;
+}
+.nocode-title {
+  margin: 0;
+  font: 700 1.15rem var(--font-display);
+  color: var(--ink);
+}
+.nocode .muted {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+.nocode-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.nocode-actions .btn {
+  text-decoration: none;
+  justify-content: center;
+}
+@media (max-width: 360px) {
+  .nocode-actions {
+    grid-template-columns: 1fr;
+  }
 }

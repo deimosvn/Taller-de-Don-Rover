@@ -307,8 +307,8 @@
   border-radius: 14px;
   background: var(--cream);
   color: var(--ink);
-  border: 3px solid var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
 }
 .room-code b {
   font-size: 1.7rem;
@@ -670,9 +670,9 @@ button.chip {
   font-weight: 700;
   font-size: 2.5rem;
   background: var(--energy);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   border-radius: 14px;
-  box-shadow: 0 5px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   animation: popIn 0.5s both;
 }
 .tile:nth-child(2) {
@@ -782,7 +782,7 @@ button.chip {
   height: clamp(320px, 54vh, 600px);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .lobby-empty-tip {
   position: absolute;
@@ -890,9 +890,9 @@ button.chip {
   border-radius: 22px;
   overflow: hidden;
   background: #06081f;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   box-shadow:
-    0 6px 0 var(--ink),
+    0 4px 0 var(--ink),
     0 0 0 6px rgba(255, 201, 60, 0.22);
 }
 .cam video,
@@ -1076,8 +1076,8 @@ button.chip {
   height: clamp(320px, 52vh, 560px);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 3px solid var(--ink);
-  box-shadow: 0 6px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
 }
 .mp-world-tag {
   position: absolute;
@@ -1087,7 +1087,7 @@ button.chip {
   border-radius: 999px;
   background: var(--cream);
   color: var(--ink);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   box-shadow: 0 3px 0 var(--ink);
   font-family: var(--font-display);
   font-weight: 700;
@@ -1127,7 +1127,7 @@ button.chip {
   gap: 8px;
   padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: rgba(255, 248, 236, 0.75);
   color: var(--ink);
   text-align: left;
@@ -1158,7 +1158,7 @@ button.chip {
 }
 .mp.on {
   background: var(--cream);
-  box-shadow: 0 4px 0 var(--ink), 0 0 0 4px color-mix(in srgb, var(--mc) 60%, transparent);
+  box-shadow: 0 3px 0 var(--ink), 0 0 0 4px color-mix(in srgb, var(--mc) 60%, transparent);
 }
 .mp.locked {
   opacity: 0.8;
@@ -1205,7 +1205,7 @@ button.chip {
   aspect-ratio: 1;
   border-radius: 18px;
   overflow: hidden;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: #1b1640;
   display: grid;
   place-items: center;
@@ -1325,8 +1325,8 @@ button.chip {
   height: clamp(320px, 52vh, 560px);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 3px solid var(--ink);
-  box-shadow: 0 6px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
 }
 .brief-planet .unlock-burst {
   position: absolute;
@@ -1541,8 +1541,8 @@ button.chip {
   background: linear-gradient(90deg, #ffc93c, #ff9a3c);
   color: var(--ink);
   font-weight: 900;
-  border: 3px solid var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   animation:
     popIn 0.5s both,
     heartbeat 1.6s 0.5s infinite;
@@ -1709,7 +1709,7 @@ button.chip {
   height: 56px;
   border-radius: 999px;
   background: rgba(26, 9, 7, 0.75);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
 }
 .big-progress-fill {
@@ -2051,7 +2051,7 @@ button.chip {
   font-weight: 700;
   font-size: 1.3rem;
   background: var(--energy);
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .learn:nth-child(2) .num {
   background: var(--water);
@@ -2298,7 +2298,7 @@ details summary {
   height: clamp(260px, 38vh, 420px);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 .crews-layout {
   display: grid;
@@ -2312,7 +2312,7 @@ details summary {
   height: clamp(300px, 50vh, 540px);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
 }
 @media (max-width: 900px) {
   .crews-layout {

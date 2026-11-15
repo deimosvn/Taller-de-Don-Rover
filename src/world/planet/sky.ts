@@ -74,6 +74,19 @@ void main() {
   float s = max(dot(d, uSunDir), 0.0);
   col += uSunColor * (pow(s, 48.0) * 0.16 + pow(s, 5.0) * 0.07) * above;
 
+  // De noche: estrellas que titilan y las dos lunas de Marte (Fobos y Deimos).
+  float night = 1.0 - smoothstep(0.06, 0.34, dot(uZenith, vec3(0.3, 0.5, 0.2)));
+  vec3 g = d * 95.0;
+  vec3 cell = floor(g);
+  float h = hash(cell);
+  float spark = smoothstep(0.42, 0.0, length(fract(g) - 0.5)) * step(0.972, h);
+  float twinkle = 0.65 + 0.35 * sin(uTime * (1.5 + h * 3.0) + h * 40.0);
+  col += vec3(1.0, 0.96, 0.9) * spark * twinkle * night * smoothstep(0.04, 0.4, e) * (1.0 - uDust);
+  float phobos = smoothstep(0.99962, 0.99974, dot(d, normalize(vec3(0.45, 0.62, 0.64))));
+  float deimos = smoothstep(0.99988, 0.99993, dot(d, normalize(vec3(-0.55, 0.42, 0.72))));
+  float moonShade = 0.82 + 0.18 * noise(d * 260.0);
+  col = mix(col, vec3(1.0, 0.95, 0.86) * moonShade, clamp(phobos + deimos, 0.0, 1.0) * (0.3 + 0.7 * night) * above * (1.0 - uDust));
+
   // Polvo de tormenta: el cielo se iguala en un velo anaranjado.
   col = mix(col, uHaze, uDust * 0.7);
 

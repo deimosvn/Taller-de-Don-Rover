@@ -40,7 +40,7 @@ import {
   crewSpots,
   type Spot,
 } from '../planet/layout';
-import type { CrewMood, PresenceMap, WorldCrewMember, WorldSnapshot } from './snapshot';
+import type { CrewMood, PresenceMap, PresencePose, WorldCrewMember, WorldSnapshot } from './snapshot';
 
 const R = PLANET_RADIUS;
 const TUBE_H = 2.3;
@@ -103,6 +103,14 @@ interface Remote {
   heading: number;
   anim: AnimName;
   speed: number;
+  /** Altura sobre el terreno (saltos y bloques sobre los que está parado). */
+  lift: number;
+}
+
+/** El último valor de la pose lleva la rapidez del paso y, en las decenas, la altura en decímetros. */
+function remoteFrom(p: PresencePose, dir: Vector3): Remote {
+  const tenths = Math.max(0, Math.floor(p[5] / 10));
+  return { dir, heading: p[3], anim: ANIMS[p[4]] ?? 'idle', speed: p[5] - tenths * 10, lift: Math.min(60, tenths / 10) };
 }
 
 interface Npc {
@@ -383,7 +391,7 @@ export class ColonyDirector {
       const dir = new Vector3(p[0], p[1], p[2]);
       if (dir.lengthSq() < 0.5) continue;
       dir.normalize();
-      npc.remote = { dir, heading: p[3], anim: ANIMS[p[4]] ?? 'idle', speed: p[5] };
+      npc.remote = remoteFrom(p, dir);
     }
   }
 
@@ -433,7 +441,7 @@ export class ColonyDirector {
         };
         this.npcs.set(uid, npc);
         const p = this.presence[m.id];
-        if (p) npc.remote = { dir: new Vector3(p[0], p[1], p[2]).normalize(), heading: p[3], anim: ANIMS[p[4]] ?? 'idle', speed: p[5] };
+        if (p) npc.remote = remoteFrom(p, new Vector3(p[0], p[1], p[2]).normalize());
       }
       npc.member = m;
       npc.home.copy(spot.dir);
@@ -613,7 +621,8 @@ export class ColonyDirector {
         if (this.playerActive) npc.heading += angleDelta(npc.heading, headingTo(npc.dir, _v2.copy(this.playerPos).normalize())) * (1 - Math.exp(-8 * dt));
       }
     }
-    this.entities.move(npc.uid, { dir: npc.dir, heading: npc.heading });
+    const lift = npc.remote ? npc.entity.lift + (npc.remote.lift - npc.entity.lift) * (1 - Math.exp(-14 * dt)) : 0;
+    this.entities.move(npc.uid, { dir: npc.dir, heading: npc.heading, lift });
     if (npc.anim !== anim || npc.entity.state.speed !== speed) {
       npc.anim = anim;
       npc.entity.setState({ anim, speed });

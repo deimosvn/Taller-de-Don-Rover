@@ -22,6 +22,9 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { AvatarConfig, RoleId } from '../../shared/types';
+import { BlockWorld, type BlockHit } from './blocks/BlockWorld';
+import { keyAt } from './blocks/grid';
+import { BLOCKS, type BlockId } from './blocks/types';
 import { CameraRig, type CameraMode, type CameraShot, type PlayerView } from './camera/CameraRig';
 import { InputController } from './camera/InputController';
 import { ColonyDirector } from './colony/ColonyDirector';
@@ -39,8 +42,9 @@ import { MaterialKit } from './models/sculpt';
 import { HUB_DIR } from './planet/features';
 import { terrainRadius } from './planet/heightfield';
 import { LANDING_PAD, colonySpot } from './planet/layout';
-import { PlayerController, type Sphere as CharSphere } from './player/PlayerController';
+import { PLAYER, PlayerController, type Sphere as CharSphere } from './player/PlayerController';
 import { PlayerInput } from './player/PlayerInput';
+import { SurfaceDetail } from './planet/detail';
 import { Sky } from './planet/sky';
 import { PlanetTerrain } from './planet/terrain';
 import { createTerrainMaterial, type TerrainUniforms } from './planet/terrainMaterial';
@@ -95,6 +99,29 @@ export interface InteractEvent {
   params: Record<string, unknown>;
 }
 
+/** Quien lleva el inventario del modo libre (la interfaz): el motor solo mueve bloques. */
+export interface BuildHost {
+  /** Bloque elegido en la barra (0 si no queda ninguno). */
+  selected(): BlockId | 0;
+  /** Se minó un bloque (`fromGround`: salió del suelo, no de un bloque colocado). */
+  mined(block: BlockId, fromGround: boolean): void;
+  placed(block: BlockId): void;
+  denied(reason: 'empty' | 'self' | 'far'): void;
+}
+
+/** Qué está apuntando el jugador y cuánto lleva minado (para la interfaz). */
+export interface BuildAim {
+  target: 'block' | 'ground' | null;
+  block: BlockId | 0;
+  progress: number;
+}
+
+/** Con qué acción responde un toque: en táctil lo elige el jugador; con ratón, clic izq./der. */
+export type BuildMode = 'auto' | 'mine' | 'place';
+
+/** Alcance del brazo del astronauta (u). */
+const REACH = 5.6;
+
 export interface WorldEventMap {
   ready: null;
   select: EntityInfo | null;
@@ -107,6 +134,9 @@ export interface WorldEventMap {
   activity: null;
   player: PlayerHud | null;
   interact: InteractEvent;
+  build: BuildAim;
+  /** Casilla de la barra elegida con el teclado (0–9). */
+  slot: number;
 }
 
 interface LocalPlayer {
@@ -207,12 +237,24 @@ export class WorldEngine {
   private readonly terrain: PlanetTerrain;
   private readonly terrainUniforms: TerrainUniforms;
   private readonly sky = new Sky();
+  private readonly detail: SurfaceDetail;
   private readonly sun = new DirectionalLight(0xffffff, 2);
   private readonly hemi = new HemisphereLight(0xffffff, 0x444444, 1);
   private readonly fog = new Fog(0xffffff, 10, 300);
   private readonly input: InputController;
   private readonly playerInput: PlayerInput;
   private player: LocalPlayer | null = null;
+  /** Bloques del modo libre (null si esta vista no los usa). */
+  blocks: BlockWorld | null = null;
+  buildMode: BuildMode = 'auto';
+  private buildHost: BuildHost | null = null;
+  private aimXY: { x: number; y: number } | null = null;
+  private aimTtl = 0;
+  private aim: BlockHit | null = null;
+  private aimTimer = 0;
+  private mining: { key: number; kind: 'block' | 'ground'; t: number; need: number } | null = null;
+  private mineHeld = false;
+  private buildKey = '';
   private readonly chars: CharSphere[] = [];
   private readonly raycaster = new Raycaster();
   private readonly marker: Mesh;
@@ -278,6 +320,8 @@ export class WorldEngine {
     this.terrainUniforms = uniforms;
     this.terrain = new PlanetTerrain(material, this.tier === 'low' ? 28 : 56);
     this.scene.add(this.terrain.group);
+    this.detail = new SurfaceDetail(Math.round(6500 * QUALITY[this.tier].scatter));
+    this.scene.add(this.detail.mesh);
 
     this.sun.castShadow = true;
     this.sun.shadow.bias = -0.0005;
@@ -301,7 +345,14 @@ export class WorldEngine {
     this.scene.add(this.marker);
 
     // ---- cámara ----
-    this.rig = new CameraRig(this.camera, { terrainRadius, colliders: () => this.entities.colliders() });
+    this.rig = new CameraRig(this.camera, {
+      terrainRadius,
+      colliders: () => this.entities.colliders(),
+      solidAt: (p) => {
+        const b = this.blocks?.get(keyAt(p)) ?? 0;
+        return b !== 0 && !BLOCKS[b].transparent;
+      },
+    });
     this.rig.onModeChange = (mode) => {
       const p = this.player;
       if (p && (mode === 'first' || mode === 'third') && p.view !== mode) {
@@ -338,6 +389,13 @@ export class WorldEngine {
       emote: (anim) => this.playerEmote(anim),
       firstPerson: () => this.player?.view === 'first',
       activity: () => this.events.emit('activity', null),
+      building: () => Boolean(this.blocks && this.buildHost && this.player),
+      action: (kind, phase, x, y) => this.buildAction(kind, phase, x, y),
+      hover: (x, y) => {
+        this.aimXY = { x, y };
+        this.aimTtl = Infinity;
+      },
+      slot: (i) => this.events.emit('slot', i),
     });
 
     this.applyQuality();
@@ -436,6 +494,7 @@ export class WorldEngine {
     this.director.setLocalPlayer(profile.id);
     const entity = this.entities.spawn('character.astronaut', PLAYER_UID, { dir: spawn.dir, heading: spawn.heading, lift: 0 }, { avatar: profile.avatar, role: profile.role, seed: 3.3 });
     const controller = new PlayerController(spawn.dir, spawn.heading);
+    controller.blocks = this.blocks;
     this.player = { profile, controller, entity, view, prompt: null, promptTimer: 0, hudKey: '' };
     entity.setState({ firstPerson: view === 'first', anim: 'idle', speed: 1 });
     this.select(null);
@@ -481,6 +540,194 @@ export class WorldEngine {
     this.player?.controller.playEmote(anim);
   }
 
+  /* ---------------- minar y construir (modo libre) ---------------- */
+
+  /** Activa los bloques: el planeta gana depósitos que se minan y se puede construir. */
+  enableBuilding(host: BuildHost): BlockWorld {
+    if (!this.blocks) {
+      this.blocks = new BlockWorld();
+      this.scene.add(this.blocks.group);
+    }
+    this.buildHost = host;
+    if (this.player) this.player.controller.blocks = this.blocks;
+    return this.blocks;
+  }
+
+  /**
+   * Brújula del explorador: depósito natural más cercano, a qué distancia está y hacia
+   * dónde queda respecto de la cámara (rad; 0 = al frente, positivo = a la derecha).
+   */
+  nearestDeposit(): { block: BlockId; distance: number; angle: number } | null {
+    const p = this.player;
+    const b = this.blocks;
+    if (!p || !b) return null;
+    const block = b.nearestDeposit(p.controller.feet, _v);
+    if (!block) return null;
+    const to = _v2.copy(_v).sub(p.controller.feet);
+    return { block, distance: to.length(), angle: Math.atan2(to.dot(this.rig.right), to.dot(this.rig.forward)) };
+  }
+
+  /** Devuelve al jugador a la plaza de la colonia (por si se pierde o queda encerrado). */
+  respawnPlayer(): void {
+    const p = this.player;
+    if (!p) return;
+    this.enterPlayer(p.profile, p.view);
+  }
+
+  private buildAction(kind: 'primary' | 'secondary', phase: 'down' | 'up' | 'tap', x: number, y: number): void {
+    if (!this.blocks || !this.buildHost || !this.player) return;
+    if (phase === 'up') {
+      if (kind === 'primary') this.mineHeld = false;
+      return;
+    }
+    let k = kind;
+    if (phase === 'tap') {
+      this.aimXY = { x, y };
+      if (this.aimTtl !== Infinity) this.aimTtl = 1.6;
+      if (this.buildMode !== 'auto') k = this.buildMode === 'place' ? 'secondary' : 'primary';
+    }
+    this.refreshAim();
+    if (k === 'secondary') this.placeBlock();
+    else {
+      this.mineHeld = phase === 'down';
+      this.startMining();
+    }
+  }
+
+  /** Coloca el bloque elegido donde apunta el jugador (botón de la interfaz táctil). */
+  buildPlace(): void {
+    if (!this.blocks || !this.player) return;
+    this.refreshAim();
+    this.placeBlock();
+  }
+
+  /** Empieza a minar lo que apunta el jugador (botón de la interfaz táctil). */
+  buildMine(): void {
+    if (!this.blocks || !this.player) return;
+    this.refreshAim();
+    this.startMining();
+  }
+
+  private refreshAim(): void {
+    const p = this.player;
+    const b = this.blocks;
+    if (!p || !b) return;
+    const first = p.view === 'first';
+    if (!first && !this.aimXY) {
+      this.aim = null;
+      return;
+    }
+    const rect = this.canvas.getBoundingClientRect();
+    const x = first || !this.aimXY ? rect.left + rect.width / 2 : this.aimXY.x;
+    const y = first || !this.aimXY ? rect.top + rect.height / 2 : this.aimXY.y;
+    this.setRay(x, y);
+    const ray = this.raycaster.ray;
+    // Solo cuenta el tramo del rayo que queda al alcance del brazo.
+    const chest = _v.copy(p.controller.feet).addScaledVector(p.controller.dir, 1.2);
+    const oc = _v2.copy(ray.origin).sub(chest);
+    const bq = oc.dot(ray.direction);
+    const disc = bq * bq - (oc.lengthSq() - REACH * REACH);
+    if (disc <= 0) {
+      this.aim = null;
+      return;
+    }
+    const sq = Math.sqrt(disc);
+    this.aim = b.raycast(ray.origin, ray.direction, Math.max(0.25, -bq - sq), -bq + sq);
+  }
+
+  private startMining(): void {
+    const p = this.player;
+    const aim = this.aim;
+    if (!p || !this.buildHost) return;
+    if (!aim) {
+      this.buildHost.denied('far');
+      return;
+    }
+    if (this.mining && this.mining.key === aim.key && this.mining.kind === aim.kind) return;
+    const need = aim.kind === 'block' ? BLOCKS[aim.block].hardness : 0.5;
+    this.mining = { key: aim.key, kind: aim.kind, t: 0, need };
+    p.controller.faceTowards(aim.point);
+    p.controller.playEmote('work', need + 0.4);
+  }
+
+  private placeBlock(): void {
+    const p = this.player;
+    const b = this.blocks;
+    const host = this.buildHost;
+    const aim = this.aim;
+    if (!p || !b || !host) return;
+    if (!aim || aim.placeKey === null) {
+      host.denied('far');
+      return;
+    }
+    const id = host.selected();
+    if (!id) {
+      host.denied('empty');
+      return;
+    }
+    // No se puede construir dentro del propio astronauta.
+    const c = b.center(aim.placeKey, _v);
+    const ctl = p.controller;
+    const feetR = ctl.feet.length();
+    const cr = c.length();
+    const horiz = _v2.copy(c).addScaledVector(ctl.dir, -c.dot(ctl.dir)).length();
+    if (horiz < 0.5 + PLAYER.radius * 0.85 && cr + 0.5 > feetR + 0.05 && cr - 0.5 < feetR + PLAYER.height) {
+      host.denied('self');
+      return;
+    }
+    b.set(aim.placeKey, id);
+    b.burst(c, id, 5);
+    ctl.faceTowards(c);
+    ctl.playEmote('point', 0.7);
+    host.placed(id);
+    this.aimTimer = 0;
+  }
+
+  private updateBuild(dt: number): void {
+    const b = this.blocks;
+    const host = this.buildHost;
+    if (!b || !host) return;
+    if (this.aimTtl !== Infinity && !this.mining) {
+      this.aimTtl -= dt;
+      if (this.aimTtl <= 0) this.aimXY = null;
+    }
+    this.aimTimer -= dt;
+    if (this.aimTimer <= 0) {
+      this.aimTimer = 0.07;
+      this.refreshAim();
+    }
+    const aim = this.aim;
+    let m = this.mining;
+    if (m && (!aim || aim.key !== m.key || aim.kind !== m.kind)) m = this.mining = null;
+    if (m && aim) {
+      m.t += dt;
+      if (m.t >= m.need) {
+        if (aim.kind === 'block') {
+          b.set(aim.key, 0);
+          b.burst(b.center(aim.key, _v), aim.block, 12);
+        } else {
+          b.burst(aim.point, aim.block, 8);
+        }
+        host.mined(aim.block, aim.kind === 'ground');
+        m = this.mining = null;
+        this.aimTimer = 0;
+        this.aim = null;
+      }
+    } else if (!m && this.mineHeld && aim) {
+      this.startMining();
+      m = this.mining;
+    }
+    const progress = m ? Math.min(1, m.t / m.need) : 0;
+    if (!aim) b.highlight(null);
+    else if (aim.kind === 'block') b.highlight(aim.key, progress);
+    else b.highlight(aim.placeKey, progress, !m);
+    const key = `${aim?.kind ?? ''}|${aim?.block ?? 0}|${Math.round(progress * 12)}`;
+    if (key !== this.buildKey) {
+      this.buildKey = key;
+      this.events.emit('build', { target: aim?.kind ?? null, block: aim?.block ?? 0, progress });
+    }
+  }
+
   /** Interactúa con lo que el jugador tiene enfrente (consola, IX, un compañero…). */
   playerInteract(): void {
     const p = this.player;
@@ -516,7 +763,9 @@ export class WorldEngine {
     const c = this.player?.controller;
     if (!c) return null;
     const r4 = (x: number) => Math.round(x * 10000) / 10000;
-    return [r4(c.dir.x), r4(c.dir.y), r4(c.dir.z), Math.round(c.heading * 100) / 100, Math.max(0, ANIMS.indexOf(c.anim)), Math.round(c.stride * 10) / 10];
+    // El último valor lleva la rapidez del paso (unidades) y la altura sobre el terreno (decenas, en dm).
+    const lift = Math.max(0, Math.round((c.feet.length() - terrainRadius(c.dir)) * 10));
+    return [r4(c.dir.x), r4(c.dir.y), r4(c.dir.z), Math.round(c.heading * 100) / 100, Math.max(0, ANIMS.indexOf(c.anim)), Math.min(9.9, Math.round(c.stride * 10) / 10) + lift * 10];
   }
 
   /** Poses de los compañeros que juegan en 3D. */
@@ -543,9 +792,11 @@ export class WorldEngine {
       const want = this.rig.headingFor(c.face);
       this.rig.goalHeading += angleDelta(this.rig.goalHeading, want) * (1 - Math.exp(-1.3 * dt));
     }
-    this.entities.move(PLAYER_UID, { dir: c.dir, heading: c.heading, lift: c.alt });
+    // Altura real sobre el terreno: cuenta el salto y los bloques sobre los que está parado.
+    this.entities.move(PLAYER_UID, { dir: c.dir, heading: c.heading, lift: Math.max(0, c.feet.length() - terrainRadius(c.dir)) });
     if (p.entity.state.anim !== c.anim || Math.abs(Number(p.entity.state.speed) - c.stride) > 0.05) p.entity.setState({ anim: c.anim, speed: Math.round(c.stride * 100) / 100 });
     this.director.playerPos.copy(c.feet);
+    this.updateBuild(dt);
 
     p.promptTimer -= dt;
     if (p.promptTimer <= 0) {
@@ -695,8 +946,10 @@ export class WorldEngine {
     this.playerInput.dispose();
     this.events.clear();
     this.director.dispose();
+    this.blocks?.dispose();
     this.entities.dispose();
     this.terrain.dispose();
+    this.detail.dispose();
     this.sky.dispose();
     this.kit.dispose();
     this.post?.dispose();
@@ -829,6 +1082,10 @@ export class WorldEngine {
     const ctx = { dt, time: this.time, night: clamp((this.light.glow - 0.55) / 1.6, 0, 1), eye: this.camera.position };
     this.director.update(ctx);
     this.entities.update(ctx);
+    if (this.blocks) {
+      this.blocks.setGlow(0.75 + ctx.night * 1.1);
+      this.blocks.update(dt);
+    }
     this.updateMarker();
     this.updateZone(dt);
 
