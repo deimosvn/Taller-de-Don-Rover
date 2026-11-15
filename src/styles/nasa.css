@@ -9,10 +9,10 @@
   gap: 8px;
   padding: 14px 16px;
   border-radius: 18px;
-  border: 3px solid var(--ink);
+  border: 2px solid var(--ink);
   background: var(--cream);
   color: var(--ink);
-  box-shadow: 0 4px 0 var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
   font-family: var(--font-body);
   text-align: left;
   min-width: 0;

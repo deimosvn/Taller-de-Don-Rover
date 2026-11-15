@@ -65,6 +65,8 @@ export class BlockWorld {
   private readonly columns = new Map<number, number>();
   /** Cambios hechos por los jugadores (lo único que se guarda y se comparte). */
   private readonly edited = new Map<number, { b: number; ts: number }>();
+  /** Celdas de los depósitos naturales (para la brújula del explorador). */
+  private readonly natural = new Set<number>();
   private readonly matrices = new Map<number, Matrix4>();
   private readonly lifted = new Map<number, boolean>();
   private readonly meshes = new Map<BlockId, InstancedMesh>();
@@ -195,7 +197,9 @@ export class BlockWorld {
         _p.copy(d).addScaledVector(_e, east / PLANET_RADIUS).addScaledVector(_n, north / PLANET_RADIUS).normalize();
         if (_p.dot(HUB_DIR) > hubCos) break;
         _p.multiplyScalar(terrainRadius(_p) + 0.45 + up);
-        this.put(keyAt(_p), type);
+        const key = keyAt(_p);
+        this.natural.add(key);
+        this.put(key, type);
         if (rnd() < 0.34 && up < 2) up += 1;
         else {
           up = 0;
@@ -224,6 +228,23 @@ export class BlockWorld {
       offsetOnSphere(HUB_DIR, Math.cos(ang) * dist, Math.sin(ang) * dist, PLANET_RADIUS, dir);
       cluster(dir.normalize(), ring[n % ring.length], 3 + Math.floor(rnd() * 5));
     }
+  }
+
+  /** Bloque de depósito natural (sin minar) más cercano a un punto; null si no queda ninguno. */
+  nearestDeposit(from: Vector3, out: Vector3): BlockId | null {
+    let best = Infinity;
+    let found: BlockId | null = null;
+    for (const key of this.natural) {
+      const b = this.cells.get(key);
+      if (!b) continue;
+      const d = cellCenter(key, _p).distanceToSquared(from);
+      if (d < best) {
+        best = d;
+        found = b;
+        out.copy(_p);
+      }
+    }
+    return found;
   }
 
   /* ---------------- física del jugador ---------------- */

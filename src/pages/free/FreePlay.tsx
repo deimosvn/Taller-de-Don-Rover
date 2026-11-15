@@ -118,6 +118,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [compass, setCompass] = useState<{ block: BlockId; distance: number; angle: number } | null>(null);
 
   const gameRef = useRef(game);
   const profileRef = useRef(profile);
@@ -239,7 +240,8 @@ export function FreePlay({ initialRoom, mode }: Props) {
       netRef.current?.sendEdit(e);
     };
     const p = profileRef.current;
-    engine.enterPlayer({ id: 'libre-yo', name: p.name.trim() || 'Astronauta', avatar: p.avatar, role: null }, 'third');
+    // Un id al azar: cada jugador aparece en un punto distinto de la plaza.
+    engine.enterPlayer({ id: `libre-${Math.random().toString(36).slice(2, 8)}`, name: p.name.trim() || 'Astronauta', avatar: p.avatar, role: null }, 'third');
     engine.setPresence(presence.current);
     engine.setLighting(isNight() ? 'dusk' : 'day');
     const clock = setInterval(() => engine.setLighting(isNight() ? 'dusk' : 'day'), 5000);
@@ -262,6 +264,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
       last = key;
       netRef.current?.sendPose(pose);
     };
+    const radar = setInterval(() => setCompass(engine.nearestDeposit()), 500);
     const fast = setInterval(() => tick(false), 170);
     const keep = setInterval(() => tick(true), 3000);
     window.addEventListener('pagehide', saveWorld);
@@ -270,6 +273,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
       clearInterval(saver);
       clearInterval(fast);
       clearInterval(keep);
+      clearInterval(radar);
       window.removeEventListener('pagehide', saveWorld);
       saveWorld();
       blocks.onEdit = null;
@@ -519,6 +523,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
             </>
           }
           objective={
+            <>
             <button className="wp-quest" onClick={() => setPanel(panel === 'quests' ? null : 'quests')}>
               {quest ? (
                 <>
@@ -533,6 +538,14 @@ export function FreePlay({ initialRoom, mode }: Props) {
                 <span>🏆 ¡Completaste todas las misiones del explorador!</span>
               )}
             </button>
+            {compass && compass.distance > 4 && (
+              <p className="wp-compass" title="Depósito más cercano">
+                <i style={{ transform: `rotate(${compass.angle}rad)` }}>↑</i>
+                <img src={blockIcon(compass.block)} alt="" />
+                {BLOCKS[compass.block].name} a {Math.round(compass.distance)} m
+              </p>
+            )}
+            </>
           }
         >
           {panel === 'craft' && (
@@ -657,6 +670,15 @@ export function FreePlay({ initialRoom, mode }: Props) {
               <p className="wp-panel-lead">
                 {done}/{QUESTS.length} completadas · {profile.xp} XP
               </p>
+              <button
+                className="wp-btn wide"
+                onClick={() => {
+                  engineRef.current?.respawnPlayer();
+                  setPanel(null);
+                }}
+              >
+                🏠 Volver a la plaza de la colonia
+              </button>
               <ul className="wp-quests">
                 {QUESTS.map((q) => {
                   const isDone = game.done.includes(q.id);

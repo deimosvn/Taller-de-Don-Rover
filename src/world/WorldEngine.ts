@@ -23,6 +23,7 @@ import {
 } from 'three';
 import type { AvatarConfig, RoleId } from '../../shared/types';
 import { BlockWorld, type BlockHit } from './blocks/BlockWorld';
+import { keyAt } from './blocks/grid';
 import { BLOCKS, type BlockId } from './blocks/types';
 import { CameraRig, type CameraMode, type CameraShot, type PlayerView } from './camera/CameraRig';
 import { InputController } from './camera/InputController';
@@ -344,7 +345,14 @@ export class WorldEngine {
     this.scene.add(this.marker);
 
     // ---- cámara ----
-    this.rig = new CameraRig(this.camera, { terrainRadius, colliders: () => this.entities.colliders() });
+    this.rig = new CameraRig(this.camera, {
+      terrainRadius,
+      colliders: () => this.entities.colliders(),
+      solidAt: (p) => {
+        const b = this.blocks?.get(keyAt(p)) ?? 0;
+        return b !== 0 && !BLOCKS[b].transparent;
+      },
+    });
     this.rig.onModeChange = (mode) => {
       const p = this.player;
       if (p && (mode === 'first' || mode === 'third') && p.view !== mode) {
@@ -543,6 +551,27 @@ export class WorldEngine {
     this.buildHost = host;
     if (this.player) this.player.controller.blocks = this.blocks;
     return this.blocks;
+  }
+
+  /**
+   * Brújula del explorador: depósito natural más cercano, a qué distancia está y hacia
+   * dónde queda respecto de la cámara (rad; 0 = al frente, positivo = a la derecha).
+   */
+  nearestDeposit(): { block: BlockId; distance: number; angle: number } | null {
+    const p = this.player;
+    const b = this.blocks;
+    if (!p || !b) return null;
+    const block = b.nearestDeposit(p.controller.feet, _v);
+    if (!block) return null;
+    const to = _v2.copy(_v).sub(p.controller.feet);
+    return { block, distance: to.length(), angle: Math.atan2(to.dot(this.rig.right), to.dot(this.rig.forward)) };
+  }
+
+  /** Devuelve al jugador a la plaza de la colonia (por si se pierde o queda encerrado). */
+  respawnPlayer(): void {
+    const p = this.player;
+    if (!p) return;
+    this.enterPlayer(p.profile, p.view);
   }
 
   private buildAction(kind: 'primary' | 'secondary', phase: 'down' | 'up' | 'tap', x: number, y: number): void {
