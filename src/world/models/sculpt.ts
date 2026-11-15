@@ -204,6 +204,8 @@ export class MaterialKit {
   readonly paintDouble: MeshStandardMaterial;
   /** Multiplicador global del brillo propio (sube al atardecer y en la oscuridad). */
   readonly glow = { value: 1 };
+  /** Invisible pero proyecta sombra (el propio astronauta en primera persona). */
+  readonly shadowOnly = new MeshBasicMaterial({ colorWrite: false, depthWrite: false });
   private readonly glasses = new Map<string, MeshStandardMaterial>();
   private readonly lights = new Map<string, MeshBasicMaterial>();
   private env: Texture | null = null;
@@ -271,6 +273,7 @@ export class MaterialKit {
   dispose(): void {
     this.paint.dispose();
     this.paintDouble.dispose();
+    this.shadowOnly.dispose();
     for (const g of this.glasses.values()) g.dispose();
     for (const l of this.lights.values()) l.dispose();
     this.glasses.clear();

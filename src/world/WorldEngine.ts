@@ -21,21 +21,26 @@ import {
   WebGLRenderTarget,
   WebGLRenderer,
 } from 'three';
-import { CameraRig, type CameraMode, type CameraShot } from './camera/CameraRig';
+import type { AvatarConfig, RoleId } from '../../shared/types';
+import { CameraRig, type CameraMode, type CameraShot, type PlayerView } from './camera/CameraRig';
 import { InputController } from './camera/InputController';
 import { ColonyDirector } from './colony/ColonyDirector';
-import { DEMO_SNAPSHOT, type WorldSnapshot } from './colony/snapshot';
+import { DEMO_SNAPSHOT, type PresenceMap, type PresencePose, type WorldSnapshot } from './colony/snapshot';
 import { CAMERA, PLANET_RADIUS, QUALITY, detectQuality, type QualityTier } from './core/config';
 import { Emitter } from './core/emitter';
-import { DEG, clamp, damp } from './core/math';
+import { DEG, angleDelta, clamp, damp } from './core/math';
 import { LIGHTING, WEATHER, type LightingId, type LightingPreset } from './core/palette';
 import { createCatalog } from './entities/catalog';
 import { EntityManager, type Entity } from './entities/EntityManager';
-import type { EntityInfo } from './entities/types';
+import type { EntityInfo, EntityState, InteractionKind } from './entities/types';
 import { PostFX } from './fx/PostFX';
+import { ANIMS, type AnimName } from './models/astronaut';
 import { MaterialKit } from './models/sculpt';
 import { HUB_DIR } from './planet/features';
 import { terrainRadius } from './planet/heightfield';
+import { LANDING_PAD, colonySpot } from './planet/layout';
+import { PlayerController, type Sphere as CharSphere } from './player/PlayerController';
+import { PlayerInput } from './player/PlayerInput';
 import { Sky } from './planet/sky';
 import { PlanetTerrain } from './planet/terrain';
 import { createTerrainMaterial, type TerrainUniforms } from './planet/terrainMaterial';
@@ -54,6 +59,42 @@ export interface WorldOptions {
   distance?: number;
 }
 
+/** Quién juega en este dispositivo. */
+export interface PlayerProfile {
+  /** Id del jugador en la sesión (null en el explorador sin sesión). */
+  id: string | null;
+  name: string;
+  avatar: AvatarConfig;
+  role: RoleId | null;
+}
+
+export interface PlayerPrompt {
+  uid: string;
+  interactionId: string;
+  label: string;
+  kind: InteractionKind;
+}
+
+/** Estado del jugador para la interfaz (HUD). */
+export interface PlayerHud {
+  view: PlayerView;
+  prompt: PlayerPrompt | null;
+  grounded: boolean;
+  running: boolean;
+}
+
+/** El jugador interactuó con algo del mundo. */
+export interface InteractEvent {
+  uid: string;
+  defId: string;
+  kind: InteractionKind;
+  interactionId: string;
+  name: string;
+  description: string;
+  state: EntityState;
+  params: Record<string, unknown>;
+}
+
 export interface WorldEventMap {
   ready: null;
   select: EntityInfo | null;
@@ -64,7 +105,21 @@ export interface WorldEventMap {
   quality: QualityTier;
   lighting: LightingId;
   activity: null;
+  player: PlayerHud | null;
+  interact: InteractEvent;
 }
+
+interface LocalPlayer {
+  profile: PlayerProfile;
+  controller: PlayerController;
+  entity: Entity;
+  view: PlayerView;
+  prompt: PlayerPrompt | null;
+  promptTimer: number;
+  hudKey: string;
+}
+
+const PLAYER_UID = 'player:local';
 
 export interface ScreenPoint {
   x: number;
@@ -99,6 +154,12 @@ const _v2 = new Vector3();
 const _ndc = new Vector2();
 const _sphere = new Sphere(new Vector3(), PLANET_RADIUS);
 const _tint = new Color();
+
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
 function lightStateFrom(p: LightingPreset): LightState {
   return {
@@ -150,6 +211,9 @@ export class WorldEngine {
   private readonly hemi = new HemisphereLight(0xffffff, 0x444444, 1);
   private readonly fog = new Fog(0xffffff, 10, 300);
   private readonly input: InputController;
+  private readonly playerInput: PlayerInput;
+  private player: LocalPlayer | null = null;
+  private readonly chars: CharSphere[] = [];
   private readonly raycaster = new Raycaster();
   private readonly marker: Mesh;
   private post: PostFX | null = null;
@@ -238,7 +302,16 @@ export class WorldEngine {
 
     // ---- cámara ----
     this.rig = new CameraRig(this.camera, { terrainRadius, colliders: () => this.entities.colliders() });
-    this.rig.onModeChange = (mode) => this.events.emit('mode', mode);
+    this.rig.onModeChange = (mode) => {
+      const p = this.player;
+      if (p && (mode === 'first' || mode === 'third') && p.view !== mode) {
+        p.view = mode;
+        p.entity.setState({ firstPerson: mode === 'first' });
+        if (mode === 'third') this.playerInput.releaseLock();
+        this.emitHud(true);
+      }
+      this.events.emit('mode', mode);
+    };
     this.rig.jumpTo(HUB_DIR, options.distance ?? CAMERA.homeDistance, 0);
     if (options.autoRotate) this.rig.startAuto();
 
@@ -255,6 +328,17 @@ export class WorldEngine {
     });
     this.input.enabled = this.interactive;
     this.input.keyboard = options.keyboard ?? false;
+    this.playerInput = new PlayerInput({
+      element: this.canvas,
+      look: (yaw, pitch) => this.rig.lookBy(yaw, pitch),
+      zoom: (factor) => this.rig.zoomPlayer(factor),
+      jump: () => this.playerJump(),
+      toggleView: () => this.togglePlayerView(),
+      interact: () => this.playerInteract(),
+      emote: (anim) => this.playerEmote(anim),
+      firstPerson: () => this.player?.view === 'first',
+      activity: () => this.events.emit('activity', null),
+    });
 
     this.applyQuality();
     this.applySnapshot();
@@ -300,13 +384,198 @@ export class WorldEngine {
 
   setInteractive(on: boolean): void {
     this.interactive = on;
-    this.input.enabled = on;
-    this.canvas.style.cursor = on ? 'grab' : 'default';
+    this.input.enabled = on && !this.player;
+    this.playerInput.enabled = on && Boolean(this.player);
+    this.canvas.style.cursor = this.player ? 'default' : on ? 'grab' : 'default';
     if (!on) this.setHover(null);
   }
 
   setKeyboard(on: boolean): void {
     this.input.keyboard = on;
+    this.playerInput.keyboard = on;
+  }
+
+  /* ---------------- jugador en primera / tercera persona ---------------- */
+
+  get playerActive(): boolean {
+    return this.player !== null;
+  }
+
+  get playerView(): PlayerView | null {
+    return this.player?.view ?? null;
+  }
+
+  /** Controles táctiles de la interfaz (joystick y botón de correr). */
+  get controls(): { stick: { x: number; y: number }; setRun(on: boolean): void } {
+    const input = this.playerInput;
+    return {
+      stick: input.stick,
+      setRun: (on: boolean) => {
+        input.runHeld = on;
+      },
+    };
+  }
+
+  /**
+   * El alumno entra al mundo con su astronauta. Si el director ya lo tenía en la colonia
+   * (con su tripulación), aparece justo ahí; si no, en la plaza frente al centro de mando.
+   */
+  enterPlayer(profile: PlayerProfile, view: PlayerView = 'third'): void {
+    if (this.player) this.exitPlayer();
+    let spawn = this.director.spawnFor(profile.id);
+    if (!spawn) {
+      const plaza = profile.id ? colonySpot(31.5, 90 + ((hashCode(profile.id) % 30) - 15)) : colonySpot(10.2, 90);
+      spawn = { dir: plaza.dir, heading: profile.id ? LANDING_PAD.heading : plaza.heading };
+    }
+    this.director.setLocalPlayer(profile.id);
+    const entity = this.entities.spawn('character.astronaut', PLAYER_UID, { dir: spawn.dir, heading: spawn.heading, lift: 0 }, { avatar: profile.avatar, role: profile.role, seed: 3.3 });
+    const controller = new PlayerController(spawn.dir, spawn.heading);
+    this.player = { profile, controller, entity, view, prompt: null, promptTimer: 0, hudKey: '' };
+    entity.setState({ firstPerson: view === 'first', anim: 'idle', speed: 1 });
+    this.select(null);
+    this.setHover(null);
+    this.input.enabled = false;
+    this.playerInput.enabled = this.interactive;
+    this.canvas.style.cursor = 'default';
+    this.rig.attachPlayer(controller, view, controller.face);
+    this.director.playerActive = true;
+    this.emitHud(true);
+  }
+
+  exitPlayer(): void {
+    const p = this.player;
+    if (!p) return;
+    this.player = null;
+    this.playerInput.releaseLock();
+    this.playerInput.enabled = false;
+    this.entities.remove(PLAYER_UID);
+    this.director.playerActive = false;
+    this.director.setLocalPlayer(null);
+    this.rig.detachPlayer();
+    this.input.enabled = this.interactive;
+    this.canvas.style.cursor = this.interactive ? 'grab' : 'default';
+    this.events.emit('player', null);
+  }
+
+  setPlayerView(view: PlayerView): void {
+    if (!this.player) return;
+    this.rig.setPlayerView(view);
+  }
+
+  togglePlayerView(): void {
+    if (!this.player) return;
+    this.setPlayerView(this.player.view === 'first' ? 'third' : 'first');
+  }
+
+  playerJump(): void {
+    this.player?.controller.jump();
+  }
+
+  playerEmote(anim: AnimName): void {
+    this.player?.controller.playEmote(anim);
+  }
+
+  /** Interactúa con lo que el jugador tiene enfrente (consola, IX, un compañero…). */
+  playerInteract(): void {
+    const p = this.player;
+    const pr = p?.prompt;
+    if (!p || !pr) return;
+    const e = this.entities.get(pr.uid);
+    if (!e) return;
+    p.controller.faceTowards(e.root.position);
+    if (e.def.id === 'character.astronaut') {
+      p.controller.playEmote('wave', 2.2);
+      this.director.greet(e.uid);
+    } else if (pr.kind === 'talk') {
+      p.controller.playEmote('talk', 2.6);
+    } else if (pr.kind === 'scan' || pr.kind === 'inspect') {
+      p.controller.playEmote('scan', 2.6);
+    } else {
+      p.controller.playEmote('point', 1.8);
+    }
+    this.events.emit('interact', {
+      uid: e.uid,
+      defId: e.def.id,
+      kind: pr.kind,
+      interactionId: pr.interactionId,
+      name: e.def.name,
+      description: e.def.description,
+      state: { ...e.state },
+      params: { ...e.params },
+    });
+  }
+
+  /** Pose compacta del jugador para mandarla por la red. */
+  playerPose(): PresencePose | null {
+    const c = this.player?.controller;
+    if (!c) return null;
+    const r4 = (x: number) => Math.round(x * 10000) / 10000;
+    return [r4(c.dir.x), r4(c.dir.y), r4(c.dir.z), Math.round(c.heading * 100) / 100, Math.max(0, ANIMS.indexOf(c.anim)), Math.round(c.stride * 10) / 10];
+  }
+
+  /** Poses de los compañeros que juegan en 3D. */
+  setPresence(map: PresenceMap): void {
+    const own = this.player?.profile.id;
+    if (own && map[own]) {
+      const copy = { ...map };
+      delete copy[own];
+      this.director.setPresence(copy);
+    } else {
+      this.director.setPresence(map);
+    }
+  }
+
+  private updatePlayer(dt: number): void {
+    const p = this.player!;
+    const c = p.controller;
+    const move = this.playerInput.read(dt);
+    const first = p.view === 'first';
+    this.director.characterSpheres(this.chars);
+    c.update(dt, move, this.rig.forward, this.rig.right, first, this.entities.colliders(), this.chars);
+    // En tercera persona, al caminar hacia delante la cámara se acomoda sola detrás.
+    if (!first && move.y > 0.3 && this.playerInput.sinceLook > 1.2 && c.speed > 0.5) {
+      const want = this.rig.headingFor(c.face);
+      this.rig.goalHeading += angleDelta(this.rig.goalHeading, want) * (1 - Math.exp(-1.3 * dt));
+    }
+    this.entities.move(PLAYER_UID, { dir: c.dir, heading: c.heading, lift: c.alt });
+    if (p.entity.state.anim !== c.anim || Math.abs(Number(p.entity.state.speed) - c.stride) > 0.05) p.entity.setState({ anim: c.anim, speed: Math.round(c.stride * 100) / 100 });
+    this.director.playerPos.copy(c.feet);
+
+    p.promptTimer -= dt;
+    if (p.promptTimer <= 0) {
+      p.promptTimer = 0.15;
+      p.prompt = this.findPrompt(c);
+    }
+    this.emitHud(false);
+  }
+
+  private findPrompt(c: PlayerController): PlayerPrompt | null {
+    const chest = _v.copy(c.feet).addScaledVector(c.dir, 1.0);
+    let best: PlayerPrompt | null = null;
+    let bestScore = Infinity;
+    for (const hit of this.entities.interactionsNear(chest)) {
+      if (hit.entity.uid === PLAYER_UID) continue;
+      // Preferir lo que está enfrente del jugador.
+      const to = _v2.copy(hit.entity.root.position).sub(c.feet);
+      to.addScaledVector(c.dir, -to.dot(c.dir));
+      const ahead = to.lengthSq() > 1e-6 ? to.normalize().dot(c.face) : 1;
+      const score = hit.distance - ahead * 0.8;
+      if (score < bestScore) {
+        bestScore = score;
+        best = { uid: hit.entity.uid, interactionId: hit.interaction.id, label: hit.interaction.label, kind: hit.interaction.kind };
+      }
+    }
+    return best;
+  }
+
+  private emitHud(force: boolean): void {
+    const p = this.player;
+    if (!p) return;
+    const hud: PlayerHud = { view: p.view, prompt: p.prompt, grounded: p.controller.grounded, running: p.controller.anim === 'run' };
+    const key = `${hud.view}|${hud.prompt?.uid}:${hud.prompt?.interactionId}|${hud.grounded}|${hud.running}`;
+    if (!force && key === p.hudKey) return;
+    p.hudKey = key;
+    this.events.emit('player', hud);
   }
 
   setPaused(paused: boolean): void {
@@ -341,7 +610,7 @@ export class WorldEngine {
   /** Lleva la cámara a una entidad y la deja orbitándola (o siguiéndola si se mueve). */
   focusEntity(uid: string, follow = false): boolean {
     const e = this.entities.get(uid);
-    if (!e || !e.visible) return false;
+    if (!e || !e.visible || this.player) return false;
     this.select(uid);
     this.rig.focusOn(e.cameraTarget(e.heading + Math.PI + 0.42), follow || e.def.kind === 'vehicle' || e.def.kind === 'phenomenon');
     return true;
@@ -350,7 +619,7 @@ export class WorldEngine {
   /** Viaja a un lugar del registro de zonas. */
   focusZone(zoneId: string): boolean {
     const z = this.zones.get(zoneId);
-    if (!z) return false;
+    if (!z || this.player) return false;
     const e = z.entityUid ? this.entities.get(z.entityUid) : null;
     if (e && e.visible && z.kind !== 'colony') return this.focusEntity(e.uid);
     this.select(null);
@@ -359,6 +628,7 @@ export class WorldEngine {
   }
 
   goHome(): void {
+    if (this.player) return;
     this.select(null);
     this.rig.flyTo({ dir: HUB_DIR, distance: CAMERA.homeDistance, heading: 0, tilt: 0 });
   }
@@ -416,6 +686,7 @@ export class WorldEngine {
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
     this.input.dispose();
+    this.playerInput.dispose();
     this.events.clear();
     this.director.dispose();
     this.entities.dispose();
@@ -543,6 +814,7 @@ export class WorldEngine {
     const dt = Math.min(0.05, elapsed / 1000);
     this.time += dt;
 
+    if (this.player) this.updatePlayer(dt);
     this.rig.update(dt);
     this.updateLighting(dt);
     const q = QUALITY[this.tier];
@@ -560,8 +832,9 @@ export class WorldEngine {
 
     if (this.post) {
       // De cerca el desenfoque es más marcado (maqueta); desde la órbita casi desaparece.
+      // Jugando en primera o tercera persona la vista es "real": sin efecto maqueta.
       const zoom = this.rig.zoomLevel();
-      this.post.strength = clamp(1.05 - zoom * 0.75, 0.25, 1);
+      this.post.strength = this.player ? 0.04 : clamp(1.05 - zoom * 0.75, 0.25, 1);
       this.post.focus = 0.5;
       this.post.render(this.renderer, this.scene, this.camera);
     } else {
@@ -648,6 +921,11 @@ export class WorldEngine {
     this.fog.color.copy(s.fog);
     this.fog.near = Math.min(far * 0.6, (6 + alt * 0.6) / Math.max(1, s.fogDensity * 0.6));
     this.fog.far = far;
+    if (this.player) {
+      // A ras de suelo la bruma empieza más lejos para que la colonia se vea nítida.
+      this.fog.near = Math.max(this.fog.near, 13 / Math.max(1, s.fogDensity));
+      this.fog.far = Math.max(this.fog.far, 105 / s.fogDensity);
+    }
 
     this.terrainUniforms.uHaze.value.copy(s.haze);
     this.terrainUniforms.uHazeAmount.value = clamp(0.16 + alt / 260, 0.16, 0.62);
@@ -683,7 +961,8 @@ export class WorldEngine {
   }
 
   private updateMarker(): void {
-    const e = this.selectedUid ? this.entities.get(this.selectedUid) : null;
+    const uid = this.player ? (this.player.prompt?.uid ?? null) : this.selectedUid;
+    const e = uid ? this.entities.get(uid) : null;
     if (!e || !e.visible) {
       this.marker.visible = false;
       return;

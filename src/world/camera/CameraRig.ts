@@ -12,13 +12,36 @@
 // sobre la esfera, así que no hay singularidades en los polos.
 //
 // Modos: 'free' (exploración), 'focus' (inspeccionar un objeto), 'follow' (seguir a un
-// personaje), 'mission' (planos guiados para futuras misiones) y 'auto' (rotación continua).
+// personaje), 'mission' (planos guiados para futuras misiones), 'auto' (rotación continua),
+// 'third' (tercera persona: detrás del astronauta del jugador) y 'first' (primera persona:
+// dentro del casco).
 
 import { PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { CAMERA, PLANET_RADIUS, type CameraTuning } from '../core/config';
 import { DEG, angleBetween, angleDelta, clamp, damp, easeInOut, lerp, tangentFrame } from '../core/math';
 
-export type CameraMode = 'free' | 'focus' | 'follow' | 'mission' | 'auto';
+export type CameraMode = 'free' | 'focus' | 'follow' | 'mission' | 'auto' | 'first' | 'third';
+export type PlayerView = 'first' | 'third';
+
+/** El astronauta que controla el jugador: la cámara lo sigue en primera o tercera persona. */
+export interface PlayerSource {
+  /** Dirección unitaria del jugador sobre el planeta. */
+  dir: Vector3;
+  /** Pies del jugador en el mundo. */
+  feet: Vector3;
+  /** Altura sobre el terreno (saltos). */
+  alt: number;
+}
+
+/** Altura de la mira en tercera persona y de los ojos en primera. */
+export const PLAYER_CAMERA = {
+  shoulder: 1.25,
+  eye: 1.38,
+  distance: 4.8,
+  minDistance: 2.0,
+  maxDistance: 9.5,
+  pitch: 16,
+} as const;
 
 /** Esfera que la cámara no puede atravesar. */
 export interface RigCollider {
@@ -164,6 +187,12 @@ export class CameraRig {
   private maxDist = CAMERA.maxDistance;
   private minDist = CAMERA.minDistance;
   private lastNear = 0;
+  private lastFar = 2200;
+  private player: PlayerSource | null = null;
+  /** Inclinación de la mirada en primera persona (rad, + arriba). */
+  private fpPitch = 0;
+  /** Distancia de la cámara al astronauta en tercera persona. */
+  tpDist: number = PLAYER_CAMERA.distance;
 
   constructor(
     readonly camera: PerspectiveCamera,
@@ -223,7 +252,7 @@ export class CameraRig {
 
   /** Cualquier gesto del jugador pasa por aquí: cancela vuelos libres y la rotación automática. */
   userInput(): boolean {
-    if (this.mode === 'mission') return false;
+    if (this.mode === 'mission' || this.mode === 'first' || this.mode === 'third') return false;
     // Los vuelos de misión y los de enfoque no se interrumpen: son cortos y deben llegar.
     if (this.flight && (this.flight.locked || this.target0)) return false;
     if (this.flight) this.finishFlight(false);
@@ -318,6 +347,7 @@ export class CameraRig {
 
   /** Vuela con suavidad hasta un punto del planeta (exploración libre). */
   flyTo(opts: FlyOptions, onArrive?: () => void): void {
+    this.player = null;
     this.target0 = null;
     this.minDist = this.tuning.minDistance;
     if (this.mode !== 'mission') this.setMode('free');
@@ -326,6 +356,7 @@ export class CameraRig {
 
   /** Enfoca un objeto: la cámara viaja hasta él y queda orbitándolo. */
   focusOn(target: RigTarget, follow = false): void {
+    this.player = null;
     this.target0 = target;
     this.minDist = target.minDistance;
     this.setMode(follow ? 'follow' : 'focus');
@@ -339,7 +370,7 @@ export class CameraRig {
 
   /** Suelta el objeto enfocado y vuelve a la exploración libre sin moverse del sitio. */
   release(): void {
-    if (this.mode === 'mission') return;
+    if (this.mode === 'mission' || this.player) return;
     this.target0 = null;
     this.minDist = this.tuning.minDistance;
     this.tilt = clamp(this.pitch - autoPitch(this.dist) * DEG, -this.tuning.tiltRange * DEG, this.tuning.tiltRange * DEG);
@@ -347,8 +378,145 @@ export class CameraRig {
     this.setMode('free');
   }
 
+  /* ---------------- jugador en primera / tercera persona ---------------- */
+
+  get playerView(): PlayerView | null {
+    return this.player && (this.mode === 'first' || this.mode === 'third') ? this.mode : null;
+  }
+
+  /**
+   * Engancha la cámara al astronauta del jugador. `facing` (tangente en el mundo) deja la
+   * cámara detrás de él. Desde la órbita la cámara baja en picada hasta su espalda.
+   */
+  attachPlayer(src: PlayerSource, view: PlayerView, facing?: Vector3): void {
+    this.player = src;
+    this.target0 = null;
+    this.flight = null;
+    this.shots = [];
+    this.velocity.active = false;
+    this.minDist = PLAYER_CAMERA.minDistance;
+    this.goalFocus.copy(src.dir);
+    if (facing) this.goalHeading = this.headingFor(facing);
+    this.goalPitch = PLAYER_CAMERA.pitch * DEG;
+    this.fpPitch = 0;
+    this.setMode(view);
+  }
+
+  /** Suelta al jugador y vuelve a la exploración libre (la cámara sube un poco). */
+  detachPlayer(): void {
+    if (!this.player) return;
+    this.player = null;
+    this.minDist = this.tuning.minDistance;
+    this.goalFocus.copy(this.focus);
+    this.goalDist = clamp(Math.max(this.dist, 16), this.minDist, this.maxDist);
+    this.goalLift = 0;
+    this.tilt = 0;
+    this.setMode('free');
+  }
+
+  setPlayerView(view: PlayerView): void {
+    if (!this.player || this.mode === view) return;
+    if (view === 'third') {
+      this.goalPitch = clamp(PLAYER_CAMERA.pitch * DEG - this.fpPitch * 0.6, this.tuning.minPitch * DEG, 70 * DEG);
+      this.tpDist = Math.max(this.tpDist, 3.2);
+    } else {
+      this.fpPitch = clamp((PLAYER_CAMERA.pitch * DEG - this.goalPitch) * 0.6, -1.2, 1.2);
+    }
+    this.setMode(view);
+  }
+
+  /** Girar la mirada (radianes): + derecha / + arriba. */
+  lookBy(yaw: number, pitch: number): void {
+    if (!this.player) return;
+    this.goalHeading += yaw;
+    if (this.mode === 'first') this.fpPitch = clamp(this.fpPitch + pitch, -1.3, 1.3);
+    else this.goalPitch = clamp(this.goalPitch - pitch, this.tuning.minPitch * DEG, 70 * DEG);
+  }
+
+  /** Acercar/alejar en tercera persona; al acercarse del todo entra al casco y viceversa. */
+  zoomPlayer(factor: number): void {
+    if (!this.player) return;
+    if (this.mode === 'first') {
+      if (factor > 1.02) {
+        this.tpDist = 2.8;
+        this.setPlayerView('third');
+      }
+      return;
+    }
+    if (factor < 1 && this.tpDist <= PLAYER_CAMERA.minDistance + 0.01) {
+      this.setPlayerView('first');
+      return;
+    }
+    this.tpDist = clamp(this.tpDist * factor, PLAYER_CAMERA.minDistance, PLAYER_CAMERA.maxDistance);
+  }
+
+  /** Rumbo de la cámara (en su marco transportado) que mira en la dirección tangente dada. */
+  headingFor(world: Vector3): number {
+    const east = _v1.crossVectors(this.ref, this.focus).normalize();
+    return Math.atan2(world.dot(east), world.dot(this.ref));
+  }
+
+  private updatePlayer(dt: number): void {
+    const p = this.player!;
+    // El foco sigue al jugador: exacto si está cerca, en planeo si acaba de aparecer lejos.
+    this.goalFocus.copy(p.dir);
+    const ang = angleBetween(this.focus, this.goalFocus);
+    if (ang > 1e-7) {
+      const frac = ang * PLANET_RADIUS < 2.5 ? 1 : 1 - Math.exp(-6 * dt);
+      _v1.crossVectors(this.focus, this.goalFocus);
+      if (_v1.lengthSq() > 1e-14) {
+        _q.setFromAxisAngle(_v1.normalize(), ang * frac);
+        this.focus.applyQuaternion(_q).normalize();
+        this.ref.applyQuaternion(_q);
+        this.orthonormalize();
+      }
+    }
+    this.heading += angleDelta(this.heading, this.goalHeading) * (1 - Math.exp(-30 * dt));
+    if (this.mode === 'third') {
+      this.lift = this.goalLift = p.alt + PLAYER_CAMERA.shoulder;
+      this.dist = Math.exp(damp(Math.log(this.dist), Math.log(this.tpDist), 5, dt));
+      this.goalDist = this.dist;
+      this.pitch = damp(this.pitch, this.goalPitch, 10, dt);
+      this.place(dt);
+    } else {
+      this.dist = damp(this.dist, 1.2, 8, dt);
+      this.goalDist = this.dist;
+      this.placeFirst();
+    }
+  }
+
+  private placeFirst(): void {
+    const p = this.player!;
+    const up = p.dir;
+    const east = _v1.crossVectors(this.ref, this.focus).normalize();
+    this.forward.copy(this.ref).multiplyScalar(Math.cos(this.heading)).addScaledVector(east, Math.sin(this.heading));
+    this.forward.addScaledVector(up, -this.forward.dot(up)).normalize();
+    this.right.crossVectors(this.forward, up).normalize();
+    const cam = this.camera.position;
+    cam.copy(p.feet).addScaledVector(up, PLAYER_CAMERA.eye).addScaledVector(this.forward, 0.12);
+    this.target.copy(cam);
+    this.groundR = cam.length() - PLAYER_CAMERA.eye;
+    const cp = Math.cos(this.fpPitch);
+    const sp = Math.sin(this.fpPitch);
+    _v2.copy(this.forward).multiplyScalar(cp).addScaledVector(up, sp).add(cam);
+    this.camera.up.copy(up).multiplyScalar(cp).addScaledVector(this.forward, -sp).normalize();
+    this.camera.lookAt(_v2);
+    this.setClip(0.06, 900);
+    this.camera.updateMatrixWorld();
+  }
+
+  private setClip(near: number, far: number): void {
+    if (Math.abs(near - this.lastNear) <= this.lastNear * 0.2 && far === this.lastFar) return;
+    this.lastNear = near;
+    this.lastFar = far;
+    this.camera.near = near;
+    this.camera.far = far;
+    this.camera.updateProjectionMatrix();
+  }
+
   /** Rotación continua del planeta (vistas de fondo y portada). */
   startAuto(): void {
+    this.player = null;
     this.target0 = null;
     this.flight = null;
     this.velocity.active = false;
@@ -358,6 +526,7 @@ export class CameraRig {
   /** Reproduce una secuencia de planos. Preparado para las cámaras de misión. */
   playShots(shots: CameraShot[], onDone?: () => void): void {
     if (!shots.length) return;
+    this.player = null;
     this.target0 = null;
     this.shots = shots.slice();
     this.shotsDone = onDone;
@@ -472,6 +641,10 @@ export class CameraRig {
   /* ---------------- actualización por cuadro ---------------- */
 
   update(dt: number): void {
+    if (this.player && (this.mode === 'first' || this.mode === 'third')) {
+      this.updatePlayer(dt);
+      return;
+    }
     const t = this.tuning;
     if (this.flight) {
       this.stepFlight(dt);
@@ -633,13 +806,7 @@ export class CameraRig {
     this.camera.up.copy(up).multiplyScalar(cp).addScaledVector(this.forward, sp).normalize();
     this.camera.lookAt(this.target);
 
-    const near = clamp(arm * 0.03, 0.08, 4);
-    if (Math.abs(near - this.lastNear) > this.lastNear * 0.2) {
-      this.lastNear = near;
-      this.camera.near = near;
-      this.camera.far = 2200;
-      this.camera.updateProjectionMatrix();
-    }
+    this.setClip(clamp(arm * 0.03, 0.08, 4), 2200);
     this.camera.updateMatrixWorld();
   }
 
