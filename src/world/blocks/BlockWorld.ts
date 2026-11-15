@@ -423,6 +423,11 @@ export class BlockWorld {
     this.bitsAlive = alive;
   }
 
+  /** Celda que contiene un punto del mundo. */
+  cellAt(point: Vector3): number {
+    return keyAt(point);
+  }
+
   /** Centro de una celda (para efectos y distancias). */
   center(key: number, out = new Vector3()): Vector3 {
     return cellCenter(key, out);

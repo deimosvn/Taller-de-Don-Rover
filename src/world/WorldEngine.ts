@@ -763,7 +763,9 @@ export class WorldEngine {
     const c = this.player?.controller;
     if (!c) return null;
     const r4 = (x: number) => Math.round(x * 10000) / 10000;
-    return [r4(c.dir.x), r4(c.dir.y), r4(c.dir.z), Math.round(c.heading * 100) / 100, Math.max(0, ANIMS.indexOf(c.anim)), Math.round(c.stride * 10) / 10];
+    // El último valor lleva la rapidez del paso (unidades) y la altura sobre el terreno (decenas, en dm).
+    const lift = Math.max(0, Math.round((c.feet.length() - terrainRadius(c.dir)) * 10));
+    return [r4(c.dir.x), r4(c.dir.y), r4(c.dir.z), Math.round(c.heading * 100) / 100, Math.max(0, ANIMS.indexOf(c.anim)), Math.min(9.9, Math.round(c.stride * 10) / 10) + lift * 10];
   }
 
   /** Poses de los compañeros que juegan en 3D. */
@@ -790,7 +792,8 @@ export class WorldEngine {
       const want = this.rig.headingFor(c.face);
       this.rig.goalHeading += angleDelta(this.rig.goalHeading, want) * (1 - Math.exp(-1.3 * dt));
     }
-    this.entities.move(PLAYER_UID, { dir: c.dir, heading: c.heading, lift: c.alt });
+    // Altura real sobre el terreno: cuenta el salto y los bloques sobre los que está parado.
+    this.entities.move(PLAYER_UID, { dir: c.dir, heading: c.heading, lift: Math.max(0, c.feet.length() - terrainRadius(c.dir)) });
     if (p.entity.state.anim !== c.anim || Math.abs(Number(p.entity.state.speed) - c.stride) > 0.05) p.entity.setState({ anim: c.anim, speed: Math.round(c.stride * 100) / 100 });
     this.director.playerPos.copy(c.feet);
     this.updateBuild(dt);

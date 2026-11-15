@@ -254,8 +254,8 @@ export function FreePlay({ initialRoom, mode }: Props) {
       const pose = engine.playerPose();
       if (!pose) return;
       if (prev) {
-        const dot = Math.min(1, pose[0] * prev[0] + pose[1] * prev[1] + pose[2] * prev[2]);
-        const dist = Math.acos(dot) * PLANET_RADIUS;
+        // Cuerda entre las dos posiciones (exactamente 0 si el astronauta no se movió).
+        const dist = Math.hypot(pose[0] - prev[0], pose[1] - prev[1], pose[2] - prev[2]) * PLANET_RADIUS;
         if (dist > 0.05 && dist < 6) update((g) => ({ ...g, stats: { ...g.stats, walked: g.stats.walked + dist } }));
       }
       prev = [pose[0], pose[1], pose[2]];
@@ -265,6 +265,13 @@ export function FreePlay({ initialRoom, mode }: Props) {
       netRef.current?.sendPose(pose);
     };
     const radar = setInterval(() => setCompass(engine.nearestDeposit()), 500);
+    // Golpecitos mientras se mina.
+    let hits = -1;
+    const offBuild = engine.events.on('build', (aim) => {
+      const step = aim.progress > 0 ? Math.floor(aim.progress * 4) : -1;
+      if (step !== hits && step >= 0) sfx.tap();
+      hits = step;
+    });
     const fast = setInterval(() => tick(false), 170);
     const keep = setInterval(() => tick(true), 3000);
     window.addEventListener('pagehide', saveWorld);
@@ -274,6 +281,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
       clearInterval(fast);
       clearInterval(keep);
       clearInterval(radar);
+      offBuild();
       window.removeEventListener('pagehide', saveWorld);
       saveWorld();
       blocks.onEdit = null;
@@ -492,7 +500,16 @@ export function FreePlay({ initialRoom, mode }: Props) {
 
   return (
     <div className="world-overlay free-world">
-      <WorldCanvas snapshot={snapshot} keyboard onEngine={setEngine} onFail={() => setFailed(true)}>
+      <WorldCanvas
+        snapshot={snapshot}
+        keyboard
+        onEngine={(e) => {
+          // Acceso al motor desde la consola del navegador, para depurar.
+          (window as unknown as { __world?: unknown }).__world = e;
+          setEngine(e);
+        }}
+        onFail={() => setFailed(true)}
+      >
         <WorldPlay
           engine={engine}
           snapshot={snapshot}

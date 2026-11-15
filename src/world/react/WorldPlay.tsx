@@ -57,7 +57,8 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
   const [card, setCard] = useState<WorldCard | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [touch] = useState(coarse);
-  const [showKeys, setShowKeys] = useState(true);
+  // En ventanas pequeñas la ayuda empieza cerrada para no tapar el mundo.
+  const [showKeys, setShowKeys] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
   const [showEmotes, setShowEmotes] = useState(false);
   const [aim, setAim] = useState<BuildAim | null>(null);
   const [mode, setMode] = useState<'mine' | 'place'>('mine');

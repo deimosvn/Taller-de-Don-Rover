@@ -475,7 +475,8 @@ export class CameraRig {
     }
     this.heading += angleDelta(this.heading, this.goalHeading) * (1 - Math.exp(-30 * dt));
     if (this.mode === 'third') {
-      this.lift = this.goalLift = p.alt + PLAYER_CAMERA.shoulder;
+      // Altura real sobre el terreno (salto + bloques bajo los pies).
+      this.lift = this.goalLift = Math.max(p.alt, p.feet.length() - this.env.terrainRadius(p.dir)) + PLAYER_CAMERA.shoulder;
       this.dist = Math.exp(damp(Math.log(this.dist), Math.log(this.tpDist), 5, dt));
       this.goalDist = this.dist;
       this.pitch = damp(this.pitch, this.goalPitch, 10, dt);
