@@ -92,8 +92,19 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
         },
       },
       twists: { type: 'array', items: { type: 'string' } },
+      science: {
+        type: 'object',
+        properties: {
+          study_id: { type: 'string' },
+          title_es: { type: 'string' },
+          summary_es: { type: 'string' },
+          connection_es: { type: 'string' },
+        },
+        required: ['study_id', 'title_es', 'summary_es', 'connection_es'],
+        additionalProperties: false,
+      },
     },
-    required: ['briefing', 'crew_lines', 'twists'],
+    required: ['briefing', 'crew_lines', 'twists', 'science'],
     additionalProperties: false,
   },
   logs: {
@@ -164,8 +175,11 @@ Reglas estrictas:
 - Mantente dentro de la historia y el giro de la plantilla.
 - "briefing": máximo 60 palabras, en segunda persona del plural; menciona el objeto descubierto en el salón.
 - "crew_lines": una línea por tripulación (máximo 18 palabras) que explique qué parte del problema le toca a su sector.
-- "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.`,
-        content: JSON.stringify(input),
+- "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.
+Investigación real:
+- "studies" trae investigaciones reales de la NASA (NTRS y OSDR, en inglés). Elige la más relevante para esta misión y úsala como base científica: el briefing debe contar en una frase lo que investigó ese estudio, sin inventar resultados que no estén en su resumen.
+- "science": study_id (exactamente el id del estudio elegido), title_es (título traducido y claro, máximo 14 palabras), summary_es (qué investigaron y qué encontraron, para niñas y niños, máximo 45 palabras, solo con información del resumen), connection_es (cómo se conecta con la misión de la colonia, máximo 25 palabras). Si "studies" viene vacío, deja los cuatro campos vacíos.`,
+        content: JSON.stringify({ ...input, studies: Array.isArray(input.studies) ? input.studies.slice(0, 4) : [] }),
         schema: SCHEMAS.narrative,
       };
     }

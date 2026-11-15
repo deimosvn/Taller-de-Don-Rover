@@ -42,6 +42,7 @@ El proyecto ya está conectado a **Vercel**: cada push a `main` se publica solo.
 | --- | --- | --- |
 | `api/colonies.ts` | Guarda cada colonia y el historial de misiones en **Supabase** | `POSTGRES_URL` (la crea la integración de Supabase) |
 | `api/ai.ts` | IA con **Claude Opus 5.5** sin exponer la clave | `ANTHROPIC_API_KEY` |
+| `api/nasa.ts` | Estudios científicos y clima espacial reales de la **NASA** | `NASA_API_KEY` (opcional: sin ella usa `DEMO_KEY`) |
 
 Ambas son opcionales: si falta la variable, el juego funciona igual que antes (colonias en el navegador, IA local). Puedes ver el ejemplo en [`.env.example`](.env.example).
 
@@ -54,6 +55,20 @@ Ambas son opcionales: si falta la variable, el juego funciona igual que antes (c
 Las tablas tienen RLS activado y sin políticas: la API pública de Supabase no puede leerlas. Solo las funciones de Vercel acceden, y la clave de cada colonia se guarda como hash.
 
 Para probar las funciones en tu computadora usa `vercel dev` (con `vercel env pull` para traer las variables); `npm run dev` corre solo la app, sin funciones.
+
+## Datos reales de la NASA
+
+Cada misión usa datos reales, a través de `api/nasa.ts`:
+
+1. **Estudios científicos → misión generada por la IA.** Al empezar una misión se buscan investigaciones reales sobre su tema en el **NTRS** (Servidor de Reportes Técnicos de la NASA) y en el **OSDR** (Repositorio de Datos Científicos Abiertos, biología espacial). Claude Opus 5.5 elige la más relevante, escribe la misión a partir de ella y la resume para niñas y niños; el proyector y los celulares muestran el estudio con su enlace original.
+2. **Clima espacial real (DONKI).** Se consultan eyecciones de masa coronal, tormentas geomagnéticas, partículas solares y llamaradas de los últimos 14 días. Si el Sol está activo de verdad, la emergencia es más difícil (la meta sube) y el escudo de radiación de la colonia se daña.
+3. **Salud de los tripulantes.** Según el clima espacial y la misión, una condición real (radiación, pérdida de hueso, músculos, defensas o sueño, con un estudio del OSDR/NTRS) afecta a todos los tripulantes: sus acciones rinden menos. Compartir recursos con la colonia y vivir en un sector blindado los protege; con radiación, cada celular muestra su dosis estimada.
+
+Sin conexión o sin la función, el juego sigue con su contenido propio. Las respuestas de la NASA se guardan en caché para no gastar el límite de la clave.
+
+## Minijuegos de la emergencia
+
+En la etapa de acción, cada especialidad hace una tarea realista de su sistema: limpiar paneles solares, regular presión/CO₂/temperatura con su zona segura en unidades reales, sellar fugas o puntos de calor, orientar paneles o la antena, dosificar agua o luz a las plantas, conectar cables y repetir el patrón de una señal. Cada minijuego muestra un dato real de la NASA. Se pueden probar todos en `#/minijuegos`.
 
 ## Inteligencia artificial
 

@@ -64,6 +64,10 @@ export const sfx = {
   scan: () => tone(280, 0.9, 'sine', 0.06, 0, 1400),
   tap: () => tone(480 + Math.random() * 260, 0.045, 'triangle', 0.05),
   whoosh: () => tone(200, 0.35, 'sine', 0.05, 0, 900),
+  /** Nota de una escala (minijuego de patrones). */
+  note: (i: number) => tone([392, 494, 587, 698, 784, 988][i % 6], 0.32, 'triangle', 0.1),
+  /** Siseo corto (fugas). */
+  hiss: () => tone(1800, 0.12, 'sawtooth', 0.015, 0, 900),
 };
 
 export function isMuted() {

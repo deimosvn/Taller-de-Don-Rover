@@ -6,6 +6,7 @@ import { IXOrb } from './components/art';
 const HostApp = lazy(() => import('./pages/host/HostApp').then((m) => ({ default: m.HostApp })));
 const PlayApp = lazy(() => import('./pages/play/PlayApp').then((m) => ({ default: m.PlayApp })));
 const WorldExplorer = lazy(() => import('./world/react/WorldExplorer').then((m) => ({ default: m.WorldExplorer })));
+const MinigameLab = lazy(() => import('./pages/play/MinigameLab').then((m) => ({ default: m.MinigameLab })));
 
 function Loading() {
   return (
@@ -27,6 +28,8 @@ export function App() {
         <PlayApp initialCode={(route.params.get('c') ?? '').toUpperCase()} sig={route.params.get('s')} />
       ) : route.path === '/mundo' ? (
         <WorldExplorer />
+      ) : route.path === '/minijuegos' ? (
+        <MinigameLab />
       ) : (
         <Landing />
       )}

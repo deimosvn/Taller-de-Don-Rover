@@ -35,6 +35,7 @@ import type {
   BadgeId,
   CategoryId,
   ColonyState,
+  CrewHealthStatus,
   CrewOutcome,
   CrewStatus,
   DebriefPublic,
@@ -44,6 +45,7 @@ import type {
   IxMessage,
   Meters,
   MissionId,
+  MissionNasa,
   MissionPublic,
   Pace,
   Phase,
@@ -61,6 +63,8 @@ import type {
 import * as ai from './ai';
 import { saveColony } from './store';
 import { logMission } from '../lib/cloud';
+import { nasaStudies, spaceWeather } from '../lib/nasa';
+import { HEALTH, MISSION_TOPICS, buildHealth, doseFor, healthFactor, healthKindFor, plainHighlight, protectionFor } from '../../shared/nasa';
 
 /* ------------------------------------------------------------------ */
 /* Utilidades                                                           */
@@ -196,6 +200,8 @@ interface MissionRun {
   debrief: DebriefPublic | null;
   metersBefore: Meters;
   hints: IxMessage[];
+  /** Estudios, clima espacial y salud de la tripulación con datos reales de la NASA. */
+  nasa?: MissionNasa;
 }
 
 export interface RoomSnapshot {
@@ -826,6 +832,7 @@ export class HostEngine {
       debrief: null,
       metersBefore: { ...this.colony.meters },
       hints: [],
+      nasa: { science: null, weather: null, health: null },
     };
     this.objectVote = null;
     if (scan.source !== 'teacher' && !this.colony.discoveries.some((d) => d.label.toLowerCase() === scan.label.toLowerCase())) {
@@ -835,26 +842,70 @@ export class HostEngine {
     this.missionsPlayed.push(id);
     this.pushIx('info', `NEW MISSION UNLOCKED · ${def.code} ${def.title}`);
     this.setPhase('briefing');
-
-    if (ai.aiStatus().enabled) {
-      const m = this.mission;
-      ai.generateNarrative({
-        ageGroup: DIFFICULTIES[this.difficulty].age,
-        className: this.className,
-        objectLabel: scan.label,
-        mission: { title: def.title, titleEs: def.titleEs, hook: def.hook, story: def.story, objective: def.objective, twist: def.twist, twists: def.twists },
-        crews: this.crews.map((c) => ({ id: c.id, name: c.name, sector: SECTORS[c.sectorId].name })),
-      }).then((n) => {
-        if (!n || this.mission !== m) return;
-        m.briefing = n.briefing;
-        m.crewLines = { ...m.crewLines, ...n.crewLines };
-        m.twists = n.twists;
-        m.aiNarrative = true;
-        this.pushIx('adapt', 'IX personalizó la historia de la misión para esta clase.');
-        this.changed();
-      });
-    }
+    void this.enrichMission(this.mission, scan);
     return OK;
+  }
+
+  /**
+   * Datos reales de la NASA para la misión: estudios científicos (NTRS + OSDR), clima
+   * espacial (DONKI) y la condición de salud que afectará a los tripulantes. Después, la IA
+   * escribe la misión a partir de esos estudios. Todo es opcional: sin servidor o sin
+   * conexión, la misión sigue con su contenido propio.
+   */
+  private async enrichMission(m: MissionRun, scan: ScanResult) {
+    const def = MISSIONS[m.id];
+    const within = <T>(p: Promise<T>, ms: number, fallback: T) => Promise.race([p.catch(() => fallback), new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+    const topic = MISSION_TOPICS[m.id];
+    const [studies, weather] = await Promise.all([within(nasaStudies(topic.ntrs, topic.osdr, 6), 9000, []), within(spaceWeather(14), 9000, null)]);
+    if (this.mission !== m) return;
+    if (studies.length || weather) {
+      const level = weather?.level ?? 0;
+      const kind = healthKindFor(m.id, level);
+      const healthStudies = await within(nasaStudies(HEALTH[kind].ntrs, HEALTH[kind].osdr, 2), 7000, []);
+      if (this.mission !== m) return;
+      m.nasa = {
+        science: studies.length ? { studies, highlight: plainHighlight(studies[0]), ai: false } : null,
+        weather,
+        health: buildHealth(kind, level, healthStudies[0] ?? null),
+      };
+      if (studies.length) this.pushIx('info', `📚 IX encontró ${studies.length} investigaciones reales de la NASA para esta misión.`);
+      if (weather) this.pushIx(weather.level >= 2 ? 'alert' : 'info', `☀️ Clima espacial real (NASA DONKI): ${weather.headline}.`);
+      this.changed();
+    }
+
+    if (!ai.aiStatus().enabled) return;
+    const n = await ai.generateNarrative({
+      ageGroup: DIFFICULTIES[this.difficulty].age,
+      className: this.className,
+      objectLabel: scan.label,
+      mission: { title: def.title, titleEs: def.titleEs, hook: def.hook, story: def.story, objective: def.objective, twist: def.twist, twists: def.twists },
+      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sector: SECTORS[c.sectorId].name })),
+      studies: studies.slice(0, 4).map((s) => ({ id: s.id, source: s.source, title: s.title, summary: s.summary, year: s.year })),
+    });
+    if (!n || this.mission !== m) return;
+    m.briefing = n.briefing;
+    m.crewLines = { ...m.crewLines, ...n.crewLines };
+    m.twists = n.twists;
+    m.aiNarrative = true;
+    const sci = m.nasa?.science;
+    const chosen = n.science && sci ? sci.studies.find((s) => s.id === n.science!.studyId) : null;
+    if (sci && chosen && n.science) {
+      sci.highlight = { studyId: chosen.id, source: chosen.source, title: n.science.title, summary: n.science.summary, connection: n.science.connection, year: chosen.year, url: chosen.url };
+      sci.ai = true;
+      this.pushIx('adapt', `IX escribió la misión a partir de una investigación real de la NASA (${chosen.id}).`);
+    } else {
+      this.pushIx('adapt', 'IX personalizó la historia de la misión para esta clase.');
+    }
+    this.changed();
+  }
+
+  /** Protección y eficacia de una tripulación ante la condición de salud de la misión. */
+  private crewHealth(c: Crew): CrewHealthStatus | null {
+    const h = this.mission?.nasa?.health ?? null;
+    if (!h) return null;
+    const share = this.phase === 'event' || this.phase === 'results' || this.phase === 'debrief' ? this.liveShare(c) : 0;
+    const protection = protectionFor(share, c.sectorId);
+    return { protection, factor: Math.round(healthFactor(h, protection) * 100) / 100, dose: doseFor(h, protection) };
   }
 
   /* ---------------- reto de tripulación ---------------- */
@@ -946,6 +997,17 @@ export class HostEngine {
     }
     this.setPhase('event');
     m.event = { stage: 'alert', stageEndsAt: now() + 6000, progress: 0, goal: 60, saved: null };
+
+    // Clima espacial real: si el Sol está activo de verdad, la emergencia es más difícil y el
+    // escudo de radiación de la colonia resiente el golpe.
+    const w = m.nasa?.weather;
+    if (w && w.level >= 1) {
+      m.event.goal = 60 + 4 * w.level;
+      this.colony.sectors.shield = Math.max(5, this.colony.sectors.shield - 5 * w.level);
+      this.pushIx('alert', `☀️ Clima espacial real (NASA DONKI): ${w.headline}. La meta de la emergencia sube a ${m.event.goal} %.`);
+    }
+    const h = m.nasa?.health;
+    if (h) this.pushIx('info', `${h.emoji} ${h.label}: ${h.advice}`);
   }
 
   private advanceEventStage() {
@@ -997,7 +1059,9 @@ export class HostEngine {
     if (!present.length) return 0;
     const taps = this.tapsByRole(c);
     const target = this.tapTarget();
-    const scores = present.map((r) => Math.min(1, taps[r] / target));
+    // La condición de salud real (radiación, huesos…) resta eficacia; cooperar protege.
+    const factor = this.crewHealth(c)?.factor ?? 1;
+    const scores = present.map((r) => Math.min(1, (taps[r] * factor) / target));
     let a = scores.reduce((s, x) => s + x, 0) / scores.length;
     if (scores.some((x) => x < 0.25)) a *= 0.6; // cada especialidad es imprescindible
     return a;
@@ -1654,7 +1718,7 @@ export class HostEngine {
           },
         ]),
       ),
-      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome })),
+      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome, health: this.crewHealth(c) })),
       colony: this.colony,
       mission: this.missionPublic(),
       event: m && this.phase === 'event' ? { ...m.event } : m && (this.phase === 'results' || this.phase === 'debrief') ? { ...m.event } : null,
@@ -1675,6 +1739,7 @@ export class HostEngine {
       bonusActive: Boolean(m?.bonusActive),
       finalUnlocked: this.finalUnlocked,
       missionsPlayed: this.missionsPlayed,
+      nasa: m?.nasa ?? null,
     };
   }
 
@@ -1794,6 +1859,14 @@ export class HostEngine {
       debrief: inMission && this.phase === 'debrief' ? (m?.debrief ?? null) : null,
       objectVote: this.objectVote ? { options: this.objectVote.options, myVote: p.objectVote, open: this.objectVote.open } : null,
       hint: hints[hints.length - 1] ?? null,
+      nasa:
+        inMission && m?.nasa
+          ? {
+              science: m.nasa.science?.highlight ?? null,
+              weather: m.nasa.weather,
+              health: m.nasa.health && crew ? { ...m.nasa.health, ...this.crewHealth(crew)! } : null,
+            }
+          : null,
     };
   }
 

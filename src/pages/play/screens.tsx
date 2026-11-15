@@ -6,6 +6,9 @@ import { hashString, makeRng, shuffle } from '../../../shared/rng';
 import type { BadgeId, IntelCard, PlayerView, QuizView, Tier } from '../../../shared/types';
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
 import { Confetti, Icon, RoleChip } from '../../components/ui';
+import { HealthCard, ScienceCard } from '../../components/nasa';
+import { minigameFor } from '../../../shared/minigames';
+import { Minigame } from './minigames';
 import { hostNow, useTicker } from '../../lib/clock';
 import { vibrate } from '../../lib/pwa';
 import { sfx } from '../../lib/sound';
@@ -283,6 +286,7 @@ function Briefing({ view }: { view: PlayerView }) {
           <b>{view.crew.name}:</b> {m.crewLines[view.crew.id]}
         </div>
       )}
+      {view.nasa?.science && <ScienceCard highlight={view.nasa.science} compact />}
       <p className="lead">Prepárate: vas a recibir una transmisión secreta que solo tú puedes leer.</p>
     </div>
   );
@@ -500,10 +504,9 @@ function TapGame({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
   const ev = view.event!;
   const role = view.me.roles[0] ?? 'power';
   const r = ROLES[role];
+  const spec = minigameFor(view.mission?.id, role);
   const pending = useRef(0);
   const [local, setLocal] = useState(0);
-  const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
-  const nextId = useRef(0);
   useEffect(() => {
     const id = setInterval(() => {
       if (pending.current > 0 && net) {
@@ -513,28 +516,17 @@ function TapGame({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
     }, 280);
     return () => clearInterval(id);
   }, [net]);
-  const tap = (e: PointerEvent<HTMLButtonElement>) => {
-    pending.current++;
-    setLocal((n) => n + 1);
-    sfx.tap();
-    vibrate(6);
-    const rect = e.currentTarget.getBoundingClientRect();
-    const id = nextId.current++;
-    setBursts((b) => [...b.slice(-10), { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-    setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 700);
+  // Cada acierto del minijuego se convierte en acciones para la colonia.
+  const onPoints = (n: number) => {
+    pending.current += n;
+    setLocal((x) => x + n);
   };
   return (
     <div className="tapgame">
-      <p className="eyebrow center">¡ACCIÓN! · {ev.action.hint}</p>
-      <button className="tap-btn" style={{ '--c': r.color, '--cd': r.dark } as CSSProperties} onPointerDown={tap} aria-label={ev.action.verb}>
-        <span className="tap-emoji">{ev.action.emoji}</span>
-        <span className="tap-verb">{ev.action.verb}</span>
-        {bursts.map((b) => (
-          <i key={b.id} className="burst" style={{ left: b.x, top: b.y }}>
-            +1
-          </i>
-        ))}
-      </button>
+      <p className="eyebrow center">
+        ¡ACCIÓN! · {ev.action.emoji} {ev.action.verb}
+      </p>
+      <Minigame spec={spec} color={r.color} dark={r.dark} onPoints={onPoints} />
       <p className="tap-count mono">{local} acciones</p>
       <div className="tap-bars">
         {ev.rolesPresent.map((x) => (
@@ -545,6 +537,7 @@ function TapGame({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
         ))}
       </div>
       {ev.protocol && <p className="fine center">🛡️ Protocolo de tripulación: si una especialidad no trabaja, todo el equipo pierde fuerza.</p>}
+      {view.nasa?.health && <HealthCard health={view.nasa.health} status={view.nasa.health} compact />}
       <ClassProgress view={view} />
     </div>
   );
@@ -616,6 +609,7 @@ function Emergency({ view, act, net }: { view: PlayerView; act: Act; net: Player
           ))}
         </div>
         <p className="fine center">{Object.keys(ev.shareVotes).length} de {view.crew?.members.length ?? 0} tripulantes ya votaron</p>
+        {view.nasa?.health && <HealthCard health={view.nasa.health} status={view.nasa.health} compact />}
         <ClassProgress view={view} />
       </div>
     );

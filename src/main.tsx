@@ -8,6 +8,8 @@ import './styles/landing.css';
 import './styles/host.css';
 import './styles/play.css';
 import './styles/world.css';
+import './styles/nasa.css';
+import './styles/minigames.css';
 import { App } from './App';
 import { probeServer } from './lib/cloud';
 import { registerServiceWorker } from './lib/pwa';

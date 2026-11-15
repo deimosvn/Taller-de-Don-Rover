@@ -1,0 +1,282 @@
+/* ==========================================================================
+   Datos reales de la NASA: investigación, clima espacial y salud
+   ========================================================================== */
+
+.nasa-card {
+  --nasa-blue: #0b3d91;
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+  font-family: var(--font-body);
+  text-align: left;
+  min-width: 0;
+}
+.nasa-card header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nasa-card header > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.nasa-card header b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+.nasa-card header small {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.nasa-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink);
+  background: #fff;
+  font-size: 1.3rem;
+}
+.nasa-card p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.nasa-src {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--nasa-blue, #0b3d91);
+  color: #fff;
+  font: 700 0.68rem/1.5 var(--font-mono);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.nasa-src.src-osdr {
+  background: #1a7f5a;
+}
+.nasa-src.src-donki {
+  background: #b05a00;
+}
+
+/* Investigación */
+.nasa-card.science {
+  border-color: var(--ink);
+  background: linear-gradient(180deg, #f3f0ff 0%, var(--cream) 60%);
+}
+.nasa-study {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 2px solid rgba(33, 26, 74, 0.12);
+}
+.nasa-study-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.nasa-study h4 {
+  margin: 0;
+  font: 700 1.02rem/1.3 var(--font-display);
+}
+.nasa-connection {
+  color: #4b3a9e;
+  font-weight: 700;
+}
+.nasa-link {
+  justify-self: start;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--nasa-blue, #0b3d91);
+}
+.nasa-others {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+  font-size: 0.82rem;
+}
+.nasa-others li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.nasa-others a {
+  color: var(--ink);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Clima espacial */
+.nasa-card.weather {
+  border-left-width: 10px;
+  border-left-color: var(--lv, #ffc93c);
+}
+.nasa-level {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--lv, #ffc93c);
+  font: 800 0.78rem var(--font-display);
+}
+.nasa-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem !important;
+}
+.nasa-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  font-size: 0.86rem;
+}
+
+/* Salud */
+.nasa-card.health {
+  background: linear-gradient(180deg, #fff0ee 0%, var(--cream) 60%);
+}
+.nasa-card.health.kind-radiation {
+  background: linear-gradient(180deg, #fff6d6 0%, var(--cream) 60%);
+}
+.nasa-health-meters {
+  display: grid;
+  gap: 6px;
+}
+.nasa-health-meters > div {
+  display: grid;
+  grid-template-columns: 6.5em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.nasa-health-meters i {
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  overflow: hidden;
+}
+.nasa-health-meters em {
+  display: block;
+  height: 100%;
+  background: #55db7a;
+  border-radius: 999px;
+}
+.nasa-health-meters b {
+  text-align: right;
+}
+.nasa-dose {
+  font-size: 0.86rem !important;
+}
+.nasa-advice {
+  font-weight: 700;
+}
+.nasa-fact {
+  color: var(--ink-soft);
+}
+.nasa-ref {
+  font-size: 0.8rem !important;
+}
+.nasa-ref a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Variantes compactas */
+.nasa-card.compact {
+  gap: 6px;
+  padding: 10px 12px;
+}
+.nasa-card.compact .nasa-icon {
+  width: 34px;
+  height: 34px;
+  font-size: 1.1rem;
+}
+.nasa-card.compact p {
+  font-size: 0.86rem;
+}
+
+/* Proyector */
+.nasa-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 10px 0;
+}
+.briefing .nasa-card.science {
+  margin: 12px 0;
+}
+.crew-health {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.92);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  font: 700 0.75rem var(--font-display);
+  white-space: nowrap;
+}
+.nasa-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.94);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  font: 700 0.85rem var(--font-display);
+  max-width: 100%;
+}
+.nasa-live i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lv, #ffc93c);
+  box-shadow: 0 0 0 0 var(--lv, #ffc93c);
+  animation: nasa-pulse 1.8s ease-out infinite;
+}
+@keyframes nasa-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--lv, #ffc93c) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+/* Celular */
+.play .nasa-card {
+  margin: 12px auto 4px;
+  width: min(460px, 100%);
+}

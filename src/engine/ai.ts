@@ -202,12 +202,22 @@ export interface NarrativeInput {
   objectLabel: string;
   mission: { title: string; titleEs: string; hook: string; story: string; objective: string; twist: string; twists: string[] };
   crews: { id: string; name: string; sector: string }[];
+  /** Investigaciones reales de la NASA (NTRS + OSDR) en las que se basa la misión. */
+  studies?: { id: string; source: string; title: string; summary: string; year: number | null }[];
+}
+
+export interface NarrativeScience {
+  studyId: string;
+  title: string;
+  summary: string;
+  connection: string;
 }
 
 export interface Narrative {
   briefing: string;
   crewLines: Record<string, string>;
   twists: string[];
+  science: NarrativeScience | null;
 }
 
 const NARRATIVE_SCHEMA = {
@@ -224,12 +234,24 @@ const NARRATIVE_SCHEMA = {
       },
     },
     twists: { type: 'array', items: { type: 'string' } },
+    science: {
+      type: 'object',
+      properties: {
+        study_id: { type: 'string' },
+        title_es: { type: 'string' },
+        summary_es: { type: 'string' },
+        connection_es: { type: 'string' },
+      },
+      required: ['study_id', 'title_es', 'summary_es', 'connection_es'],
+      additionalProperties: false,
+    },
   },
-  required: ['briefing', 'crew_lines', 'twists'],
+  required: ['briefing', 'crew_lines', 'twists', 'science'],
   additionalProperties: false,
 };
 
 export async function generateNarrative(input: NarrativeInput): Promise<Narrative | null> {
+  const studies = (input.studies ?? []).slice(0, 4);
   const system = `Eres IX, la IA narradora del Taller de Don Rover, un videojuego cooperativo de misiones espaciales para el salón de clases.
 Escribe en español de México, con tono de videojuego: urgente, emocionante y amable, para niñas y niños de ${input.ageGroup}.
 Reglas estrictas:
@@ -237,8 +259,11 @@ Reglas estrictas:
 - Mantente dentro de la historia y el giro de la plantilla.
 - "briefing": máximo 60 palabras, en segunda persona del plural; menciona el objeto descubierto en el salón.
 - "crew_lines": una línea por tripulación (máximo 18 palabras) que explique qué parte del problema le toca a su sector.
-- "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.`;
-  return structured('narrative', { ...input }, system, JSON.stringify(input), NARRATIVE_SCHEMA, (x) => {
+- "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.
+Investigación real:
+- "studies" trae investigaciones reales de la NASA (NTRS y OSDR, en inglés). Elige la más relevante para esta misión y úsala como base científica: el briefing debe contar en una frase lo que investigó ese estudio, sin inventar resultados que no estén en su resumen.
+- "science": study_id (exactamente el id del estudio elegido), title_es (título traducido y claro, máximo 14 palabras), summary_es (qué investigaron y qué encontraron, para niñas y niños, máximo 45 palabras, solo con información del resumen), connection_es (cómo se conecta con la misión de la colonia, máximo 25 palabras). Si "studies" viene vacío, deja los cuatro campos vacíos.`;
+  return structured('narrative', { ...input, studies }, system, JSON.stringify({ ...input, studies }), NARRATIVE_SCHEMA, (x) => {
     const o = obj(x);
     const briefing = str(o.briefing, 600);
     if (!briefing) return null;
@@ -251,7 +276,13 @@ Reglas estrictas:
       }
     }
     const twists = Array.isArray(o.twists) ? o.twists.map((t) => str(t, 140)).filter(Boolean).slice(0, 3) : [];
-    return { briefing, crewLines, twists: twists.length === 3 ? twists : input.mission.twists };
+    const sc = obj(o.science);
+    const studyId = str(sc.study_id, 40);
+    const science =
+      studyId && studies.some((s) => s.id === studyId) && str(sc.title_es, 160)
+        ? { studyId, title: str(sc.title_es, 160), summary: str(sc.summary_es, 360), connection: str(sc.connection_es, 220) }
+        : null;
+    return { briefing, crewLines, twists: twists.length === 3 ? twists : input.mission.twists, science };
   });
 }
 

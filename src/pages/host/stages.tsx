@@ -8,6 +8,7 @@ import { PlanetView } from '../../world/react/PlanetView';
 import { useHostSnapshot } from '../../world/react/useHostSnapshot';
 import { MISSION_ZONE } from '../../world/react/missionZones';
 import { Confetti, Icon, QR, RoleChip, Stars, Typewriter, useCountUp } from '../../components/ui';
+import { HealthCard, NasaLiveChip, ScienceCard, WeatherCard } from '../../components/nasa';
 import { joinUrl, loadSettings } from '../../engine/settings';
 import { encodeSignaling } from '../../net/protocol';
 import type { Run } from './Console';
@@ -56,6 +57,7 @@ export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
         <div className="lobby-head">
           <h2 className="sticker">{view.players.length ? `${view.players.length} astronauta${view.players.length > 1 ? 's' : ''} a bordo` : 'Esperando tripulantes…'}</h2>
           <p>Cada quien crea su astronauta en su celular. Cuando estén todos, IX formará tripulaciones de cuatro.</p>
+          <NasaLiveChip />
         </div>
         <div className="lobby-empty">
           <PlanetView snapshot={snapshot} className="stage-planet" />
@@ -197,6 +199,7 @@ export function BriefingStage({ view }: { view: HostView }) {
             </div>
           </div>
         </div>
+        {view.nasa?.science?.highlight && <ScienceCard highlight={view.nasa.science.highlight} studies={view.nasa.science.studies} ai={view.nasa.science.ai} />}
         <div className="twists">
           <span className="eyebrow">3 acontecimientos inesperados</span>
           <div className="twist-cards">
@@ -393,6 +396,13 @@ export function EventStage({ view }: { view: HostView }) {
         </div>
         <p className="event-narrative">{def.event.narrative}</p>
 
+        {(view.nasa?.weather || view.nasa?.health) && (
+          <div className="nasa-row">
+            {view.nasa.weather && <WeatherCard weather={view.nasa.weather} compact={ev.stage === 'action'} />}
+            {view.nasa.health && <HealthCard health={view.nasa.health} compact={ev.stage !== 'alert'} />}
+          </div>
+        )}
+
         {ev.stage === 'alert' && <p className="event-hint">Transmisión de emergencia a todas las tripulaciones…</p>}
 
         {ev.stage === 'share' && (
@@ -437,6 +447,11 @@ export function EventStage({ view }: { view: HostView }) {
                     ))}
                   </div>
                   {c.status.protocol && <span className="chip warn">Protocolo</span>}
+                  {c.health && (
+                    <span className="crew-health" title="Protección ante la condición de salud y rendimiento de sus acciones">
+                      {view.nasa?.health?.emoji} {Math.round(c.health.factor * 100)}%{c.health.dose !== null ? ` · ${c.health.dose.toFixed(1)} mSv` : ''}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

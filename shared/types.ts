@@ -1,5 +1,24 @@
 // Tipos compartidos entre el servidor (motor de juego) y los clientes (proyector y celulares).
 
+import type { CrewHealth, MissionScience, ScienceHighlight, SpaceWeather } from './nasa';
+
+/** Datos reales de la NASA de la misión en curso. */
+export interface MissionNasa {
+  science: MissionScience | null;
+  weather: SpaceWeather | null;
+  health: CrewHealth | null;
+}
+
+/** Cómo afecta la condición de salud a una tripulación. */
+export interface CrewHealthStatus {
+  /** 0–0.75: compartir y vivir en un sector blindado protegen. */
+  protection: number;
+  /** Eficacia de las acciones en la emergencia (1 = sin efecto). */
+  factor: number;
+  /** Dosis de radiación estimada (mSv, valor de juego) o null si la condición no es radiación. */
+  dose: number | null;
+}
+
 export type SystemId = 'energy' | 'water' | 'food' | 'habitat';
 export type RoleId = 'power' | 'life' | 'bio' | 'habitat';
 export type Phase =
@@ -169,6 +188,7 @@ export interface CrewStatus {
 export interface HostCrew extends CrewSummary {
   status: CrewStatus;
   outcome: CrewOutcome | null;
+  health: CrewHealthStatus | null;
 }
 
 export interface ScanResult {
@@ -298,6 +318,7 @@ export interface HostView {
   bonusActive: boolean;
   finalUnlocked: boolean;
   missionsPlayed: MissionId[];
+  nasa: MissionNasa | null;
 }
 
 export interface PlayerChallengeView {
@@ -359,6 +380,11 @@ export interface PlayerView {
   debrief: DebriefPublic | null;
   objectVote: { options: CategoryId[]; myVote: CategoryId | null; open: boolean } | null;
   hint: IxMessage | null;
+  nasa: {
+    science: ScienceHighlight | null;
+    weather: SpaceWeather | null;
+    health: (CrewHealth & CrewHealthStatus) | null;
+  } | null;
 }
 
 export type AnyView = HostView | PlayerView;
