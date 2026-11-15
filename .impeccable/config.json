@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/styles/world.css"
+        ],
+        "createdAt": "2026-11-15T08:57:18.836Z",
+        "reason": "Claude triage: .wp-card top band is the per-mission color code (--wc), the same intentional motif as .mission-detail in landing/host/play; pre-existing since 79ba97c"
+      }
+    ]
+  }
+}

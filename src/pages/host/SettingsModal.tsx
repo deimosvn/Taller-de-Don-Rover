@@ -94,9 +94,9 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               escuela tiene su propio PeerServer, configúralo aquí.
             </p>
             <div className="grid2">
-              <input className="input" placeholder="host (ej. peer.miescuela.mx)" value={sig.host} onChange={(e) => setS({ ...s, signaling: { ...sig, host: e.target.value.trim() } })} />
-              <input className="input" type="number" placeholder="puerto" value={sig.port} onChange={(e) => setS({ ...s, signaling: { ...sig, port: Number(e.target.value) || 443 } })} />
-              <input className="input" placeholder="ruta (ej. /)" value={sig.path} onChange={(e) => setS({ ...s, signaling: { ...sig, path: e.target.value || '/' } })} />
+              <input className="input" aria-label="Host del servidor" autoComplete="off" spellCheck={false} placeholder="host (ej. peer.miescuela.mx)" value={sig.host} onChange={(e) => setS({ ...s, signaling: { ...sig, host: e.target.value.trim() } })} />
+              <input className="input" aria-label="Puerto" type="number" inputMode="numeric" placeholder="puerto" value={sig.port} onChange={(e) => setS({ ...s, signaling: { ...sig, port: Number(e.target.value) || 443 } })} />
+              <input className="input" aria-label="Ruta" autoComplete="off" spellCheck={false} placeholder="ruta (ej. /)" value={sig.path} onChange={(e) => setS({ ...s, signaling: { ...sig, path: e.target.value || '/' } })} />
               <label className="check">
                 <input type="checkbox" checked={sig.secure} onChange={(e) => setS({ ...s, signaling: { ...sig, secure: e.target.checked } })} /> HTTPS / WSS
               </label>

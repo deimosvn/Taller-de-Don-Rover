@@ -230,7 +230,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
           </div>
         </>
       ) : (
-        <div className={`wp-keys ${showKeys ? 'open' : ''}`} onClick={() => setShowKeys((v) => !v)}>
+        <button type="button" className={`wp-keys ${showKeys ? 'open' : ''}`} aria-expanded={showKeys} onClick={() => setShowKeys((v) => !v)}>
           {showKeys ? (
             <>
               <b>Controles</b>
@@ -266,7 +266,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
           ) : (
             <b>⌨️ Controles</b>
           )}
-        </div>
+        </button>
       )}
 
       {!touch && build && (

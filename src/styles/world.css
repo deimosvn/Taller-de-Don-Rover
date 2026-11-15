@@ -500,7 +500,10 @@
   background: var(--glass);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
+  font: inherit;
   font-size: 0.82rem;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
 }
 .wp-keys span {

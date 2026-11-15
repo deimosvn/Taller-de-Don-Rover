@@ -146,7 +146,10 @@ function MissionsSection() {
             {MISSION_ORDER.map((id) => {
               const mm = MISSIONS[id];
               return (
-                <button key={id} className={`mission-item ${active === id ? 'on' : ''}`} style={{ '--mc': mm.color } as CSSProperties} onClick={() => setActive(id)}>
+                <button key={id} className={`mission-item ${active === id ? 'on' : ''}`} style={{ '--mc': mm.color } as CSSProperties}
+                  aria-pressed={active === id}
+                  onClick={() => setActive(id)}
+                >
                   <MissionPatch id={id} size={64} live={active === id} />
                   <span>
                     <b>{mm.title}</b>
@@ -254,7 +257,7 @@ export function Landing() {
               </button>
             )}
             <a className="btn small cream" href="#/libre">
-              🎮 Jugar ahora
+              Jugar ahora
             </a>
             <a className="btn small cream" href="#/jugar">
               Tengo código
@@ -283,7 +286,9 @@ export function Landing() {
             </a>
           </div>
           <a className="hero-free" href="#/libre">
-            <span className="hero-free-icon">⛏️</span>
+            <span className="hero-free-icon" aria-hidden="true">
+              ⛏️
+            </span>
             <span>
               <b>¿Sin código? Juega ahora</b>
               <small>Mina, fabrica y construye en Marte · solo o con amigos por enlace</small>
