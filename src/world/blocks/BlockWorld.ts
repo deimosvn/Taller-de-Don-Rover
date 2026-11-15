@@ -299,7 +299,9 @@ export class BlockWorld {
       _d.copy(_p).divideScalar(r);
       const ground = terrainRadius(_d);
       if (r < ground) {
-        const place = keyAt(_d.multiplyScalar(ground + 0.45));
+        // El bloque nuevo asoma entre 0.7 y 1.7 u: siempre se puede saltar encima y dos
+        // bloques de pared dejan sitio para que el astronauta pase bajo el techo.
+        const place = keyAt(_d.multiplyScalar(ground + 0.7));
         return { kind: 'ground', key, placeKey: this.cells.has(place) ? null : place, point: _p.clone(), block: this.groundBlock(_p) };
       }
       empty = key;

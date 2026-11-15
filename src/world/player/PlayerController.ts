@@ -26,6 +26,8 @@ export const PLAYER = {
   turn: 11,
   /** Escalón que se sube sin saltar (los bloques enteros hay que saltarlos). */
   step: 0.42,
+  /** Altura del cuerpo frente a los bloques (un poco menos que el modelo, para caber bajo un techo). */
+  body: 1.68,
 } as const;
 
 export interface MoveInput {
@@ -184,7 +186,7 @@ export class PlayerController {
       this.vy -= PLAYER.gravity * dt;
       // Techo: un bloque justo encima de la cabeza detiene el salto.
       if (this.vy > 0 && this.blocks) {
-        const head = ground + this.alt + PLAYER.height;
+        const head = ground + this.alt + PLAYER.body;
         if (this.blocks.blocked(this.dir, head, head + 0.12 + this.vy * dt)) this.vy = 0;
       }
       this.alt += this.vy * dt;
@@ -251,7 +253,7 @@ export class PlayerController {
   private hitsBlocks(dir: Vector3, feetR: number): boolean {
     const b = this.blocks!;
     const r0 = feetR + PLAYER.step;
-    const r1 = feetR + PLAYER.height;
+    const r1 = feetR + PLAYER.body;
     if (b.blocked(dir, r0, r1)) return true;
     const k = (PLAYER.radius * 0.9) / Math.max(1, feetR);
     tangentFrame(dir, _east, _north);
