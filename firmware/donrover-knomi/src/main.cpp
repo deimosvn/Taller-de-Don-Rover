@@ -28,6 +28,7 @@ static uint32_t pressAt = 0;
 static bool pressed = false, longSent = false, infoSent = false;
 static bool wasLinked = false;
 static uint32_t idleSince = 0;
+static uint8_t shownLink = 255;
 
 static bool hostLinked() {
   const uint32_t now = millis();
@@ -170,7 +171,11 @@ void loop() {
   readButton();
 
   const bool linked = hostLinked();
-  face::status(linked ? 2 : net::online());
+  const uint8_t link = linked ? 2 : net::online();
+  if (link != shownLink) {
+    shownLink = link;
+    face::status(link);
+  }
   if (linked && !wasLinked) {
     face::setExpr(Expr::Happy, 2500);
   } else if (!linked && wasLinked) {

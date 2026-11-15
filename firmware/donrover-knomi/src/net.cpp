@@ -378,7 +378,7 @@ void begin(CommandHandler h) {
   boardId = buf;
   outbox = xQueueCreate(32, sizeof(char *));
   mu = xSemaphoreCreateMutex();
-  xTaskCreatePinnedToCore(task, "net", 12288, nullptr, 2, nullptr, 0);
+  xTaskCreatePinnedToCore(task, "net", 16384, nullptr, 2, nullptr, 0);
 }
 
 void setWifi(const String &s, const String &p) {
