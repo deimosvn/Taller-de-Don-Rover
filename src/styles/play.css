@@ -1462,3 +1462,183 @@
 .wp-problem .problem-bar {
   border-color: var(--txt);
 }
+
+/* ---------------- tarea de la especialidad (exploración) ---------------- */
+.role-task {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+.role-task-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.role-task-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+.role-task-emoji {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid var(--ink);
+  background: var(--c);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 1.55rem;
+}
+.role-task-kicker {
+  margin: 0;
+  font: 700 0.72rem var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.role-task-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.role-task-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.role-task-link,
+.role-task-feeds {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-left: 4px solid var(--c);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+.role-task-link b {
+  white-space: nowrap;
+}
+.role-task-link.waiting {
+  border-left-color: var(--energy);
+  background: rgba(255, 201, 60, 0.16);
+}
+.role-task-link em {
+  display: block;
+  font-style: normal;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.role-task .problem-bar i {
+  background: var(--c);
+}
+.role-task-done {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(85, 219, 122, 0.18);
+  border: 2px solid rgba(85, 219, 122, 0.6);
+  font-weight: 700;
+}
+.task-chain-m {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+.task-chain-m li {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) 1fr 2.6rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+.task-chain-m li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-chain-m li.mine > span {
+  font-weight: 800;
+}
+.task-chain-m i {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.task-chain-m i b {
+  display: block;
+  height: 100%;
+  background: var(--c);
+  transition: width 0.4s ease;
+}
+.task-chain-m small {
+  text-align: right;
+}
+
+/* ---------------- Marte desde el primer segundo ---------------- */
+.intro-world {
+  z-index: 30;
+}
+.intro-float {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow-y: auto;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+.intro-float > * {
+  pointer-events: auto;
+}
+.intro-float .play-intro {
+  min-height: 0;
+  background: none;
+  padding-top: 16px;
+}
+.intro-float .play-intro > .starfield {
+  display: none;
+}
+.intro-float .play-intro-top {
+  display: none;
+}
+.intro-hide {
+  position: sticky;
+  top: calc(66px + env(safe-area-inset-top));
+  align-self: flex-end;
+  margin: calc(66px + env(safe-area-inset-top)) 12px -52px auto;
+  z-index: 6;
+}
+.intro-show {
+  position: absolute;
+  left: 50%;
+  top: calc(66px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 5;
+  white-space: nowrap;
+}
+
+/* ---------------- ir a la estación (el minijuego se juega en el mundo 3D) ---------------- */
+.go-station {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.go-station p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.06);
+  font-weight: 700;
+  line-height: 1.35;
+}

@@ -8,6 +8,7 @@ import { MISSION_PROBLEMS } from '../../../shared/minigames';
 import type { PlayerView } from '../../../shared/types';
 import type { PlayerNet } from '../../net/playerNet';
 import { Minigame } from './minigames';
+import { GoToStation } from './RoleTask';
 
 /** Junta los puntos del minijuego y los manda al proyector cada poco. */
 function useFixSender(net: PlayerNet | null) {
@@ -92,6 +93,7 @@ export function StoryProblem({ view, net }: { view: PlayerView; net: PlayerNet |
 export function ProblemCard({ view, net, open3d }: { view: PlayerView; net: PlayerNet | null; open3d?: () => void }) {
   const [play, setPlay] = useState(false);
   if (!view.mission || !problemOpen(view)) return null;
+  // Con mundo 3D el problema se resuelve en su estación: aquí solo se guía hasta ella.
   const prob = MISSION_PROBLEMS[view.mission.id];
   const def = MISSIONS[view.mission.id];
   if (play) {
@@ -114,16 +116,15 @@ export function ProblemCard({ view, net, open3d }: { view: PlayerView; net: Play
         </div>
       </div>
       <ProblemProgress view={view} />
-      <div className="problem-actions">
-        <button className="btn mars" onClick={() => setPlay(true)}>
-          🔧 Resolver aquí
-        </button>
-        {open3d && (
-          <button className="btn cream" onClick={open3d}>
-            🌍 Ir a la estación ({prob.place})
+      {open3d ? (
+        <GoToStation place={prob.place} onGo={open3d} />
+      ) : (
+        <div className="problem-actions">
+          <button className="btn mars" onClick={() => setPlay(true)}>
+            🔧 Resolver aquí
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

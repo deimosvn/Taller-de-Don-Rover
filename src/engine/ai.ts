@@ -1,24 +1,22 @@
 // Capa de IA del Taller de Don Rover con Claude (Opus 5.5).
 //
-// Principio de diseño: "la IA narra, el motor decide". Claude clasifica la foto del escáner,
-// personaliza la narrativa, evalúa las bitácoras y redacta el debrief, siempre con salidas
+// Principio de diseño: "la IA narra, el motor decide". Claude genera la misión a partir de
+// datos reales de la NASA (y las tareas de cada especialidad), personaliza la narrativa, evalúa las bitácoras y redacta el debrief, siempre con salidas
 // estructuradas (JSON Schema). Recursos, consecuencias y puntajes los calcula el motor.
 //
 // Orden de preferencia:
 //   1. IA del servidor (función /api/ai en Vercel con ANTHROPIC_API_KEY): la clave nunca
 //      llega al navegador.
 //   2. Clave que el profesor escribe en Ajustes (se guarda solo en su navegador).
-//   3. Sin IA: visión local (TensorFlow.js) y plantillas.
+//   3. Sin IA: las reglas del motor eligen la misión y se usan plantillas.
 // Las instrucciones del modo servidor viven en api/ai.ts: mantener ambos textos en sintonía.
 
 import type Anthropic from '@anthropic-ai/sdk';
-import type { CategoryId, ScanResult } from '../../shared/types';
+import type { MissionId, RoleId } from '../../shared/types';
 import { serverAi, serverStatus, type AiTask } from '../lib/cloud';
 import { loadSettings } from './settings';
 
 type Sdk = typeof import('@anthropic-ai/sdk');
-
-const CATEGORIES: CategoryId[] = ['plant', 'water', 'light', 'signal', 'material', 'mystery'];
 
 let sdkPromise: Promise<Sdk> | null = null;
 let client: Anthropic | null = null;
@@ -139,57 +137,80 @@ const obj = (x: unknown) => (x && typeof x === 'object' ? (x as Record<string, u
 /* ------------------------------------------------------------------ */
 /* 1 · Escáner del mundo                                                */
 /* ------------------------------------------------------------------ */
+/* 1 · Generar la misión con datos reales de la NASA                     */
+/* ------------------------------------------------------------------ */
 
-const SCAN_SYSTEM = `Eres IX, la inteligencia artificial del Taller de Don Rover, un juego educativo de misiones espaciales para salones de clase (niñas y niños de 7 a 14 años).
-Tu tarea: identificar el objeto principal de la foto y clasificarlo en UNA categoría:
-- plant: plantas, flores, hojas, árboles, frutas, verduras, semillas
-- water: botellas, vasos, tazas, termos, agua, recipientes para líquidos, llaves o lavabos
-- light: lámparas, focos, linternas, ventanas, luz del sol, velas
-- signal: celulares, radios, bocinas, audífonos, antenas, controles remotos, computadoras, tabletas
-- material: cartón, papel, plástico, latas, cajas, bloques, telas, materiales reciclables, útiles escolares
-- mystery: cualquier otra cosa
-Reglas:
-- Si aparecen personas, ignóralas: no las describas ni menciones sus rasgos.
-- "label": nombre corto del objeto en español (2 a 4 palabras).
-- "discovery": una frase emocionante (máximo 25 palabras) que conecte el objeto con una misión en Marte, sin inventar propiedades científicas del objeto.
-- "fun_fact": un dato real y verificable, apto para niños, sobre el espacio o la NASA relacionado con la categoría (máximo 30 palabras).
-- "confidence": número entre 0 y 1.`;
+export interface PlanInput {
+  ageGroup: string;
+  /** Condiciones reales en palabras (clima espacial NASA DONKI y estado de la colonia). */
+  conditions: string[];
+  meters: Record<string, number>;
+  missionsDone: string[];
+  candidates: { id: MissionId; title: string; focus: string; story: string }[];
+  suggested: MissionId;
+  roles: { role: RoleId; base: { title: string; text: string; facts: string[] }; link: string }[];
+}
 
-const SCAN_SCHEMA = {
-  type: 'object',
-  properties: {
-    category: { type: 'string', enum: CATEGORIES },
-    label: { type: 'string' },
-    confidence: { type: 'number' },
-    discovery: { type: 'string' },
-    fun_fact: { type: 'string' },
-  },
-  required: ['category', 'label', 'confidence', 'discovery', 'fun_fact'],
-  additionalProperties: false,
-};
+export interface MissionPlan {
+  missionId: MissionId;
+  reason: string;
+  tasks: Partial<Record<RoleId, { title: string; text: string }>>;
+}
 
-export async function classifyImage(dataUrl: string): Promise<ScanResult | null> {
-  const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,(.+)$/.exec(dataUrl);
-  if (!m) return null;
-  const mediaType = m[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-  return structured(
-    'scan',
-    { image: dataUrl },
-    SCAN_SYSTEM,
-    [
-      { type: 'image', source: { type: 'base64', media_type: mediaType, data: m[2] } },
-      { type: 'text', text: 'Clasifica el objeto principal de esta foto tomada en un salón de clases.' },
-    ],
-    SCAN_SCHEMA,
-    (x) => {
-      const o = obj(x);
-      const category = CATEGORIES.includes(o.category as CategoryId) ? (o.category as CategoryId) : 'mystery';
-      const label = str(o.label, 60);
-      if (!label) return null;
-      const confidence = typeof o.confidence === 'number' ? Math.max(0, Math.min(1, o.confidence)) : 0.6;
-      return { category, label, confidence, discovery: str(o.discovery, 220), funFact: str(o.fun_fact, 260), source: 'ai' as const };
+const PLAN_SCHEMA = {
+    type: 'object',
+    properties: {
+      mission_id: { type: 'string' },
+      reason_es: { type: 'string' },
+      tasks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            role: { type: 'string', enum: ['power', 'life', 'bio', 'habitat'] },
+            title_es: { type: 'string' },
+            text_es: { type: 'string' },
+          },
+          required: ['role', 'title_es', 'text_es'],
+          additionalProperties: false,
+        },
+      },
     },
-  );
+    required: ['mission_id', 'reason_es', 'tasks'],
+    additionalProperties: false,
+  };
+
+const ROLE_IDS: RoleId[] = ['power', 'life', 'bio', 'habitat'];
+
+export async function planMission(input: PlanInput): Promise<MissionPlan | null> {
+  const system = `Eres IX, la IA de la colonia en el Taller de Don Rover, un videojuego cooperativo de misiones en Marte para el salón de clases.
+Una partida es UNA tripulación de máximo 4 alumnos, uno por especialidad: power (Energía), life (Soporte vital), bio (Astrobiología) y habitat (Hábitat).
+Tu trabajo: generar la siguiente misión a partir de condiciones reales.
+1. "mission_id": elige UNA de "candidates" (usa su id exacto). Elige la que mejor responda a los problemas reales de "conditions" (clima espacial de la NASA DONKI y estado de la colonia). "suggested" es la sugerencia de las reglas del motor: úsala si no hay una razón mejor.
+2. "reason_es": por qué IX generó esta misión, en una o dos frases (máximo 35 palabras), citando un dato real de "conditions".
+3. "tasks": exactamente 4, una por especialidad (power, life, bio, habitat). Cada una con "title_es" (máximo 8 palabras) y "text_es" (máximo 40 palabras), en segunda persona del singular.
+   Las tareas deben estar conectadas como dice "link" de cada especialidad: Hábitat protege los paneles de Energía, Energía alimenta las bombas de Soporte vital, el agua de Soporte vital llega a los cultivos de Astrobiología y la comida fresca da fuerza a Hábitat. Cada texto debe decir de quién depende o a quién ayuda.
+Reglas estrictas:
+- Español de México, para niñas y niños de ${input.ageGroup}, con tono de videojuego: claro, urgente y amable.
+- Usa solo los números que aparecen en "conditions" y en "base"; no inventes datos científicos, porcentajes ni reglas: el motor del juego controla recursos y puntajes.
+- No menciones marcas, personas reales ni nada fuera de la misión.`;
+  return structured('plan', { ...input }, system, JSON.stringify(input), PLAN_SCHEMA, (x) => {
+    const o = obj(x);
+    const id = str(o.mission_id, 30) as MissionId;
+    if (!input.candidates.some((c) => c.id === id)) return null;
+    const tasks: MissionPlan['tasks'] = {};
+    if (Array.isArray(o.tasks)) {
+      for (const item of o.tasks) {
+        const t = obj(item);
+        const role = str(t.role, 10) as RoleId;
+        if (!ROLE_IDS.includes(role)) continue;
+        const title = str(t.title_es, 80);
+        const text = str(t.text_es, 320);
+        if (title && text) tasks[role] = { title, text };
+      }
+    }
+    return { missionId: id, reason: str(o.reason_es, 300), tasks };
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -199,7 +220,8 @@ export async function classifyImage(dataUrl: string): Promise<ScanResult | null>
 export interface NarrativeInput {
   ageGroup: string;
   className: string;
-  objectLabel: string;
+  /** Por qué IX generó la misión (condiciones reales). */
+  reason: string;
   mission: { title: string; titleEs: string; hook: string; story: string; objective: string; twist: string; twists: string[] };
   crews: { id: string; name: string; sector: string }[];
   /** Investigaciones reales de la NASA (NTRS + OSDR) en las que se basa la misión. */
@@ -257,7 +279,7 @@ Escribe en español de México, con tono de videojuego: urgente, emocionante y a
 Reglas estrictas:
 - No inventes números, porcentajes, datos científicos nuevos ni reglas: el motor del juego controla recursos y consecuencias.
 - Mantente dentro de la historia y el giro de la plantilla.
-- "briefing": máximo 60 palabras, en segunda persona del plural; menciona el objeto descubierto en el salón.
+- "briefing": máximo 60 palabras, en segunda persona del plural; cuenta por qué IX generó esta misión ("reason": condiciones reales de la NASA).
 - "crew_lines": una línea por tripulación (máximo 18 palabras) que explique qué parte del problema le toca a su sector.
 - "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.
 Investigación real:

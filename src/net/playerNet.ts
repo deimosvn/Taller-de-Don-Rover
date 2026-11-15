@@ -311,6 +311,11 @@ export class PlayerNet {
   }
 
   /** Puntos del minijuego del problema de la misión (sin esperar respuesta, como los toques). */
+  /** Puntos del minijuego de la tarea de su especialidad (sin confirmación). */
+  sendTask(points: number) {
+    if (points > 0) this.send({ t: 'act', rid: 0, action: { type: 'task', points } });
+  }
+
   sendFix(count: number) {
     if (count > 0) this.send({ t: 'act', rid: 0, action: { type: 'fix', count } });
   }

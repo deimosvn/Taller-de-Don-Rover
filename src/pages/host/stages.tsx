@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { BUILDINGS, CATEGORIES, MISSIONS, MISSION_ORDER, PACES, ROLES, ROLE_ORDER, SECTORS } from '../../../shared/content';
-import type { HostCrew, HostView, Tier } from '../../../shared/types';
+import type { HostCrew, HostView, RoleId, Tier } from '../../../shared/types';
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
 import { PlanetView } from '../../world/react/PlanetView';
 import { useHostSnapshot } from '../../world/react/useHostSnapshot';
@@ -56,7 +56,7 @@ export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
       <div className="lobby-world">
         <div className="lobby-head">
           <h2 className="sticker">{view.players.length ? `${view.players.length} astronauta${view.players.length > 1 ? 's' : ''} a bordo` : 'Esperando tripulantes…'}</h2>
-          <p>Cada quien crea su astronauta en su celular. Cuando estén todos, IX formará tripulaciones de cuatro.</p>
+          <p>Hasta 4 astronautas por misión, uno por especialidad. Cada quien entra a Marte desde su celular; cuando estén todos, IX forma la tripulación.</p>
           <NasaLiveChip />
         </div>
         <div className="lobby-empty">
@@ -104,9 +104,9 @@ export function CrewsStage({ view }: { view: HostView }) {
   return (
     <div className="crews-stage">
       <div className="stage-head">
-        <p className="eyebrow">Crew assignment</p>
-        <h2 className="sticker">¡Tripulaciones listas!</h2>
-        <p>Cada tripulación cuida un sector de la colonia. Los cuatro roles reciben información distinta: nadie puede resolver la misión solo.</p>
+        <p className="eyebrow">Tripulación asignada</p>
+        <h2 className="sticker">{view.crews.length > 1 ? '¡Tripulaciones listas!' : '¡Tripulación lista!'}</h2>
+        <p>La tripulación cuida un sector de la colonia. Cada especialidad recibe información distinta: nadie puede resolver la misión solo.</p>
       </div>
       <div className="crews-layout">
       <div className="crews-planet">
@@ -168,11 +168,12 @@ export function BriefingStage({ view }: { view: HostView }) {
           </div>
         </div>
         <span className="chip ix">
-          {CATEGORIES[m.category].emoji} {m.source === 'teacher' ? 'Elegida por el profesor' : `Descubierto: ${m.objectLabel}`}
+          🤖 {m.aiPlanned ? 'Generada por IX con IA y datos de la NASA' : 'Generada por IX con datos de la NASA'}
         </span>
+        {view.nasa?.science?.highlight && <ScienceCard highlight={view.nasa.science.highlight} studies={view.nasa.science.studies} ai={view.nasa.science.ai} compact />}
       </div>
       <div className="brief-right">
-        <p className="eyebrow">New mission unlocked · {def.code}</p>
+        <p className="eyebrow">Nueva misión · {def.code}</p>
         <h1 className="sticker brief-title" style={{ '--mc': def.color } as CSSProperties}>
           {def.title}
         </h1>
@@ -185,8 +186,8 @@ export function BriefingStage({ view }: { view: HostView }) {
         </div>
         <div className="brief-grid">
           <div className="panel brief-box">
-            <span className="eyebrow">Objetivo</span>
-            <p>{def.objective}</p>
+            <span className="eyebrow">Por qué esta misión</span>
+            <p>{m.reason || def.objective}</p>
           </div>
           <div className="panel brief-box">
             <span className="eyebrow">Aprenderemos</span>
@@ -199,7 +200,6 @@ export function BriefingStage({ view }: { view: HostView }) {
             </div>
           </div>
         </div>
-        {view.nasa?.science?.highlight && <ScienceCard highlight={view.nasa.science.highlight} studies={view.nasa.science.studies} ai={view.nasa.science.ai} />}
         <div className="twists">
           <span className="eyebrow">3 acontecimientos inesperados</span>
           <div className="twist-cards">
@@ -236,58 +236,62 @@ function Gauge({ label, value, color }: { label: string; value: number; color: s
   );
 }
 
+/** Orden en que se ven las tareas: así se lee la cadena de dependencias. */
+const TASK_CHAIN: RoleId[] = ['habitat', 'power', 'life', 'bio'];
+
 export function DiscoveryStage({ view }: { view: HostView }) {
   const def = MISSIONS[view.mission!.id];
   const byId = new Map(view.players.map((p) => [p.id, p]));
   const inCrews = view.crews.flatMap((c) => c.memberIds);
-  const answered = inCrews.filter((id) => view.progress[id]?.decoded).length;
-  const correct = inCrews.filter((id) => view.progress[id]?.correct).length;
+  const done = inCrews.filter((id) => view.progress[id]?.decoded).length;
+  const crew = view.crews[0];
+  const avg = crew ? ROLE_ORDER.reduce((sum, r) => sum + (crew.tasks?.[r] ?? 0), 0) / ROLE_ORDER.length : 0;
   return (
     <div className="discovery">
       <div className="stage-head">
-        <p className="eyebrow">Discovery</p>
-        <h2 className="sticker">Transmisiones cifradas</h2>
-        <p>Cada especialidad recibió una transmisión secreta. Para leerla debe resolver un reto científico en su celular… y luego contarla a su tripulación.</p>
+        <p className="eyebrow">Exploración · tareas conectadas</p>
+        <h2 className="sticker">Cada especialidad, una tarea</h2>
+        <p>
+          Cada quien camina a su estación en el mundo 3D para hacer su minijuego. Las tareas están encadenadas (↓): el escudo protege los paneles, la energía
+          mueve las bombas y el agua llega a los cultivos. Al terminar, cada quien recibe su transmisión secreta.
+        </p>
       </div>
       <div className="discovery-body">
         <div className="decode-grid">
           {view.crews.map((c) => (
-            <div key={c.id} className="decode-card panel">
+            <div key={c.id} className="decode-card panel task-chain">
               <div className="decode-head">
                 <b>{c.name}</b>
                 <small>
-                  {c.status.decoded}/{c.status.members}
+                  {c.status.decoded}/{c.status.members} tareas completas
                 </small>
               </div>
-              <div className="role-slots">
-                {c.memberIds.map((id) => {
-                  const p = byId.get(id);
-                  const pr = view.progress[id];
-                  if (!p) return null;
-                  const role = p.roles[0];
-                  return (
-                    <div key={id} className={`role-slot ${pr?.decoded ? (pr.correct ? 'ok' : 'retry') : ''}`} style={{ '--c': role ? ROLES[role].color : '#999' } as CSSProperties} title={p.name}>
-                      <span>{role ? ROLES[role].emoji : '•'}</span>
-                      <i>{pr?.decoded ? (pr.correct ? '✓' : '↺') : '…'}</i>
-                    </div>
-                  );
-                })}
-              </div>
+              {TASK_CHAIN.map((r, i) => {
+                const who = c.memberIds.map((id) => byId.get(id)).find((p) => p?.roles.includes(r));
+                const v = Math.round((c.tasks?.[r] ?? 0) * 100);
+                return (
+                  <div key={r} className="task-row" style={{ '--c': ROLES[r].color } as CSSProperties}>
+                    <span className="task-role">
+                      {ROLES[r].emoji} {ROLES[r].specialty}
+                      <small>{who ? who.name : 'sin tripulante'}</small>
+                    </span>
+                    <span className="task-bar" role="progressbar" aria-valuenow={v} aria-valuemin={0} aria-valuemax={100}>
+                      <i style={{ width: `${v}%` }} />
+                    </span>
+                    <b className="mono">{v >= 100 ? '✓' : `${v}%`}</b>
+                    {i < TASK_CHAIN.length - 1 && <span className="task-arrow" aria-hidden="true">↓</span>}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
         <div className="discovery-side">
-          <Gauge label="Transmisiones descifradas" value={inCrews.length ? answered / inCrews.length : 0} color="var(--water)" />
-          <Gauge label="Precisión de la clase" value={answered ? correct / answered : 0} color="var(--food)" />
+          <Gauge label="Tareas de la tripulación" value={avg} color="var(--food)" />
+          <Gauge label="Transmisiones recuperadas" value={inCrews.length ? done / inCrews.length : 0} color="var(--water)" />
           <div className="panel concept">
-            <span className="eyebrow">Conceptos en juego</span>
-            <div className="chips">
-              {def.learning.map((l) => (
-                <span key={l} className="chip">
-                  {l}
-                </span>
-              ))}
-            </div>
+            <span className="eyebrow">Por qué esta misión</span>
+            <p>{view.mission!.reason || def.hook}</p>
           </div>
         </div>
       </div>
@@ -306,7 +310,7 @@ export function ChallengeStage({ view }: { view: HostView }) {
   return (
     <div className="challenge">
       <div className="stage-head">
-        <p className="eyebrow">Crew challenge · {locked}/{view.crews.length} decisiones</p>
+        <p className="eyebrow">Reto de la tripulación · {locked}/{view.crews.length} {view.crews.length === 1 ? 'decisión' : 'decisiones'}</p>
         <h2 className="sticker">{m.puzzleTitle}</h2>
         <p>
           {m.puzzleQuestion} Nadie tiene toda la información: combinen sus datos y voten en su celular. Cuando toda la tripulación vota lo mismo, la decisión se
@@ -622,9 +626,9 @@ export function DebriefStage({ view }: { view: HostView }) {
       </div>
       <div className="campaign panel">
         <div>
-          <span className="eyebrow">The space campaign · Capítulo 1: Marte</span>
+          <span className="eyebrow">Campaña espacial · Capítulo 1: Marte</span>
           <p>
-            {done.size}/6 misiones completadas · Próximo: <b>{d.nextTeaser}</b>
+            {done.size}/{MISSION_ORDER.length} misiones completadas · Próximo: <b>{d.nextTeaser}</b>
           </p>
         </div>
         <div className="campaign-patches">

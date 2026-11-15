@@ -72,7 +72,7 @@ function StatusPanel({ view }: { view: HostView }) {
     <div className="status panel">
       <div className="status-head">
         <div>
-          <p className="eyebrow">Global planet status</p>
+          <p className="eyebrow">Estado del planeta</p>
           <h3>MARS-01</h3>
         </div>
         <span className="chip">Sol {view.colony.sol}</span>
@@ -118,13 +118,13 @@ function CrewStrip({ view }: { view: HostView }) {
   const byId = new Map(view.players.map((p) => [p.id, p]));
   const target = Math.round(PACES[view.pace].action * 1.6);
   return (
-    <div className="crewstrip">
+    <div className="crewstrip" aria-label="Tripulación">
       {view.crews.map((c) => {
         const s = c.status;
         let status = '';
-        if (view.phase === 'discovery') status = `${s.decoded}/${s.members} 🔓`;
-        else if (view.phase === 'challenge') status = s.locked ? '🔒 Lista' : s.tie ? '⚖️ Empate' : `${s.voted}/${s.members} 🗳️`;
-        else if (view.phase === 'event') status = view.event?.stage === 'share' ? `${s.shareVotes}/${s.members} 🤝` : `${Math.round(s.action * 100)}% ⚙️`;
+        if (view.phase === 'discovery') status = `${s.decoded}/${s.members} tareas listas`;
+        else if (view.phase === 'challenge') status = s.locked ? '🔒 Decisión tomada' : s.tie ? '⚖️ Empate' : `${s.voted}/${s.members} votos`;
+        else if (view.phase === 'event') status = view.event?.stage === 'share' ? `${s.shareVotes}/${s.members} votaron` : `${Math.round(s.action * 100)}% de acción`;
         else if (c.outcome) status = `${c.outcome.scores.total} pts`;
         return (
           <div key={c.id} className={`crew-mini ${s.locked && view.phase === 'challenge' ? 'is-locked' : ''} ${c.outcome ? `tier-${c.outcome.tier}` : ''}`}>
@@ -142,6 +142,7 @@ function CrewStrip({ view }: { view: HostView }) {
                 return (
                   <span key={id} className={`mini-av ${lit ? 'lit' : ''} ${p.connected ? '' : 'off'}`} title={p.name}>
                     <Astronaut avatar={p.avatar} role={p.roles[0]} size={30} pose="still" />
+                    <small>{p.name}</small>
                   </span>
                 );
               })}
@@ -221,13 +222,13 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
   let primary: { label: string; icon?: string; action: HostAction; cls?: string } | null = null;
   switch (view.phase) {
     case 'lobby':
-      primary = { label: 'Formar tripulaciones', icon: 'users', action: { type: 'formCrews' } };
+      primary = { label: 'Formar la tripulación', icon: 'users', action: { type: 'formCrews' } };
       break;
     case 'crews':
-      primary = { label: 'Escanear el mundo', icon: 'scan', action: { type: 'toScan' } };
+      primary = { label: 'Generar la misión', icon: 'spark', action: { type: 'toScan' } };
       break;
     case 'briefing':
-      primary = { label: 'Enviar transmisiones', icon: 'arrow', action: { type: 'next' } };
+      primary = { label: 'Empezar exploración', icon: 'arrow', action: { type: 'next' } };
       break;
     case 'discovery':
       primary = { label: 'Ir al reto', icon: 'arrow', action: { type: 'next' } };
@@ -293,23 +294,21 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
         </section>
         <aside className="rail">
           <StatusPanel view={view} />
+          {view.crews.length > 0 && view.phase !== 'lobby' && <CrewStrip view={view} />}
           <IxFeed view={view} />
         </aside>
       </main>
-
-      {view.crews.length > 0 && view.phase !== 'lobby' && <CrewStrip view={view} />}
 
       <footer className="dock">
         <div className="dock-left">
           {view.phase === 'lobby' && (
             <>
-              <button className="btn small ghost" onClick={() => run({ type: 'addBots', count: 4 })}>
-                <Icon name="bot" size={18} /> +4 bots
+              <button className="btn small ghost" disabled={view.players.length >= view.maxPlayers} onClick={() => run({ type: 'addBots', count: view.maxPlayers - view.players.length })}>
+                <Icon name="bot" size={18} /> Completar con bots
               </button>
-              <button className="btn small ghost" onClick={() => run({ type: 'addBots', count: 12 })}>
-                <Icon name="bot" size={18} /> +12 bots
-              </button>
-              <span className="dock-note">{humans ? `${humans} alumno${humans > 1 ? 's' : ''} conectado${humans > 1 ? 's' : ''}` : 'Los bots sirven para probar o completar equipos'}</span>
+              <span className="dock-note">
+                {view.players.length}/{view.maxPlayers} tripulantes · {humans ? `${humans} alumno${humans > 1 ? 's' : ''}` : 'si entra un alumno, un bot le cede su lugar'}
+              </span>
             </>
           )}
           {view.phase === 'crews' && (

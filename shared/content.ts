@@ -211,7 +211,7 @@ export const BUILDINGS: Record<BuildingId, { name: string; desc: string; emoji: 
 
 export const BADGES: Record<BadgeId, { name: string; emoji: string; desc: string }> = {
   first: { name: 'Primer contacto', emoji: '🚀', desc: 'Primera persona en abordar la colonia' },
-  decoder: { name: 'Decodificador', emoji: '🔓', desc: 'Descifró su transmisión al primer intento' },
+  decoder: { name: 'Decodificador', emoji: '🔓', desc: 'Completó la tarea de su especialidad' },
   voice: { name: 'Voz de la tripulación', emoji: '🗳️', desc: 'Votó en la decisión de su tripulación' },
   brain: { name: 'Mente brillante', emoji: '🧠', desc: 'Su tripulación encontró la mejor solución' },
   hands: { name: 'Manos a la obra', emoji: '🛠️', desc: 'La mayor cantidad de acciones de su tripulación' },
@@ -264,7 +264,7 @@ export const CLASS_PLAN: { from: string; to: string; stage: string; es: string; 
   { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR, crean su astronauta y aparecen en la colonia.' },
   { from: '03', to: '05', stage: 'CREW ASSIGNMENT', es: 'Tripulaciones', text: 'IX forma tripulaciones de cuatro y asigna las especialidades.' },
   { from: '05', to: '08', stage: 'WORLD SCANNER', es: 'Escáner', text: 'Se fotografía un objeto del salón y la IA desbloquea la misión.' },
-  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien descifra una transmisión secreta con un reto científico.' },
+  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien va a su estación en Marte y completa la tarea de su especialidad.' },
   { from: '15', to: '22', stage: 'CREW CHALLENGE', es: 'Reto de tripulación', text: 'Los cuatro roles combinan sus datos y votan una decisión.' },
   { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Evento global', text: 'Toda la clase enfrenta una emergencia y decide cuánto compartir.' },
   { from: '30', to: '35', stage: 'MISSION RESULTS', es: 'Resultados', text: 'La colonia cambia según las decisiones de cada tripulación.' },

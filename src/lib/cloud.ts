@@ -250,7 +250,7 @@ export async function missionHistory(colonyId: string): Promise<MissionRow[]> {
 /* IA del servidor (Claude Opus 5.5)                                    */
 /* ------------------------------------------------------------------ */
 
-export type AiTask = 'scan' | 'narrative' | 'logs' | 'debrief' | 'trainer' | 'coach';
+export type AiTask = 'plan' | 'narrative' | 'logs' | 'debrief' | 'trainer' | 'coach';
 
 /** Pide una tarea a la IA del servidor. Devuelve el JSON crudo (se valida en el motor) o null. */
 export async function serverAi(task: AiTask, input: Record<string, unknown>): Promise<unknown | null> {

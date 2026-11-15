@@ -1,10 +1,10 @@
 // Función de Vercel: IA del Taller de Don Rover con Claude Opus 5.5, del lado del servidor.
 //
 // Espacio listo para la IA: basta con agregar ANTHROPIC_API_KEY en las variables de entorno
-// del proyecto de Vercel y volver a desplegar. Sin la clave, el juego sigue con visión local
-// (TensorFlow.js) y plantillas, o con la clave que el profesor escriba en Ajustes.
+// del proyecto de Vercel y volver a desplegar. Sin la clave, el juego sigue con las reglas
+// del motor y plantillas, o con la clave que el profesor escriba en Ajustes.
 //
-// "La IA narra, el motor decide": aquí solo se clasifican fotos y se redactan textos con
+// "La IA narra, el motor decide": aquí solo se generan misiones y se redactan textos con
 // salidas estructuradas (JSON Schema). Los puntajes y consecuencias los calcula el motor.
 // Las instrucciones viven en el servidor (el navegador solo manda los datos de la tarea),
 // así que nadie puede usar la clave para otra cosa que no sea el juego.
@@ -31,7 +31,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-5-5';
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic({ timeout: 50_000, maxRetries: 1 }) : null;
 let useServerFallbacks = true;
 
-const CATEGORIES = ['plant', 'water', 'light', 'signal', 'material', 'mystery'];
+const MISSION_IDS = ['greenhouse', 'water', 'darkness', 'signal', 'habitat', 'final'];
 
 /** Texto corto y de una línea para insertar en las instrucciones. */
 const clean = (x: unknown, max: number) =>
@@ -49,21 +49,6 @@ interface Task {
   content: Content;
   schema: Record<string, unknown>;
 }
-
-const SCAN_SYSTEM = `Eres IX, la inteligencia artificial del Taller de Don Rover, un juego educativo de misiones espaciales para salones de clase (niñas y niños de 7 a 14 años).
-Tu tarea: identificar el objeto principal de la foto y clasificarlo en UNA categoría:
-- plant: plantas, flores, hojas, árboles, frutas, verduras, semillas
-- water: botellas, vasos, tazas, termos, agua, recipientes para líquidos, llaves o lavabos
-- light: lámparas, focos, linternas, ventanas, luz del sol, velas
-- signal: celulares, radios, bocinas, audífonos, antenas, controles remotos, computadoras, tabletas
-- material: cartón, papel, plástico, latas, cajas, bloques, telas, materiales reciclables, útiles escolares
-- mystery: cualquier otra cosa
-Reglas:
-- Si aparecen personas, ignóralas: no las describas ni menciones sus rasgos.
-- "label": nombre corto del objeto en español (2 a 4 palabras).
-- "discovery": una frase emocionante (máximo 25 palabras) que conecte el objeto con una misión en Marte, sin inventar propiedades científicas del objeto.
-- "fun_fact": un dato real y verificable, apto para niños, sobre el espacio o la NASA relacionado con la categoría (máximo 30 palabras).
-- "confidence": número entre 0 y 1.`;
 
 const TRAINER_SIMS = ['solar', 'oxygen', 'water', 'greenhouse', 'shield', 'landing'];
 
@@ -111,16 +96,26 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
     required: ['feedback', 'next_step', 'question'],
     additionalProperties: false,
   },
-  scan: {
+  plan: {
     type: 'object',
     properties: {
-      category: { type: 'string', enum: CATEGORIES },
-      label: { type: 'string' },
-      confidence: { type: 'number' },
-      discovery: { type: 'string' },
-      fun_fact: { type: 'string' },
+      mission_id: { type: 'string' },
+      reason_es: { type: 'string' },
+      tasks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            role: { type: 'string', enum: ['power', 'life', 'bio', 'habitat'] },
+            title_es: { type: 'string' },
+            text_es: { type: 'string' },
+          },
+          required: ['role', 'title_es', 'text_es'],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ['category', 'label', 'confidence', 'discovery', 'fun_fact'],
+    required: ['mission_id', 'reason_es', 'tasks'],
     additionalProperties: false,
   },
   narrative: {
@@ -197,17 +192,24 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
 /** Arma la tarea a partir de los datos que manda el navegador (nunca de instrucciones suyas). */
 function buildTask(task: string, input: Record<string, unknown>): Task | string {
   switch (task) {
-    case 'scan': {
-      const m = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(String(input.image ?? ''));
-      if (!m) return 'La foto no es válida.';
-      if (m[2].length > 4_500_000) return 'La foto es demasiado grande.';
+    case 'plan': {
+      const age = clean(input.ageGroup, 40) || '8 a 14 años';
+      const candidates = Array.isArray(input.candidates) ? input.candidates.filter((c) => MISSION_IDS.includes(String((c as { id?: unknown })?.id))).slice(0, 6) : [];
+      if (!candidates.length) return 'No hay misiones candidatas.';
       return {
-        system: SCAN_SYSTEM,
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: m[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif', data: m[2] } },
-          { type: 'text', text: 'Clasifica el objeto principal de esta foto tomada en un salón de clases.' },
-        ],
-        schema: SCHEMAS.scan,
+        system: `Eres IX, la IA de la colonia en el Taller de Don Rover, un videojuego cooperativo de misiones en Marte para el salón de clases.
+Una partida es UNA tripulación de máximo 4 alumnos, uno por especialidad: power (Energía), life (Soporte vital), bio (Astrobiología) y habitat (Hábitat).
+Tu trabajo: generar la siguiente misión a partir de condiciones reales.
+1. "mission_id": elige UNA de "candidates" (usa su id exacto). Elige la que mejor responda a los problemas reales de "conditions" (clima espacial de la NASA DONKI y estado de la colonia). "suggested" es la sugerencia de las reglas del motor: úsala si no hay una razón mejor.
+2. "reason_es": por qué IX generó esta misión, en una o dos frases (máximo 35 palabras), citando un dato real de "conditions".
+3. "tasks": exactamente 4, una por especialidad (power, life, bio, habitat). Cada una con "title_es" (máximo 8 palabras) y "text_es" (máximo 40 palabras), en segunda persona del singular.
+   Las tareas deben estar conectadas como dice "link" de cada especialidad: Hábitat protege los paneles de Energía, Energía alimenta las bombas de Soporte vital, el agua de Soporte vital llega a los cultivos de Astrobiología y la comida fresca da fuerza a Hábitat. Cada texto debe decir de quién depende o a quién ayuda.
+Reglas estrictas:
+- Español de México, para niñas y niños de ${age}, con tono de videojuego: claro, urgente y amable.
+- Usa solo los números que aparecen en "conditions" y en "base"; no inventes datos científicos, porcentajes ni reglas: el motor del juego controla recursos y puntajes.
+- No menciones marcas, personas reales ni nada fuera de la misión.`,
+        content: JSON.stringify({ ...input, candidates }),
+        schema: SCHEMAS.plan,
       };
     }
     case 'narrative': {
@@ -218,7 +220,7 @@ Escribe en español de México, con tono de videojuego: urgente, emocionante y a
 Reglas estrictas:
 - No inventes números, porcentajes, datos científicos nuevos ni reglas: el motor del juego controla recursos y consecuencias.
 - Mantente dentro de la historia y el giro de la plantilla.
-- "briefing": máximo 60 palabras, en segunda persona del plural; menciona el objeto descubierto en el salón.
+- "briefing": máximo 60 palabras, en segunda persona del plural; cuenta por qué IX generó esta misión ("reason": condiciones reales de la NASA).
 - "crew_lines": una línea por tripulación (máximo 18 palabras) que explique qué parte del problema le toca a su sector.
 - "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.
 Investigación real:

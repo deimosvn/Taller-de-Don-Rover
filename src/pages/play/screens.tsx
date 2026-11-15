@@ -7,8 +7,9 @@ import type { BadgeId, IntelCard, PlayerView, QuizView, Tier } from '../../../sh
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
 import { Confetti, Icon, RoleChip } from '../../components/ui';
 import { HealthCard, ScienceCard } from '../../components/nasa';
-import { minigameFor } from '../../../shared/minigames';
+import { MISSION_PROBLEMS, minigameFor } from '../../../shared/minigames';
 import { Minigame } from './minigames';
+import { GoToStation, RoleTask } from './RoleTask';
 import { ProblemCard } from './MissionProblem';
 import { hostNow, useTicker } from '../../lib/clock';
 import { vibrate } from '../../lib/pwa';
@@ -222,43 +223,15 @@ function RoleReveal({ view }: { view: PlayerView }) {
 
 /* ---------------- escáner ---------------- */
 
-function ScanWait({ view, act }: { view: PlayerView; act: Act }) {
-  const ov = view.objectVote;
-  if (ov?.open) {
-    return (
-      <div className="screen">
-        <p className="eyebrow center">Votación de la clase</p>
-        <h2 className="center">¿Qué objeto del salón exploramos?</h2>
-        <div className="object-vote">
-          {ov.options.map((c) => (
-            <button
-              key={c}
-              className={`ov-opt card ${ov.myVote === c ? 'on' : ''}`}
-              onClick={() => {
-                sfx.select();
-                vibrate(15);
-                void act({ type: 'objectVote', category: c });
-              }}
-            >
-              <span className="ov-emoji">{CATEGORIES[c].emoji}</span>
-              <b>{CATEGORIES[c].label}</b>
-              <small>{CATEGORIES[c].examples}</small>
-              {ov.myVote === c && <span className="ov-check">✓</span>}
-            </button>
-          ))}
-        </div>
-        <p className="fine center">Puedes cambiar tu voto hasta que el profesor cierre la votación.</p>
-      </div>
-    );
-  }
+function ScanWait() {
   return (
     <Center>
       <div className="radar">
         <i />
         <IXOrb size={80} mood="talk" />
       </div>
-      <h2>IX está escaneando el mundo…</h2>
-      <p className="lead">Mira el proyector: un objeto del salón está por convertirse en misión.</p>
+      <h2>IX está generando la misión…</h2>
+      <p className="lead">Revisa el clima espacial real de la NASA y el estado de la colonia para decidir qué problema enfrentarán.</p>
     </Center>
   );
 }
@@ -559,7 +532,7 @@ function ClassProgress({ view }: { view: PlayerView }) {
   );
 }
 
-function Emergency({ view, act, net }: { view: PlayerView; act: Act; net: PlayerNet | null }) {
+function Emergency({ view, act, net, open3d }: { view: PlayerView; act: Act; net: PlayerNet | null; open3d?: () => void }) {
   const ev = view.event;
   if (!ev) {
     return (
@@ -615,7 +588,21 @@ function Emergency({ view, act, net }: { view: PlayerView; act: Act; net: Player
       </div>
     );
   }
-  if (ev.stage === 'action') return <TapGame view={view} net={net} />;
+  if (ev.stage === 'action') {
+    // La acción de emergencia se hace en su estación del mundo 3D.
+    if (open3d)
+      return (
+        <Center>
+          <div className="stamp bad">🚨 {ev.title}</div>
+          <p className="lead">
+            {ev.action.emoji} {ev.action.verb}
+          </p>
+          <GoToStation place={view.mission ? MISSION_PROBLEMS[view.mission.id].place : 'la colonia'} onGo={open3d} />
+          <ClassProgress view={view} />
+        </Center>
+      );
+    return <TapGame view={view} net={net} />;
+  }
   return (
     <Center>
       {ev.saved && <Confetti count={40} />}
@@ -795,7 +782,7 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
         </>
       );
     case 'scan':
-      return <ScanWait view={view} act={act} />;
+      return <ScanWait />;
     case 'briefing':
       return view.mission ? (
         <>
@@ -803,24 +790,27 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
           <ProblemCard view={view} net={net} open3d={open3d} />
         </>
       ) : (
-        <ScanWait view={view} act={act} />
+        <ScanWait />
       );
     case 'discovery':
       return (
         <>
-          <Decode view={view} act={act} />
-          <ProblemCard view={view} net={net} open3d={open3d} />
+          <Explore3D open3d={open3d} text={view.task ? `Tu estación está en ${view.task.place}.` : 'Recorre la colonia.'} />
+          <div className="screen">
+            <RoleTask view={view} net={net} onGo={open3d} />
+            {view.intel && view.intel.map((c) => <IntelCardView key={c.role} card={c} />)}
+          </div>
         </>
       );
     case 'challenge':
       return (
         <>
-          {view.quiz && !view.quiz.answered ? <Decode view={view} act={act} /> : <Vote view={view} act={act} />}
+          <Vote view={view} act={act} />
           <ProblemCard view={view} net={net} open3d={open3d} />
         </>
       );
     case 'event':
-      return <Emergency view={view} act={act} net={net} />;
+      return <Emergency view={view} act={act} net={net} open3d={open3d} />;
     case 'results':
       return <Outcome view={view} />;
     case 'debrief':

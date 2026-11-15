@@ -20,6 +20,25 @@ const CODE_RE = /^[A-Z]{4}$/;
 
 /** Mundo 3D del alumno (three.js se descarga solo si lo abre). */
 const PlayWorld = lazy(() => import('./PlayWorld'));
+const IntroWorld = lazy(() => import('./IntroWorld'));
+
+/** ¿Este dispositivo puede mostrar el mundo 3D? (si no, se juega con las pantallas de siempre). */
+const SUPPORTS_3D = (() => {
+  try {
+    return Boolean(document.createElement('canvas').getContext('webgl2'));
+  } catch {
+    return false;
+  }
+})();
+
+const WORLD_LOADING = (
+  <div className="world-overlay">
+    <div className="world-loading">
+      <div className="spinner" />
+      Preparando Marte…
+    </div>
+  </div>
+);
 
 function loadSig(raw: string | null) {
   const fromUrl = decodeSignaling(raw);
@@ -46,7 +65,11 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
   const [netState, setNetState] = useState<PlayerNetState>('connecting');
   const [joinError, setJoinError] = useState('');
   const [toast, setToast] = useState<{ text: string; kind: 'hint' | 'error' } | null>(null);
-  const [show3d, setShow3d] = useState(false);
+  // El juego es en 3D: el alumno está en Marte desde el principio (el panel de misión se abre encima).
+  const [show3d, setShow3d] = useState(SUPPORTS_3D);
+  // Al volver al mundo desde "Ir a la misión", la flecha guía ya aparece encendida.
+  const [guide, setGuide] = useState(false);
+  const [card, setCard] = useState(true);
   const netRef = useRef<PlayerNet | null>(null);
   const profileRef = useRef(profile);
   profileRef.current = profile;
@@ -99,6 +122,10 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, code]);
+
+  useEffect(() => {
+    if (SUPPORTS_3D && (view?.phase === 'discovery' || view?.phase === 'event')) setShow3d(true);
+  }, [view?.phase]);
 
   // Retroalimentación al cambiar de fase
   const lastPhase = useRef<string | null>(null);
@@ -155,109 +182,147 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
   /* ---------- pantallas previas ---------- */
 
   if (stage === 'code') {
+    const panel = (
+        <div className="play play-intro space-bg">
+          <div className="starfield" />
+          <header className="play-intro-top">
+            <a href="#/" className="plain-link">
+              <Logo size="sm" />
+            </a>
+            {install.canInstall && (
+              <button className="btn small cream" onClick={install.install}>
+                <Icon name="install" size={16} /> Instalar
+              </button>
+            )}
+          </header>
+          <main className="intro-card card">
+            <IXOrb size={92} mood="talk" />
+            <h1>Únete a la misión</h1>
+            <p className="muted">Escribe el código de 4 letras que aparece en el proyector.</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (CODE_RE.test(code)) {
+                  primeAudio();
+                  setStage('profile');
+                }
+              }}
+            >
+              <input
+                className="code-input"
+                value={code}
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoFocus
+                maxLength={4}
+                placeholder="ABCD"
+                aria-label="Código de la misión"
+                onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+              />
+              <button className="btn big block food" disabled={!CODE_RE.test(code)}>
+                Continuar <Icon name="arrow" />
+              </button>
+            </form>
+            <div className="nocode">
+              <p className="nocode-title">¿No tienes código?</p>
+              <p className="muted">Explora Marte en modo libre: recolecta recursos y construye tu propia base.</p>
+              <div className="nocode-actions">
+                <a className="btn block mars" href="#/libre?modo=solo">
+                  🚀 Jugar solo
+                </a>
+                <a className="btn block ix" href="#/libre?modo=amigos">
+                  👥 Invitar amigos
+                </a>
+              </div>
+            </div>
+          </main>
+        </div>
+    );
+    if (!SUPPORTS_3D) return panel;
     return (
-      <div className="play play-intro space-bg">
-        <div className="starfield" />
-        <header className="play-intro-top">
-          <a href="#/" className="plain-link">
-            <Logo size="sm" />
-          </a>
-          {install.canInstall && (
-            <button className="btn small cream" onClick={install.install}>
-              <Icon name="install" size={16} /> Instalar
+      <Suspense fallback={panel}>
+        <IntroWorld name={profile.name} avatar={profile.avatar}>
+          {card ? (
+            <div className="intro-float">
+              <button className="btn small cream intro-hide" onClick={() => setCard(false)}>
+                🌍 Explorar Marte
+              </button>
+              {panel}
+            </div>
+          ) : (
+            <button className="btn mars intro-show" onClick={() => setCard(true)}>
+              🚀 Unirme a una misión
             </button>
           )}
-        </header>
-        <main className="intro-card card">
-          <IXOrb size={92} mood="talk" />
-          <h1>Únete a la misión</h1>
-          <p className="muted">Escribe el código de 4 letras que aparece en el proyector.</p>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (CODE_RE.test(code)) {
-                primeAudio();
-                setStage('profile');
-              }
-            }}
-          >
-            <input
-              className="code-input"
-              value={code}
-              inputMode="text"
-              autoCapitalize="characters"
-              autoComplete="off"
-              autoFocus
-              maxLength={4}
-              placeholder="ABCD"
-              aria-label="Código de la misión"
-              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
-            />
-            <button className="btn big block food" disabled={!CODE_RE.test(code)}>
-              Continuar <Icon name="arrow" />
-            </button>
-          </form>
-          <div className="nocode">
-            <p className="nocode-title">¿No tienes código?</p>
-            <p className="muted">Explora Marte en modo libre: recolecta recursos y construye tu propia base.</p>
-            <div className="nocode-actions">
-              <a className="btn block mars" href="#/libre?modo=solo">
-                🚀 Jugar solo
-              </a>
-              <a className="btn block ix" href="#/libre?modo=amigos">
-                👥 Invitar amigos
-              </a>
-            </div>
-          </div>
-        </main>
-      </div>
+        </IntroWorld>
+      </Suspense>
     );
   }
 
   if (stage === 'profile') {
-    return (
-      <div className="play play-intro space-bg">
-        <div className="starfield" />
-        <header className="play-intro-top">
-          <button className="icon-btn" onClick={() => setStage('code')} aria-label="Cambiar código">
-            <Icon name="back" />
-          </button>
-          <span className="chip mono">Misión {code}</span>
-        </header>
-        <main className="intro-card card profile-card">
-          <h1>Crea tu astronauta</h1>
-          <AvatarBuilder value={profile.avatar} onChange={(avatar) => updateProfile({ ...profile, avatar })} />
-          <div className="field">
-            <label htmlFor="pname">Tu nombre de astronauta</label>
-            <input
-              id="pname"
-              className="input big-input"
-              maxLength={16}
-              placeholder="Ej. Itzel"
-              value={profile.name}
-              autoComplete="nickname"
-              onChange={(e) => {
+    const panel = (
+        <div className="play play-intro space-bg">
+          <div className="starfield" />
+          <header className="play-intro-top">
+            <button className="icon-btn" onClick={() => setStage('code')} aria-label="Cambiar código">
+              <Icon name="back" />
+            </button>
+            <span className="chip mono">Misión {code}</span>
+          </header>
+          <main className="intro-card card profile-card">
+            <h1>Crea tu astronauta</h1>
+            <AvatarBuilder value={profile.avatar} onChange={(avatar) => updateProfile({ ...profile, avatar })} />
+            <div className="field">
+              <label htmlFor="pname">Tu nombre de astronauta</label>
+              <input
+                id="pname"
+                className="input big-input"
+                maxLength={16}
+                placeholder="Ej. Itzel"
+                value={profile.name}
+                autoComplete="nickname"
+                onChange={(e) => {
+                  setJoinError('');
+                  updateProfile({ ...profile, name: e.target.value });
+                }}
+              />
+            </div>
+            {joinError && <p className="error-text">{joinError}</p>}
+            <button
+              className="btn huge block mars"
+              disabled={!profile.name.trim()}
+              onClick={() => {
+                primeAudio();
                 setJoinError('');
-                updateProfile({ ...profile, name: e.target.value });
+                setView(null);
+                setStage('game');
               }}
-            />
-          </div>
-          {joinError && <p className="error-text">{joinError}</p>}
-          <button
-            className="btn huge block mars"
-            disabled={!profile.name.trim()}
-            onClick={() => {
-              primeAudio();
-              setJoinError('');
-              setView(null);
-              setStage('game');
-            }}
-          >
-            🚀 ¡Abordar!
-          </button>
-          <p className="fine center">Sin cuentas: tu astronauta, tu XP y tus insignias se guardan solo en este dispositivo.</p>
-        </main>
-      </div>
+            >
+              🚀 ¡Abordar!
+            </button>
+            <p className="fine center">Sin cuentas: tu astronauta, tu XP y tus insignias se guardan solo en este dispositivo.</p>
+          </main>
+        </div>
+    );
+    if (!SUPPORTS_3D) return panel;
+    return (
+      <Suspense fallback={panel}>
+        <IntroWorld name={profile.name} avatar={profile.avatar}>
+          {card ? (
+            <div className="intro-float">
+              <button className="btn small cream intro-hide" onClick={() => setCard(false)}>
+                🌍 Explorar Marte
+              </button>
+              {panel}
+            </div>
+          ) : (
+            <button className="btn mars intro-show" onClick={() => setCard(true)}>
+              🧑‍🚀 Crear mi astronauta
+            </button>
+          )}
+        </IntroWorld>
+      </Suspense>
     );
   }
 
@@ -322,7 +387,19 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
 
       <main className="play-main" key={view?.phase ?? 'none'}>
         {view ? (
-          <PhaseScreen view={view} act={act} net={netRef.current} open3d={() => setShow3d(true)} />
+          <PhaseScreen
+            view={view}
+            act={act}
+            net={netRef.current}
+            open3d={
+              SUPPORTS_3D
+                ? () => {
+                    setGuide(true);
+                    setShow3d(true);
+                  }
+                : undefined
+            }
+          />
         ) : (
           <div className="play-center">
             <IXOrb size={110} mood="talk" />
@@ -340,17 +417,30 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
       )}
 
       {show3d && view && (
-        <Suspense
-          fallback={
-            <div className="world-overlay">
-              <div className="world-loading">
-                <div className="spinner" />
-                Preparando Marte…
-              </div>
+        <Suspense fallback={WORLD_LOADING}>
+          <PlayWorld
+            view={view}
+            net={netRef.current}
+            guide={guide}
+            onClose={() => {
+              setGuide(false);
+              setShow3d(false);
+            }}
+          />
+        </Suspense>
+      )}
+      {show3d && !view && SUPPORTS_3D && (
+        <Suspense fallback={WORLD_LOADING}>
+          <IntroWorld name={profile.name} avatar={profile.avatar}>
+            <div className="wp-banner">
+              <span>{netState === 'notfound' ? `No encontramos la misión ${code}.` : `Conectando con la colonia ${code}…`}</span>
+              {netState === 'notfound' && (
+                <button className="wp-btn" onClick={() => setStage('code')}>
+                  Cambiar código
+                </button>
+              )}
             </div>
-          }
-        >
-          <PlayWorld view={view} net={netRef.current} onClose={() => setShow3d(false)} />
+          </IntroWorld>
         </Suspense>
       )}
     </div>
