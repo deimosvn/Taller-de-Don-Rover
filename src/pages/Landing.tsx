@@ -256,6 +256,9 @@ export function Landing() {
                 <Icon name="install" size={16} /> Instalar app
               </button>
             )}
+            <a className="btn small cream" href="#/pitch">
+              🎤 Presentación
+            </a>
             <a className="btn small cream" href="#/donrover">
               🤖 Don Rover físico
             </a>

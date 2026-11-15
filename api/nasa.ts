@@ -315,7 +315,10 @@ export default async function handler(req: Req, res: Res) {
     if (op === 'apod') {
       // Foto astronómica del día (APOD), con la explicación oficial de la NASA.
       const apod = await cached('apod', 3 * 3600_000, async () => {
-        const o = (await getJson(`https://api.nasa.gov/planetary/apod?thumbs=true&api_key=${KEY}`)) as Record<string, unknown>;
+        // La foto de "hoy" se publica en horario de EE. UU.: si todavía no existe, se usa la de ayer.
+        const base = `https://api.nasa.gov/planetary/apod?thumbs=true&api_key=${KEY}`;
+        const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+        const o = ((await getJson(base, 7000).catch(() => getJson(`${base}&date=${yesterday}`, 7000))) ?? {}) as Record<string, unknown>;
         const s = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
         return {
           title: s(o.title, 200),

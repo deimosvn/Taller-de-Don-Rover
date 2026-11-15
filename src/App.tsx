@@ -11,6 +11,7 @@ const RoverSetup = lazy(() => import('./pages/rover/RoverSetup').then((m) => ({ 
 const Trainer = lazy(() => import('./pages/trainer/Trainer').then((m) => ({ default: m.Trainer })));
 /** Don Rover flotante en todas las secciones (se carga aparte para no frenar la portada). */
 const RoverDock = lazy(() => import('./rover/RoverDock').then((m) => ({ default: m.RoverDock })));
+const Pitch = lazy(() => import('./pages/pitch/Pitch').then((m) => ({ default: m.Pitch })));
 const FreePlay = lazy(() => import('./pages/free/FreePlay').then((m) => ({ default: m.FreePlay })));
 
 function Loading() {
@@ -25,13 +26,19 @@ function Loading() {
 
 export function App() {
   const route = useRoute();
+  // En la presentación Don Rover ya está en el escenario: sin la burbuja flotante.
+  const isPitch = route.path === '/pitch' || route.path === '/presentacion';
   return (
     <>
-    <Suspense fallback={null}>
-      <RoverDock />
-    </Suspense>
+    {!isPitch && (
+      <Suspense fallback={null}>
+        <RoverDock />
+      </Suspense>
+    )}
     <Suspense fallback={<Loading />}>
-      {route.path === '/profe' ? (
+      {isPitch ? (
+        <Pitch />
+      ) : route.path === '/profe' ? (
         <HostApp />
       ) : route.path === '/jugar' ? (
         <PlayApp initialCode={(route.params.get('c') ?? '').toUpperCase()} sig={route.params.get('s')} />
