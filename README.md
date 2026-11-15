@@ -36,10 +36,30 @@ npm run build
 
 Sube la carpeta `dist/` a cualquier hosting estático con HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages…). La app usa rutas con `#`, así que no necesita configuración extra. El service worker guarda la app para que abra sin conexión; sin internet funciona el modo demo con bots.
 
+El proyecto ya está conectado a **Vercel**: cada push a `main` se publica solo. En Vercel, además de la app, corren dos funciones del servidor (carpeta `api/`):
+
+| Función | Para qué sirve | Variable que necesita |
+| --- | --- | --- |
+| `api/colonies.ts` | Guarda cada colonia y el historial de misiones en **Supabase** | `POSTGRES_URL` (la crea la integración de Supabase) |
+| `api/ai.ts` | IA con **Claude Opus 5.5** sin exponer la clave | `ANTHROPIC_API_KEY` |
+
+Ambas son opcionales: si falta la variable, el juego funciona igual que antes (colonias en el navegador, IA local). Puedes ver el ejemplo en [`.env.example`](.env.example).
+
+## Base de datos (Supabase en Vercel)
+
+1. En Vercel, conecta la base de Supabase al proyecto (**Storage → Supabase → Connect Project**). La integración agrega `POSTGRES_URL` y las demás variables.
+2. Vuelve a desplegar. La primera vez, `api/colonies.ts` crea las tablas `donrover_colonies` y `donrover_missions` (también están en [`supabase/schema.sql`](supabase/schema.sql) por si prefieres crearlas a mano).
+3. En la consola del profesor aparece **Base de datos conectada · Supabase**. Cada colonia muestra su **código de colonia** (`XXXX-XXXX-XXXX-XXXX`): con él se abre la misma colonia en otra computadora, sin cuentas.
+
+Las tablas tienen RLS activado y sin políticas: la API pública de Supabase no puede leerlas. Solo las funciones de Vercel acceden, y la clave de cada colonia se guarda como hash.
+
+Para probar las funciones en tu computadora usa `vercel dev` (con `vercel env pull` para traer las variables); `npm run dev` corre solo la app, sin funciones.
+
 ## Inteligencia artificial
 
 - **Sin clave**: el escáner usa visión local con TensorFlow.js (COCO-SSD) y un detector de brillo para las fuentes de luz. La foto se analiza en el navegador y nunca sale del dispositivo. Las narrativas usan plantillas revisadas.
-- **Con Claude** (opcional): en **Ajustes** de la consola, pega una clave de API de Anthropic. IX usará visión multimodal para reconocer cualquier objeto, personalizará la historia, evaluará la creatividad de las bitácoras y escribirá el debrief. La clave se guarda solo en ese navegador; usa una clave con límite de gasto.
+- **Claude Opus 5.5 en el servidor** (recomendado): agrega `ANTHROPIC_API_KEY` en las variables de entorno del proyecto en Vercel y vuelve a desplegar. La función `api/ai.ts` clasifica las fotos del escáner, personaliza la historia, evalúa la creatividad de las bitácoras y escribe el debrief. La clave nunca llega al navegador y las instrucciones viven en el servidor, así que solo sirve para el juego. Si un filtro de seguridad rechaza una petición, la API la reintenta sola con otro modelo (`fallbacks: "default"`).
+- **Clave en el navegador** (alternativa): en **Ajustes** de la consola, pega una clave de API de Anthropic. Se guarda solo en ese navegador; usa una clave con límite de gasto.
 
 Principio de diseño: **la IA narra, el motor decide**. Los recursos, las puntuaciones y las consecuencias los calcula un motor determinista; el modelo solo escribe dentro de plantillas con salidas estructuradas.
 
@@ -70,6 +90,9 @@ src/engine/      Motor del juego, IA (Claude), visión local, colonias y ajustes
 src/net/         Conexión WebRTC entre el proyector y los celulares
 src/components/  Ilustraciones SVG (astronautas, IX, parches, mapa) y piezas de UI
 src/pages/       Presentación, consola del profesor y app del alumno
+src/world/       Mundo 3D: planeta, colonia, astronautas, modo jugador en 1.ª y 3.ª persona
+api/             Funciones de Vercel: base de datos (Supabase) e IA (Claude Opus 5.5)
+supabase/        Esquema SQL de las tablas
 pwa/sw.js        Plantilla del service worker (se genera en el build)
 public/          Manifiesto e íconos de la PWA
 ```

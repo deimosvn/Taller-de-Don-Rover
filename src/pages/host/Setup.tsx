@@ -1,13 +1,25 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DIFFICULTIES, MISSIONS, PACES, PHASE_LABELS } from '../../../shared/content';
 import type { Difficulty, Pace } from '../../../shared/types';
 import { aiStatus } from '../../engine/ai';
 import type { RoomSnapshot } from '../../engine/room';
-import { deleteColony, exportColony, importColony, listColonies } from '../../engine/store';
+import { deleteColony, exportColony, importColony, listColonies, storeColony } from '../../engine/store';
 import { IXOrb } from '../../components/art';
 import { Icon, Logo } from '../../components/ui';
+import { cloudRef, formatCode, openFromCode, probeServer, serverStatus, subscribeCloud, syncColony, syncState } from '../../lib/cloud';
 import { useInstall } from '../../lib/pwa';
 import { SettingsModal } from './SettingsModal';
+
+/** Estado de la base de datos (Supabase en Vercel) y código de cada colonia. */
+function useCloud() {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const off = subscribeCloud(() => bump((n) => n + 1));
+    void probeServer();
+    return off;
+  }, []);
+  return serverStatus();
+}
 
 export function Setup({
   snapshot,
@@ -30,7 +42,41 @@ export function Setup({
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const install = useInstall();
+  const server = useCloud();
   const ai = aiStatus();
+  const dbOn = Boolean(server.db?.connected);
+  const [code, setCode] = useState('');
+  const [opening, setOpening] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // Con la base de datos conectada, las colonias de este navegador se suben a la nube.
+  useEffect(() => {
+    if (!dbOn) return;
+    for (const c of listColonies()) if (!syncState(c.id)) syncColony(c);
+  }, [dbOn]);
+
+  const openCloud = async () => {
+    setOpening(true);
+    setError('');
+    try {
+      const c = await openFromCode(code);
+      storeColony(c);
+      setColonies(listColonies());
+      setColonyId(c.id);
+      setClassName(c.name);
+      setCode('');
+    } catch (err) {
+      setError((err as Error).message);
+    }
+    setOpening(false);
+  };
+
+  const copyCode = (id: string, text: string) => {
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(id);
+      setTimeout(() => setCopied(null), 1600);
+    });
+  };
 
   return (
     <div className="setup space-bg">
@@ -138,6 +184,7 @@ export function Setup({
                       <small>
                         Sol {c.sol} · {c.missions.length} misiones · {c.buildings.length} edificios
                       </small>
+                      {dbOn && <CloudLine colonyId={c.id} copied={copied === c.id} onCopy={copyCode} />}
                     </span>
                   </button>
                   <span className="colony-actions">
@@ -162,6 +209,29 @@ export function Setup({
                 </div>
               ))}
             </div>
+            {dbOn && (
+              <form
+                className="cloud-open"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!opening) void openCloud();
+                }}
+              >
+                <input
+                  className="input"
+                  value={code}
+                  placeholder="Código de colonia: XXXX-XXXX-XXXX-XXXX"
+                  aria-label="Código de colonia guardada en la nube"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={24}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                />
+                <button className="btn small water" disabled={opening || code.replace(/[^A-Z0-9]/gi, '').length !== 16}>
+                  {opening ? 'Abriendo…' : '☁️ Abrir'}
+                </button>
+              </form>
+            )}
             <button className="link-btn" onClick={() => fileRef.current?.click()}>
               <Icon name="upload" size={16} /> Importar colonia (.json)
             </button>
@@ -215,11 +285,41 @@ export function Setup({
           <button className="ai-row" onClick={() => setSettingsOpen(true)}>
             <span className={`dot`} style={{ ['--c' as string]: ai.enabled ? 'var(--food)' : 'var(--ix)' }} />
             <span>
-              <b>{ai.enabled ? `IA en la nube activa · ${ai.model}` : 'IA local (sin clave)'}</b>
-              <small>{ai.enabled ? 'Claude reconoce objetos y personaliza la historia' : 'Agrega una clave de Claude para el escáner avanzado'}</small>
+              <b>{ai.server ? `IA del servidor activa · ${ai.model}` : ai.enabled ? `IA en la nube activa · ${ai.model}` : 'IA local (sin clave)'}</b>
+              <small>
+                {ai.server
+                  ? 'Claude Opus 5.5 corre en Vercel: no hace falta escribir ninguna clave'
+                  : ai.enabled
+                    ? 'Claude reconoce objetos y personaliza la historia'
+                    : 'Agrega ANTHROPIC_API_KEY en Vercel o una clave de Claude en Ajustes'}
+              </small>
             </span>
             <Icon name="arrow" size={18} />
           </button>
+
+          <div className="ai-row db-row" role="status">
+            <span className="dot" style={{ ['--c' as string]: dbOn ? 'var(--food)' : server.db?.configured ? 'var(--habitat)' : 'var(--ix)' }} />
+            <span>
+              <b>
+                {dbOn
+                  ? 'Base de datos conectada · Supabase'
+                  : server.db?.configured
+                    ? 'La base de datos no respondió'
+                    : server.db
+                      ? 'Base de datos sin configurar'
+                      : 'Colonias guardadas en este navegador'}
+              </b>
+              <small>
+                {dbOn
+                  ? 'Cada colonia se guarda en la nube con su código para abrirla en otra computadora'
+                  : server.db?.configured
+                    ? (server.db.error ?? 'Revisa la conexión de Supabase en Vercel')
+                    : server.db
+                      ? 'Conecta Supabase al proyecto en Vercel para guardar en la nube'
+                      : 'Sin servidor: exporta la colonia (.json) para moverla de computadora'}
+              </small>
+            </span>
+          </div>
 
           {error && <p className="error-text">{error}</p>}
 
@@ -237,5 +337,34 @@ export function Setup({
         }}
       />
     </div>
+  );
+}
+
+function CloudLine({ colonyId, copied, onCopy }: { colonyId: string; copied: boolean; onCopy: (id: string, text: string) => void }) {
+  const ref = cloudRef(colonyId);
+  const st = syncState(colonyId);
+  if (!ref) return <small className="cloud-line">{st?.pending ? '☁️ Guardando en la nube…' : '☁️ Se guardará en la nube'}</small>;
+  const text = formatCode(ref);
+  const copy = (e: { stopPropagation(): void; preventDefault(): void }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onCopy(colonyId, text);
+  };
+  return (
+    <small className={`cloud-line ${st?.error ? 'err' : ''}`}>
+      {st?.pending ? '☁️ Guardando…' : st?.error ? `⚠️ ${st.error}` : '☁️ En la nube ·'}{' '}
+      <span
+        role="button"
+        tabIndex={0}
+        className="cloud-code"
+        title="Copiar el código para abrir esta colonia en otra computadora"
+        onClick={copy}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') copy(e);
+        }}
+      >
+        {copied ? '¡Código copiado!' : text}
+      </span>
+    </small>
   );
 }

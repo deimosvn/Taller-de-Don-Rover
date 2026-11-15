@@ -194,6 +194,51 @@
   display: block;
 }
 
+/* ---------------- base de datos (Supabase en Vercel) ---------------- */
+
+.db-row {
+  cursor: default;
+  margin-top: 8px;
+  background: #e9f8ff;
+  border-color: #3cc8ff;
+}
+.cloud-line {
+  margin-top: 3px;
+  color: #0a78b0 !important;
+}
+.cloud-line.err {
+  color: #c13628 !important;
+}
+.cloud-code {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 7px;
+  border: 1.5px solid currentColor;
+  background: #fff;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  cursor: copy;
+  white-space: nowrap;
+}
+.cloud-code:hover,
+.cloud-code:focus-visible {
+  background: #d9f4ff;
+  outline: none;
+}
+.cloud-open {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 2px;
+}
+.cloud-open .input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 /* ---------------- consola ---------------- */
 
 .console {

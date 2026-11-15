@@ -1,6 +1,9 @@
 node_modules
 dist
 data
-.env
 *.log
 .claude/
+.env
+.env.*
+!.env.example
+.vercel

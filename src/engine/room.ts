@@ -60,6 +60,7 @@ import type {
 } from '../../shared/types';
 import * as ai from './ai';
 import { saveColony } from './store';
+import { logMission } from '../lib/cloud';
 
 /* ------------------------------------------------------------------ */
 /* Utilidades                                                           */
@@ -1213,6 +1214,23 @@ export class HostEngine {
     this.pushIx('info', `Resultados listos. Nuevo en la colonia: ${BUILDINGS[def.unlock].emoji} ${BUILDINGS[def.unlock].name}.`);
     this.setPhase('results');
     this.enrichWithAi(m);
+
+    // Historial de la colonia en la base de datos (si el despliegue la tiene).
+    const players = [...this.players.values()];
+    logMission(this.colony, {
+      mission: m.id,
+      saved,
+      score: this.colony.missions[this.colony.missions.length - 1]?.score ?? 0,
+      players: players.filter((p) => !p.isBot).length,
+      crews: this.crews.length,
+      difficulty: this.difficulty,
+      summary: {
+        className: this.className,
+        bots: players.filter((p) => p.isBot).length,
+        unlocked: def.unlock,
+        crews: this.crews.map((c) => ({ name: c.name, sector: c.sectorId, tier: c.outcome?.tier ?? null, total: c.outcome?.scores.total ?? 0 })),
+      },
+    });
   }
 
   private templateDebrief(m: MissionRun): DebriefPublic {

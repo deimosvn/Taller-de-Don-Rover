@@ -3,6 +3,7 @@
 
 import { SECTOR_ORDER, START_METERS } from '../../shared/content';
 import type { ColonyState, SectorId } from '../../shared/types';
+import { forgetCloud, syncColony } from '../lib/cloud';
 
 const KEY = 'ixchel.colonies';
 
@@ -35,12 +36,22 @@ export function saveColony(colony: ColonyState) {
   colony.updatedAt = Date.now();
   all[colony.id] = colony;
   writeAll(all);
+  // Si el despliegue tiene base de datos (Supabase en Vercel), también se guarda en la nube.
+  syncColony(colony);
+}
+
+/** Guarda una colonia que llegó de la nube (sin volver a subirla). */
+export function storeColony(colony: ColonyState) {
+  const all = readAll();
+  all[colony.id] = colony;
+  writeAll(all);
 }
 
 export function deleteColony(id: string) {
   const all = readAll();
   delete all[id];
   writeAll(all);
+  forgetCloud(id);
 }
 
 function slug(s: string) {

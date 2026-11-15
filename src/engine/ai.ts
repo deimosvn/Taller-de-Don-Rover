@@ -1,13 +1,19 @@
-// Capa de IA del Taller de Don Rover con Claude, ejecutada directamente desde el navegador del profesor.
+// Capa de IA del Taller de Don Rover con Claude (Opus 5.5).
 //
 // Principio de diseño: "la IA narra, el motor decide". Claude clasifica la foto del escáner,
 // personaliza la narrativa, evalúa las bitácoras y redacta el debrief, siempre con salidas
 // estructuradas (JSON Schema). Recursos, consecuencias y puntajes los calcula el motor.
-// La clave de API la escribe el profesor y se guarda solo en su navegador; sin clave,
-// el juego usa visión local (TensorFlow.js) y plantillas.
+//
+// Orden de preferencia:
+//   1. IA del servidor (función /api/ai en Vercel con ANTHROPIC_API_KEY): la clave nunca
+//      llega al navegador.
+//   2. Clave que el profesor escribe en Ajustes (se guarda solo en su navegador).
+//   3. Sin IA: visión local (TensorFlow.js) y plantillas.
+// Las instrucciones del modo servidor viven en api/ai.ts: mantener ambos textos en sintonía.
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { CategoryId, ScanResult } from '../../shared/types';
+import { serverAi, serverStatus, type AiTask } from '../lib/cloud';
 import { loadSettings } from './settings';
 
 type Sdk = typeof import('@anthropic-ai/sdk');
@@ -22,9 +28,11 @@ let useServerFallbacks = true;
 
 const loadSdk = () => (sdkPromise ??= import('@anthropic-ai/sdk'));
 
-export function aiStatus() {
+export function aiStatus(): { enabled: boolean; model: string; server: boolean } {
+  const server = serverStatus().ai;
+  if (server?.enabled) return { enabled: true, model: server.model, server: true };
   const s = loadSettings();
-  return { enabled: Boolean(s.apiKey) && s.apiKey !== disabledKey, model: s.model || 'claude-opus-5-5' };
+  return { enabled: Boolean(s.apiKey) && s.apiKey !== disabledKey, model: s.model || 'claude-opus-5-5', server: false };
 }
 
 async function getClient(): Promise<{ c: Anthropic; mod: Sdk; model: string } | null> {
@@ -53,7 +61,27 @@ export async function testConnection(): Promise<{ ok: boolean; message: string }
 
 type Content = string | Anthropic.Beta.BetaContentBlockParam[];
 
-async function structured<T>(system: string, content: Content, schema: Record<string, unknown>, validate: (x: unknown) => T | null): Promise<T | null> {
+async function structured<T>(
+  task: AiTask,
+  serverInput: Record<string, unknown>,
+  system: string,
+  content: Content,
+  schema: Record<string, unknown>,
+  validate: (x: unknown) => T | null,
+): Promise<T | null> {
+  // 1) Claude en el servidor de Vercel (si el despliegue tiene ANTHROPIC_API_KEY).
+  if (serverStatus().ai?.enabled) {
+    const raw = await serverAi(task, serverInput).catch(() => null);
+    if (raw !== null) {
+      try {
+        const ok = validate(raw);
+        if (ok) return ok;
+      } catch {
+        /* respuesta inesperada: se intenta con la clave del navegador o con plantillas */
+      }
+    }
+  }
+  // 2) Clave escrita por el profesor en Ajustes.
   const got = await getClient().catch(() => null);
   if (!got) return null;
   const { c, mod, model } = got;
@@ -145,6 +173,8 @@ export async function classifyImage(dataUrl: string): Promise<ScanResult | null>
   if (!m) return null;
   const mediaType = m[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
   return structured(
+    'scan',
+    { image: dataUrl },
     SCAN_SYSTEM,
     [
       { type: 'image', source: { type: 'base64', media_type: mediaType, data: m[2] } },
@@ -208,7 +238,7 @@ Reglas estrictas:
 - "briefing": máximo 60 palabras, en segunda persona del plural; menciona el objeto descubierto en el salón.
 - "crew_lines": una línea por tripulación (máximo 18 palabras) que explique qué parte del problema le toca a su sector.
 - "twists": exactamente 3 avances breves (máximo 12 palabras cada uno) de los acontecimientos inesperados, en este orden: datos nuevos, emergencia global, descubrimiento.`;
-  return structured(system, JSON.stringify(input), NARRATIVE_SCHEMA, (x) => {
+  return structured('narrative', { ...input }, system, JSON.stringify(input), NARRATIVE_SCHEMA, (x) => {
     const o = obj(x);
     const briefing = str(o.briefing, 600);
     if (!briefing) return null;
@@ -269,7 +299,7 @@ export async function scoreLogs(missionTitle: string, ageGroup: string, logs: Lo
 Califica de 1 a 3 estrellas el razonamiento y la creatividad: 3 = explica con datos de su tripulación o propone una idea original; 2 = explica algo con sentido; 1 = muy breve o sin relación.
 Si el texto es ofensivo, inapropiado o contiene datos personales, marca appropriate=false y da 1 estrella.
 "comment": retroalimentación amable y específica en español, máximo 18 palabras, dirigida a la tripulación. No reveles cuál era la respuesta correcta.`;
-  return structured(system, JSON.stringify({ logs }), LOG_SCHEMA, (x) => {
+  return structured('logs', { missionTitle, ageGroup, logs }, system, JSON.stringify({ logs }), LOG_SCHEMA, (x) => {
     const o = obj(x);
     if (!Array.isArray(o.scores)) return null;
     const out: Record<string, LogScore> = {};
@@ -332,7 +362,7 @@ Español claro y cálido para niñas y niños de ${input.ageGroup}. Usa SOLO la 
 - "learnings": exactamente 3 ideas clave (máximo 28 palabras cada una), basadas en los objetivos de aprendizaje y en lo que pasó en la colonia.
 - "shoutouts": hasta 3 reconocimientos específicos y positivos (máximo 20 palabras) usando crew_id; reconoce la cooperación, no solo los aciertos.
 - "reflection": una pregunta abierta para conversar en clase (máximo 20 palabras).`;
-  return structured(system, JSON.stringify(input), DEBRIEF_SCHEMA, (x) => {
+  return structured('debrief', { ...input }, system, JSON.stringify(input), DEBRIEF_SCHEMA, (x) => {
     const o = obj(x);
     const headline = str(o.headline, 90);
     const learnings = Array.isArray(o.learnings) ? o.learnings.map((l) => str(l, 240)).filter(Boolean).slice(0, 3) : [];
