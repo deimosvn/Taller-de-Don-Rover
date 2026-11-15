@@ -9,6 +9,7 @@ import { Confetti, Icon, RoleChip } from '../../components/ui';
 import { HealthCard, ScienceCard } from '../../components/nasa';
 import { minigameFor } from '../../../shared/minigames';
 import { Minigame } from './minigames';
+import { RoleTask } from './RoleTask';
 import { ProblemCard } from './MissionProblem';
 import { hostNow, useTicker } from '../../lib/clock';
 import { vibrate } from '../../lib/pwa';
@@ -222,43 +223,15 @@ function RoleReveal({ view }: { view: PlayerView }) {
 
 /* ---------------- escáner ---------------- */
 
-function ScanWait({ view, act }: { view: PlayerView; act: Act }) {
-  const ov = view.objectVote;
-  if (ov?.open) {
-    return (
-      <div className="screen">
-        <p className="eyebrow center">Votación de la clase</p>
-        <h2 className="center">¿Qué objeto del salón exploramos?</h2>
-        <div className="object-vote">
-          {ov.options.map((c) => (
-            <button
-              key={c}
-              className={`ov-opt card ${ov.myVote === c ? 'on' : ''}`}
-              onClick={() => {
-                sfx.select();
-                vibrate(15);
-                void act({ type: 'objectVote', category: c });
-              }}
-            >
-              <span className="ov-emoji">{CATEGORIES[c].emoji}</span>
-              <b>{CATEGORIES[c].label}</b>
-              <small>{CATEGORIES[c].examples}</small>
-              {ov.myVote === c && <span className="ov-check">✓</span>}
-            </button>
-          ))}
-        </div>
-        <p className="fine center">Puedes cambiar tu voto hasta que el profesor cierre la votación.</p>
-      </div>
-    );
-  }
+function ScanWait() {
   return (
     <Center>
       <div className="radar">
         <i />
         <IXOrb size={80} mood="talk" />
       </div>
-      <h2>IX está escaneando el mundo…</h2>
-      <p className="lead">Mira el proyector: un objeto del salón está por convertirse en misión.</p>
+      <h2>IX está generando la misión…</h2>
+      <p className="lead">Revisa el clima espacial real de la NASA y el estado de la colonia para decidir qué problema enfrentarán.</p>
     </Center>
   );
 }
@@ -795,7 +768,7 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
         </>
       );
     case 'scan':
-      return <ScanWait view={view} act={act} />;
+      return <ScanWait />;
     case 'briefing':
       return view.mission ? (
         <>
@@ -803,19 +776,22 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
           <ProblemCard view={view} net={net} open3d={open3d} />
         </>
       ) : (
-        <ScanWait view={view} act={act} />
+        <ScanWait />
       );
     case 'discovery':
       return (
         <>
-          <Decode view={view} act={act} />
-          <ProblemCard view={view} net={net} open3d={open3d} />
+          <Explore3D open3d={open3d} text={view.task ? `Tu estación está en ${view.task.place}.` : 'Recorre la colonia.'} />
+          <div className="screen">
+            <RoleTask view={view} net={net} />
+            {view.intel && view.intel.map((c) => <IntelCardView key={c.role} card={c} />)}
+          </div>
         </>
       );
     case 'challenge':
       return (
         <>
-          {view.quiz && !view.quiz.answered ? <Decode view={view} act={act} /> : <Vote view={view} act={act} />}
+          <Vote view={view} act={act} />
           <ProblemCard view={view} net={net} open3d={open3d} />
         </>
       );

@@ -2319,3 +2319,156 @@ details summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------- misión generada por IX ---------------- */
+.mission-gen-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.mission-gen-planet {
+  position: relative;
+  height: clamp(320px, 52vh, 560px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
+}
+.mission-gen-crew {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 30px 10px 6px;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(43, 16, 11, 0.55), transparent);
+}
+.mission-gen-side {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.gen-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+.gen-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.55;
+}
+.gen-steps li.now,
+.gen-steps li.done {
+  opacity: 1;
+}
+.gen-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  font-size: 0.85rem;
+}
+.gen-steps li.done .gen-dot {
+  background: var(--food);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.gen-steps li.now .gen-dot {
+  background: var(--energy);
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.gen-now {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.spinner-sm {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 248, 236, 0.25);
+  border-top-color: var(--energy);
+  animation: spin 0.9s linear infinite;
+}
+.gen-conditions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.gen-conditions li {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.gen-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---------------- exploración: tareas conectadas ---------------- */
+.task-chain {
+  display: grid;
+  gap: 6px;
+}
+.task-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) 1fr 3rem;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.task-role {
+  display: grid;
+  font-weight: 800;
+}
+.task-role small {
+  font-weight: 600;
+  opacity: 0.75;
+}
+.task-bar {
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.task-bar i {
+  display: block;
+  height: 100%;
+  background: var(--c);
+  transition: width 0.4s ease;
+}
+.task-arrow {
+  position: absolute;
+  left: 1.2rem;
+  bottom: -6px;
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+@media (max-width: 900px) {
+  .mission-gen-body {
+    grid-template-columns: 1fr;
+  }
+}

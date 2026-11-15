@@ -8,8 +8,6 @@ import {
   BOT_LOGS,
   BOT_NAMES,
   BUILDINGS,
-  CATEGORIES,
-  CATEGORY_LINES,
   CREWS,
   DIFFICULTIES,
   HELMETS,
@@ -25,7 +23,6 @@ import {
   SYSTEMS,
   SYSTEM_ORDER,
   VISORS,
-  missionForCategory,
 } from '../../shared/content';
 import { generatePuzzle } from '../../shared/puzzles';
 import { hashString, pick, shuffle } from '../../shared/rng';
@@ -53,12 +50,13 @@ import type {
   PlayerPublic,
   PlayerView,
   Puzzle,
-  QuizView,
   ResultsPublic,
   RoleId,
   ScanResult,
   SectorId,
   Tier,
+  MissionGenerator,
+  PlayerTaskView,
 } from '../../shared/types';
 import * as ai from './ai';
 import { saveColony } from './store';
@@ -66,6 +64,11 @@ import { logMission } from '../lib/cloud';
 import { nasaStudies, spaceWeather } from '../lib/nasa';
 import { HEALTH, MISSION_TOPICS, buildHealth, doseFor, healthFactor, healthKindFor, plainHighlight, protectionFor } from '../../shared/nasa';
 import { FIX_GOAL, MISSION_PROBLEMS } from '../../shared/minigames';
+import { ROLE_PLACE, ROLE_STATION, TASK_GOAL, TASK_LINKS, conditionsFrom, roleTaskText, taskProgress, type RoleTaskText } from '../../shared/roleTasks';
+import type { SpaceWeather } from '../../shared/nasa';
+
+/** Una partida es una sola tripulación: máximo 4 astronautas, uno por especialidad. */
+export const MAX_PLAYERS = 4;
 
 /* ------------------------------------------------------------------ */
 /* Utilidades                                                           */
@@ -95,7 +98,8 @@ const TIER_SCORE: Record<Tier, number> = { best: 100, ok: 60, bad: 25, critical:
 const TIER_HEALTH: Record<Tier, number> = { best: 12, ok: 4, bad: -10, critical: -16 };
 
 /** Fases en las que se trabaja en el problema de la historia (minijuego de la tripulación). */
-const FIX_PHASES: Phase[] = ['briefing', 'discovery', 'challenge'];
+const FIX_PHASES: Phase[] = ['challenge'];
+const ROLES_NAME: Record<RoleId, string> = { power: '⚡ Energía', life: '💧 Soporte vital', bio: '🌱 Astrobiología', habitat: '🛡️ Hábitat' };
 /** Lo que suma al sistema de la misión una tripulación que resolvió su problema. */
 const FIX_METER = 10;
 
@@ -169,6 +173,10 @@ interface Player {
   tapStamp: number;
   /** Puntos del minijuego del problema de la misión. */
   fix: number;
+  /** Puntos del minijuego de la tarea de su especialidad (exploración). */
+  task: number;
+  taskAllowance: number;
+  taskStamp: number;
   fixAllowance: number;
   fixStamp: number;
 }
@@ -214,6 +222,13 @@ interface MissionRun {
   nasa?: MissionNasa;
   /** Tripulaciones que ya resolvieron el problema de la historia. */
   fixed?: string[];
+  /** Por qué IX generó esta misión. */
+  reason?: string;
+  aiPlanned?: boolean;
+  /** Tareas de cada especialidad, con datos reales. */
+  tasks?: Record<RoleId, RoleTaskText>;
+  /** Tripulaciones que ya completaron las cuatro tareas. */
+  tasksDone?: string[];
 }
 
 export interface RoomSnapshot {
@@ -280,6 +295,9 @@ export class HostEngine {
   objectVote: { options: CategoryId[]; open: boolean } | null = null;
   ix: IxMessage[] = [];
   missionsPlayed: MissionId[] = [];
+  /** IX generando la siguiente misión. */
+  generator: MissionGenerator | null = null;
+  private genToken = 0;
   private firstHumanAwarded = false;
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -456,6 +474,9 @@ export class HostEngine {
       tapAllowance: 40,
       tapStamp: t,
       fix: 0,
+      task: 0,
+      taskAllowance: 30,
+      taskStamp: t,
       fixAllowance: 30,
       fixStamp: t,
     };
@@ -485,7 +506,12 @@ export class HostEngine {
     const name = cleanName(msg.name);
     if (!name) return { ok: false, error: 'Escribe tu nombre de astronauta.' };
     if (looksInappropriate(name)) return { ok: false, error: 'Elige otro nombre, por favor.' };
-    if (this.players.size >= 48) return { ok: false, error: 'La colonia está llena (48 astronautas).' };
+    if (this.players.size >= MAX_PLAYERS) {
+      // Un alumno real siempre tiene lugar si hay un bot de práctica: el bot le cede su puesto.
+      const bot = [...this.players.values()].find((x) => x.isBot);
+      if (!bot) return { ok: false, error: `La misión ya tiene ${MAX_PLAYERS} tripulantes. Pide al profesor que abra otra sala.` };
+      return this.replaceBot(bot, name, msg);
+    }
     const p = this.createPlayer(this.uniqueName(name), sanitizeAvatar(msg.avatar), false, clamp(Number(msg.xp) || 0, 0, 1e7));
     if (!this.firstHumanAwarded) {
       p.badges.push('first');
@@ -507,6 +533,26 @@ export class HostEngine {
     this.changed(false);
   }
 
+  /** Un alumno entra en lugar de un bot de práctica (con su especialidad y su avance). */
+  private replaceBot(bot: Player, name: string, msg: { avatar?: Partial<AvatarConfig>; xp?: number }): Ack<{ playerId: string; token: string; name: string }> {
+    this.players.delete(bot.id);
+    const p = this.createPlayer(this.uniqueName(name), sanitizeAvatar(msg.avatar), false, clamp(Number(msg.xp) || 0, 0, 1e7));
+    p.crewId = bot.crewId;
+    p.roles = [...bot.roles];
+    p.vote = bot.vote;
+    p.shareVote = bot.shareVote;
+    p.task = bot.task;
+    for (const c of this.crews) c.memberIds = c.memberIds.map((id) => (id === bot.id ? p.id : id));
+    if (!this.firstHumanAwarded) {
+      p.badges.push('first');
+      this.firstHumanAwarded = true;
+    }
+    this.players.set(p.id, p);
+    this.pushIx('info', `${p.name} tomó el lugar de ${bot.name} (bot de práctica).`);
+    this.changed();
+    return { ok: true, data: { playerId: p.id, token: p.token, name: p.name } };
+  }
+
   private placeLateJoiner(p: Player) {
     const crew = [...this.crews].sort((a, b) => a.memberIds.length - b.memberIds.length)[0];
     if (!crew) return;
@@ -522,8 +568,8 @@ export class HostEngine {
   private addBots(count: number): Ack {
     const used = new Set([...this.players.values()].map((p) => p.name));
     const free = shuffle(R, BOT_NAMES.filter((n) => !used.has(n)));
-    const n = clamp(Math.floor(count), 1, 48 - this.players.size);
-    if (n <= 0) return err('La colonia está llena.');
+    const n = Math.min(Math.floor(count) || 1, MAX_PLAYERS - this.players.size);
+    if (n <= 0) return err(`La tripulación ya está completa (${MAX_PLAYERS} astronautas).`);
     for (let i = 0; i < n; i++) {
       const p = this.createPlayer(free[i] ?? `Bot ${rid(3)}`, randomAvatar(), true);
       this.players.set(p.id, p);
@@ -614,24 +660,8 @@ export class HostEngine {
         res = this.formCrews();
         break;
       case 'toScan':
-        if (!this.crews.length) return err('Primero forma las tripulaciones.');
-        this.mission = null;
-        this.objectVote = null;
-        this.setPhase('scan');
-        break;
-      case 'objectVoteStart':
-        if (this.phase !== 'scan') return err('La votación de objetos es parte del escáner.');
-        this.objectVote = { options: a.options.filter((c) => CATEGORIES[c]).slice(0, 5), open: true };
-        for (const p of this.players.values()) p.objectVote = null;
-        this.pushIx('info', 'Votación abierta: ¿qué objeto del salón explorará la colonia?');
-        break;
-      case 'objectVoteClose':
-        return this.closeObjectVote();
-      case 'chooseScan':
-        res = this.chooseScan(a.scan);
-        break;
-      case 'chooseMission':
-        res = this.chooseMission(a.missionId);
+        if (!this.crews.length) return err('Primero forma la tripulación.');
+        res = this.generateMission();
         break;
       case 'next':
         res = this.next();
@@ -652,9 +682,7 @@ export class HostEngine {
         res = this.kick(a.playerId);
         break;
       case 'newMission':
-        this.mission = null;
-        this.objectVote = null;
-        this.setPhase('scan');
+        res = this.generateMission();
         break;
       case 'toLobby':
         this.mission = null;
@@ -679,10 +707,9 @@ export class HostEngine {
       case 'lobby':
         return this.formCrews();
       case 'crews':
-        this.setPhase('scan');
-        return OK;
+        return this.generateMission();
       case 'scan':
-        return err('Primero escanea un objeto o elige una misión.');
+        return this.generator?.stage === 'error' ? this.generateMission() : err('IX está generando la misión con datos de la NASA…');
       case 'briefing':
         this.setPhase('discovery', PACES[this.pace].discovery);
         this.pushIx('info', 'Transmisiones enviadas: cada especialidad debe descifrar la suya.');
@@ -706,10 +733,7 @@ export class HostEngine {
         this.setPhase('debrief');
         return OK;
       case 'debrief':
-        this.mission = null;
-        this.objectVote = null;
-        this.setPhase('scan');
-        return OK;
+        return this.generateMission();
     }
   }
 
@@ -741,54 +765,120 @@ export class HostEngine {
 
   /* ---------------- escáner y misión ---------------- */
 
-  private closeObjectVote(): Ack<{ category: CategoryId; counts: Partial<Record<CategoryId, number>> }> {
-    if (!this.objectVote) return err('No hay votación abierta.') as Ack<never>;
-    const counts: Partial<Record<CategoryId, number>> = {};
-    for (const p of this.players.values()) if (p.objectVote) counts[p.objectVote] = (counts[p.objectVote] ?? 0) + 1;
-    const max = Math.max(0, ...this.objectVote.options.map((o) => counts[o] ?? 0));
-    const top = this.objectVote.options.filter((o) => (counts[o] ?? 0) === max);
-    const category = pick(R, top);
-    this.objectVote.open = false;
-    this.pushIx('info', `La clase votó: ${CATEGORIES[category].emoji} ${CATEGORIES[category].label}.`);
+  /**
+   * IX genera la misión sola: consulta el clima espacial real de la NASA (DONKI), revisa el
+   * estado de la colonia y, si hay IA, Claude elige la misión y escribe las tareas de cada
+   * especialidad con esos datos. Sin IA ni internet, las reglas del motor deciden igual.
+   */
+  private generateMission(): Ack {
+    if (!this.crews.length) return err('Primero forma la tripulación.');
+    const token = ++this.genToken;
+    this.mission = null;
+    this.objectVote = null;
+    this.generator = { stage: 'nasa', text: 'Consultando el clima espacial real de la NASA…', conditions: [] };
+    this.setPhase('scan');
+    void this.runGenerator(token);
+    return OK;
+  }
+
+  private async runGenerator(token: number) {
+    const live = () => token === this.genToken && this.phase === 'scan';
+    const within = <T>(pr: Promise<T>, ms: number, fallback: T) => Promise.race([pr.catch(() => fallback), new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+    const weather = await within(spaceWeather(14), 9000, null);
+    if (!live()) return;
+    const conditions = this.conditionLines(weather);
+    const rule = this.ruleMission(weather);
+    this.generator = { stage: 'ai', text: ai.aiStatus().enabled ? 'IX (Claude) está diseñando la misión con esos datos…' : 'IX está armando la misión con esos datos…', conditions };
     this.changed();
-    return { ok: true, data: { category, counts } };
-  }
 
-  private chooseScan(scan: ScanResult): Ack {
-    if (this.phase !== 'scan') return err('El escáner no está activo.');
-    const category: CategoryId = CATEGORIES[scan.category] ? scan.category : 'mystery';
-    let missionId = missionForCategory(category);
-    if (category === 'mystery') {
-      const fresh = MISSION_ORDER.filter((m) => m !== 'final' && !this.colony.missions.some((x) => x.id === m));
-      missionId = fresh.length ? pick(R, fresh) : pick(R, MISSION_ORDER.filter((m) => m !== 'final'));
+    let id = rule.id;
+    let reason = rule.reason;
+    let aiPlanned = false;
+    let tasks: Record<RoleId, RoleTaskText> | undefined;
+    if (ai.aiStatus().enabled) {
+      const candidates = this.candidateMissions();
+      const plan = await within(
+        ai.planMission({
+          ageGroup: DIFFICULTIES[this.difficulty].age,
+          conditions,
+          meters: { ...this.colony.meters },
+          missionsDone: this.colony.missions.map((x) => x.id),
+          candidates: candidates.map((c) => ({ id: c, title: MISSIONS[c].titleEs, focus: SYSTEMS[MISSIONS[c].focus].name, story: MISSIONS[c].story })),
+          suggested: rule.id,
+          roles: ROLE_ORDER.map((r) => ({ role: r, base: roleTaskText(rule.id, r, conditionsFrom(weather, rule.id)), link: TASK_LINKS[r].text })),
+        }),
+        25000,
+        null,
+      );
+      if (!live()) return;
+      if (plan && candidates.includes(plan.missionId)) {
+        id = plan.missionId;
+        reason = plan.reason || reason;
+        aiPlanned = true;
+        const c = conditionsFrom(weather, id);
+        tasks = Object.fromEntries(
+          ROLE_ORDER.map((r) => {
+            const base = roleTaskText(id, r, c);
+            const t = plan.tasks[r];
+            return [r, t ? { title: t.title || base.title, text: t.text || base.text, facts: base.facts } : base];
+          }),
+        ) as Record<RoleId, RoleTaskText>;
+      }
     }
-    const clean: ScanResult = {
-      category,
-      label: cleanName(scan.label).slice(0, 40) || CATEGORIES[category].label,
-      confidence: clamp(Number(scan.confidence) || 0.7, 0, 1),
-      discovery: String(scan.discovery || CATEGORY_LINES[category].discovery).slice(0, 240),
-      funFact: String(scan.funFact || CATEGORY_LINES[category].funFact).slice(0, 280),
-      source: scan.source,
+    if (!live()) return;
+    this.startMission(id, reason, aiPlanned, tasks, weather);
+  }
+
+  /** Condiciones reales en palabras (se muestran mientras IX genera la misión). */
+  private conditionLines(w: SpaceWeather | null): string[] {
+    const lines: string[] = [];
+    if (w) {
+      lines.push(`☀️ NASA DONKI (${w.from} a ${w.to}): ${w.headline}.`);
+      if (w.flares) lines.push(`🔆 ${w.flares} fulguraciones solares${w.strongestFlare ? `, la más fuerte de clase ${w.strongestFlare}` : ''}: pueden cortar las comunicaciones por radio.`);
+      if (w.cmes) lines.push(`🌪️ ${w.cmes} eyecciones de masa coronal (la más rápida, ${Math.round(w.fastestCme)} km/s).`);
+      if (w.sep) lines.push(`☢️ ${w.sep} eventos de partículas energéticas: más radiación en Marte.`);
+    } else {
+      lines.push('📡 Sin conexión con la NASA: IX usa los datos guardados de Marte (Curiosity midió 0.64 mSv de radiación al día).');
+    }
+    const weakest = SYSTEM_ORDER.reduce((x, y) => (this.colony.meters[y] < this.colony.meters[x] ? y : x));
+    lines.push(`🏠 Colonia: el sistema más débil es ${SYSTEMS[weakest].emoji} ${SYSTEMS[weakest].name} (${this.colony.meters[weakest]} %).`);
+    return lines;
+  }
+
+  /** Misiones posibles: primero las que no se han jugado; la final solo si ya se desbloqueó. */
+  private candidateMissions(): MissionId[] {
+    const done = new Set(this.colony.missions.map((x) => x.id));
+    const all = MISSION_ORDER.filter((id) => id !== 'final' || this.finalUnlocked);
+    const fresh = all.filter((id) => !done.has(id) && !this.missionsPlayed.includes(id));
+    return fresh.length ? fresh : all.filter((id) => id !== this.missionsPlayed[this.missionsPlayed.length - 1]);
+  }
+
+  /** Reglas del motor: el problema real más urgente decide la misión. */
+  private ruleMission(w: SpaceWeather | null): { id: MissionId; reason: string } {
+    const cands = this.candidateMissions();
+    const scores = new Map<MissionId, { score: number; reason: string }>();
+    const add = (id: MissionId, score: number, reason: string) => {
+      const cur = scores.get(id);
+      if (!cur || score > cur.score) scores.set(id, { score, reason });
     };
-    return this.startMission(missionId, clean);
+    if (w && w.flares && w.strongestFlare && /^[MX]/.test(w.strongestFlare)) add('signal', 6 + w.level, `Hubo una fulguración solar clase ${w.strongestFlare}: en la vida real cortan la radio, así que la comunicación con el rover está en peligro.`);
+    if (w && (w.sep || w.level >= 2)) add('habitat', 5 + w.level, 'Llegan partículas energéticas del Sol: la tripulación necesita un módulo mejor protegido de la radiación.');
+    if (w && w.cmes >= 3) add('darkness', 4 + w.level, `${w.cmes} eyecciones de masa coronal agitan el clima espacial: la energía de la colonia está en riesgo.`);
+    const focusMission: Record<string, MissionId> = { energy: 'darkness', water: 'water', food: 'greenhouse', habitat: 'habitat' };
+    for (const sys of SYSTEM_ORDER) {
+      const v = this.colony.meters[sys];
+      add(focusMission[sys], (100 - v) / 12, `${SYSTEMS[sys].name} de la colonia está en ${v} %: es el sistema que más ayuda necesita.`);
+    }
+    if (this.finalUnlocked) add('final', 3.5, 'La colonia ya superó tres misiones: es hora de demostrar que puede sobrevivir sola.');
+    const ranked = cands
+      .map((id) => ({ id, ...(scores.get(id) ?? { score: 1, reason: `${MISSIONS[id].titleEs}: la colonia todavía no ha superado esta misión.` }) }))
+      .sort((x, y) => y.score - x.score);
+    const best = ranked[0] ?? { id: 'greenhouse' as MissionId, reason: MISSIONS.greenhouse.hook };
+    return { id: best.id, reason: best.reason };
   }
 
-  private chooseMission(missionId: MissionId): Ack {
-    if (this.phase !== 'scan') return err('Elige la misión desde el escáner.');
-    if (!MISSIONS[missionId]) return err('Misión desconocida.');
-    if (missionId === 'final' && !this.finalUnlocked) return err('THE FINAL COLONY se desbloquea al completar 3 misiones distintas.');
-    const category = (Object.keys(CATEGORIES) as CategoryId[]).find((c) => CATEGORIES[c].missionId === missionId && c !== 'mystery') ?? 'mystery';
-    return this.startMission(missionId, {
-      category,
-      label: 'Misión elegida por el profesor',
-      confidence: 1,
-      discovery: CATEGORY_LINES[category].discovery,
-      funFact: CATEGORY_LINES[category].funFact,
-      source: 'teacher',
-    });
-  }
-
-  private startMission(id: MissionId, scan: ScanResult): Ack {
+  private startMission(id: MissionId, reason: string, aiPlanned: boolean, tasks: Record<RoleId, RoleTaskText> | undefined, weather: SpaceWeather | null): Ack {
+    const scan: ScanResult = { category: 'mystery', label: MISSIONS[id].titleEs, confidence: 1, discovery: reason, funFact: '', source: 'teacher' };
     if (!this.crews.length) return err('Primero forma las tripulaciones.');
     const def = MISSIONS[id];
     for (const p of this.players.values()) {
@@ -807,6 +897,9 @@ export class HostEngine {
       p.fix = 0;
       p.fixAllowance = 30;
       p.fixStamp = now();
+      p.task = 0;
+      p.taskAllowance = 30;
+      p.taskStamp = now();
     }
     const stamp = now();
     for (const c of this.crews) {
@@ -832,8 +925,7 @@ export class HostEngine {
       const s = SECTORS[c.sectorId];
       crewLines[c.id] = `${s.emoji} ${s.name}: su decisión cuidará ${SYSTEMS[s.system].short.toLowerCase()} de toda la colonia.`;
     }
-    const briefing =
-      scan.source === 'teacher' ? `${def.hook} ${def.story}` : `${def.hook} El escáner de IX encontró: ${scan.label}. ${def.story}`;
+    const briefing = `${def.hook} ${def.story}`;
     this.mission = {
       id,
       scan,
@@ -853,11 +945,13 @@ export class HostEngine {
       nasa: { science: null, weather: null, health: null },
     };
     this.objectVote = null;
-    if (scan.source !== 'teacher' && !this.colony.discoveries.some((d) => d.label.toLowerCase() === scan.label.toLowerCase())) {
-      this.colony.discoveries.push({ category: scan.category, label: scan.label, emoji: CATEGORIES[scan.category].emoji, at: stamp });
-      saveColony(this.colony);
-    }
     this.missionsPlayed.push(id);
+    this.mission.reason = reason;
+    this.mission.aiPlanned = aiPlanned;
+    const cond = conditionsFrom(weather, id);
+    this.mission.tasks = tasks ?? (Object.fromEntries(ROLE_ORDER.map((r) => [r, roleTaskText(id, r, cond)])) as Record<RoleId, RoleTaskText>);
+    this.mission.tasksDone = [];
+    this.generator = null;
     this.pushIx('info', `NEW MISSION UNLOCKED · ${def.code} ${def.title}`);
     this.setPhase('briefing');
     void this.enrichMission(this.mission, scan);
@@ -895,7 +989,7 @@ export class HostEngine {
     const n = await ai.generateNarrative({
       ageGroup: DIFFICULTIES[this.difficulty].age,
       className: this.className,
-      objectLabel: scan.label,
+      reason: m.reason ?? '',
       mission: { title: def.title, titleEs: def.titleEs, hook: def.hook, story: def.story, objective: def.objective, twist: def.twist, twists: def.twists },
       crews: this.crews.map((c) => ({ id: c.id, name: c.name, sector: SECTORS[c.sectorId].name })),
       studies: studies.slice(0, 4).map((s) => ({ id: s.id, source: s.source, title: s.title, summary: s.summary, year: s.year })),
@@ -1006,7 +1100,7 @@ export class HostEngine {
     const flagged: string[] = [];
     for (const c of this.crews) {
       const ms = this.members(c);
-      c.protocol = ms.length > 1 && ms.some((p) => p.quizChoice === null || p.vote === null);
+      c.protocol = ms.length > 1 && ms.some((p) => (p.task ?? 0) <= 0 || p.vote === null);
       if (c.protocol) flagged.push(c.name);
     }
     this.pushIx('alert', `🚨 ${def.event.title}: ${m.twists[1]}`);
@@ -1085,6 +1179,43 @@ export class HostEngine {
     return a;
   }
 
+  /** Puntos de tarea por especialidad (si alguien cubre dos especialidades, cuenta para ambas). */
+  private taskRaw(c: Crew): Record<RoleId, number> {
+    const raw: Record<RoleId, number> = { power: 0, life: 0, bio: 0, habitat: 0 };
+    for (const p of this.members(c)) for (const r of p.roles) raw[r] = Math.max(raw[r], p.task ?? 0);
+    return raw;
+  }
+
+  /** Avance efectivo de las cuatro tareas, con sus dependencias (0–1). */
+  private crewTasks(c: Crew): Record<RoleId, number> {
+    const present = new Set<RoleId>();
+    for (const p of this.members(c)) p.roles.forEach((r) => present.add(r));
+    return taskProgress(this.taskRaw(c), ROLE_ORDER.filter((r) => present.has(r)));
+  }
+
+  /** ¿Ya terminó la tarea de su especialidad principal? (desbloquea su transmisión secreta). */
+  private taskDone(p: Player): boolean {
+    const c = this.crewOf(p);
+    if (!c || !p.roles[0]) return false;
+    return this.crewTasks(c)[p.roles[0]] >= 1;
+  }
+
+  /** IX avisa cuando una tarea se completa y cuando la tripulación termina las cuatro. */
+  private announceTasks(c: Crew) {
+    const m = this.mission;
+    if (!m) return;
+    const t = this.crewTasks(c);
+    m.tasksDone ??= [];
+    for (const r of ROLE_ORDER) {
+      const key = `${c.id}:${r}`;
+      if (t[r] >= 1 && !m.tasksDone.includes(key)) {
+        m.tasksDone.push(key);
+        const who = this.members(c).find((x) => x.roles.includes(r));
+        this.pushIx('info', `✅ ${ROLES_NAME[r]} completó su tarea${who ? ` (${who.name})` : ''}: su transmisión secreta está lista.`, c.id);
+      }
+    }
+  }
+
   /** Cuánto resolvió la tripulación del problema de la historia (0–1). */
   private crewFix(c: Crew): number {
     const ms = this.activeMembers(c);
@@ -1135,7 +1266,7 @@ export class HostEngine {
     // de una mala solo por la bitácora o por la velocidad en la emergencia.
     const efficiency = Math.round(TIER_SCORE[tier] * 0.7 + this.crewAction(c) * 15 + this.crewFix(c) * 15);
     const participation = ms.length
-      ? ms.reduce((s, p) => s + ((p.quizChoice !== null ? 1 : 0) + (p.vote ? 1 : 0) + (p.taps >= 5 ? 1 : 0) + ((p.fix ?? 0) > 0 ? 1 : 0)) / 4, 0) / ms.length
+      ? ms.reduce((s, p) => s + (((p.task ?? 0) > 0 ? 1 : 0) + (p.vote ? 1 : 0) + (p.taps >= 5 ? 1 : 0) + ((p.fix ?? 0) > 0 ? 1 : 0)) / 4, 0) / ms.length
       : 0;
     const votes = ms.map((p) => p.vote).filter(Boolean);
     const agree = votes.filter((v) => v === c.decision).length;
@@ -1260,10 +1391,10 @@ export class HostEngine {
       for (const p of ms) {
         let xp = 0;
         const earned: BadgeId[] = [];
-        if (p.quizChoice !== null) {
-          xp += 20;
-          if (p.quizCorrect) {
-            xp += 30;
+        if ((p.task ?? 0) > 0) {
+          xp += Math.round(30 * Math.min(1, (p.task ?? 0) / TASK_GOAL));
+          if (this.taskDone(p)) {
+            xp += 20;
             earned.push('decoder');
           }
         }
@@ -1438,18 +1569,17 @@ export class HostEngine {
     let acted = false;
 
     if (this.phase === 'discovery' && !m.flags.discoveryHint) {
-      const players = this.crewPlayers();
-      const answered = players.filter((p) => p.quizChoice !== null);
       const elapsed = (t - this.phaseStartedAt) / (pace.discovery * 1000);
-      if (answered.length >= Math.max(2, players.length * 0.6) || elapsed > 0.6) {
-        const acc = answered.filter((p) => p.quizCorrect).length / Math.max(1, answered.length);
-        if (answered.length && acc < 0.5) {
-          m.flags.discoveryHint = true;
-          this.pushHint(def.conceptHint);
-          this.pushIx('adapt', 'IX detectó que muchas transmisiones fallaron y envió una pista del concepto a toda la clase.');
+      if (elapsed > 0.45) {
+        m.flags.discoveryHint = true;
+        const slow = this.crews.filter((c) => {
+          const tk = this.crewTasks(c);
+          return ROLE_ORDER.some((r) => this.members(c).some((x) => x.roles.includes(r)) && tk[r] < 0.4);
+        });
+        if (slow.length) {
+          this.pushHint('Las tareas están conectadas: Hábitat protege a Energía, Energía alimenta a Soporte vital y el agua llega a Astrobiología. ¡Avísense cuando avancen!');
+          this.pushIx('adapt', 'IX notó que una tarea va lenta y frena a las demás: recordó a la tripulación cómo están conectadas.');
           acted = true;
-        } else if (elapsed > 0.6) {
-          m.flags.discoveryHint = true;
         }
       }
     }
@@ -1545,14 +1675,10 @@ export class HostEngine {
         continue;
       }
       if (!m) continue;
-      if ((this.phase === 'discovery' || this.phase === 'challenge') && p.quizChoice === null && p.roles[0]) {
-        if (R() < (this.phase === 'challenge' ? 0.5 : 0.12)) {
-          const quiz = MISSIONS[m.id].quiz[p.roles[0]];
-          const correct = R() < 0.78;
-          p.quizChoice = correct ? quiz.answer : pick(R, quiz.options.map((_, i) => i).filter((i) => i !== quiz.answer));
-          p.quizCorrect = correct;
-          acted = true;
-        }
+      if (crew && this.phase === 'discovery' && p.roles[0] && (p.task ?? 0) < TASK_GOAL * 1.1 && R() < 0.14) {
+        p.task = (p.task ?? 0) + 1 + Math.floor(R() * 3);
+        this.announceTasks(crew);
+        acted = true;
       }
       if (crew && FIX_PHASES.includes(this.phase) && (p.fix ?? 0) < FIX_GOAL * 1.2 && R() < 0.1) {
         p.fix = (p.fix ?? 0) + 2 + Math.floor(R() * 4);
@@ -1620,6 +1746,18 @@ export class HostEngine {
         if (!this.objectVote?.open || !this.objectVote.options.includes(a.category)) return err('La votación no está abierta.');
         p.objectVote = a.category;
         break;
+      case 'task': {
+        if (!m || !crew || this.phase !== 'discovery') return OK;
+        const t = now();
+        p.taskAllowance = Math.min(30, (p.taskAllowance ?? 30) + ((t - (p.taskStamp ?? t)) / 1000) * 8);
+        p.taskStamp = t;
+        const n = Math.max(0, Math.min(Math.floor(Number(a.points) || 0), Math.floor(p.taskAllowance)));
+        p.taskAllowance -= n;
+        p.task = Math.min(TASK_GOAL * 1.5, (p.task ?? 0) + n);
+        this.announceTasks(crew);
+        this.changed(false);
+        return OK;
+      }
       case 'quiz': {
         if (!m || (this.phase !== 'discovery' && this.phase !== 'challenge')) return err('Ahora no hay transmisión que descifrar.');
         if (p.quizChoice !== null) return err('Ya descifraste tu transmisión.');
@@ -1713,7 +1851,7 @@ export class HostEngine {
     return {
       members: ms.length,
       connected: ms.filter((p) => p.connected || p.isBot).length,
-      decoded: ms.filter((p) => p.quizChoice !== null).length,
+      decoded: ms.filter((p) => this.taskDone(p)).length,
       voted: ms.filter((p) => p.vote).length,
       locked: c.locked,
       lockIn: c.lockIn,
@@ -1750,6 +1888,8 @@ export class HostEngine {
       twistsRevealed: m.twistsRevealed,
       aiNarrative: m.aiNarrative,
       source: m.scan.source,
+      reason: m.reason ?? '',
+      aiPlanned: Boolean(m.aiPlanned),
       puzzleTitle: this.crews.find((c) => c.puzzle)?.puzzle?.title ?? '',
       puzzleQuestion: this.crews.find((c) => c.puzzle)?.puzzle?.question ?? '',
     };
@@ -1778,7 +1918,7 @@ export class HostEngine {
         all.map((p) => [
           p.id,
           {
-            decoded: p.quizChoice !== null,
+            decoded: this.taskDone(p),
             correct: p.quizCorrect,
             voted: Boolean(p.vote),
             share: p.shareVote,
@@ -1790,7 +1930,7 @@ export class HostEngine {
           },
         ]),
       ),
-      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome, health: this.crewHealth(c) })),
+      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome, health: this.crewHealth(c), tasks: this.crewTasks(c) })),
       colony: this.colony,
       mission: this.missionPublic(),
       event: m && this.phase === 'event' ? { ...m.event } : m && (this.phase === 'results' || this.phase === 'debrief') ? { ...m.event } : null,
@@ -1812,6 +1952,8 @@ export class HostEngine {
       finalUnlocked: this.finalUnlocked,
       missionsPlayed: this.missionsPlayed,
       nasa: m?.nasa ?? null,
+      generator: this.phase === 'scan' ? this.generator : null,
+      maxPlayers: MAX_PLAYERS,
     };
   }
 
@@ -1825,22 +1967,9 @@ export class HostEngine {
     const at = (ph: Phase) => idx >= PHASE_FLOW.indexOf(ph);
     const inMission = Boolean(m && crew && at('briefing'));
 
-    let quiz: QuizView | null = null;
-    if (inMission && def && p.roles[0] && at('discovery')) {
-      const q = def.quiz[p.roles[0]];
-      const answered = p.quizChoice !== null;
-      quiz = {
-        q: q.q,
-        options: q.options,
-        answered,
-        correct: answered ? Boolean(p.quizCorrect) : null,
-        choice: p.quizChoice,
-        explain: answered ? q.explain : null,
-        answer: answered ? q.answer : null,
-      };
-    }
+    const task = inMission && crew && m && p.roles[0] && at('discovery') ? this.taskView(p, crew, m) : null;
     const intel =
-      inMission && crew?.puzzle && at('discovery') && (p.quizChoice !== null || at('challenge'))
+      inMission && crew?.puzzle && at('discovery') && (this.taskDone(p) || at('challenge'))
         ? p.roles.map((r) => crew.puzzle!.intel[r])
         : null;
 
@@ -1861,19 +1990,6 @@ export class HostEngine {
           }
         : null;
 
-    let bonus: QuizView | null = null;
-    if (m?.bonusActive && def && crew?.locked) {
-      const answered = p.bonusChoice !== null;
-      bonus = {
-        q: def.bonus.q,
-        options: def.bonus.options,
-        answered,
-        correct: answered ? Boolean(p.bonusCorrect) : null,
-        choice: p.bonusChoice,
-        explain: answered ? def.bonus.explain : null,
-        answer: answered ? def.bonus.answer : null,
-      };
-    }
 
     const event =
       inMission && def && crew && at('event')
@@ -1922,10 +2038,11 @@ export class HostEngine {
       me: { ...this.pub(p), sessionXp: p.sessionXp, badges: p.badges },
       crew: crew ? { id: crew.id, name: crew.name, sectorId: crew.sectorId, memberIds: crew.memberIds, members: members.map((x) => this.pub(x)) } : null,
       mission: inMission ? this.missionPublic() : null,
-      quiz,
+      quiz: null,
       intel,
       challenge,
-      bonus,
+      bonus: null,
+      task,
       event,
       problem:
         inMission && crew && m && FIX_PHASES.concat(['event', 'results']).includes(this.phase)
@@ -1933,7 +2050,7 @@ export class HostEngine {
           : null,
       outcome,
       debrief: inMission && this.phase === 'debrief' ? (m?.debrief ?? null) : null,
-      objectVote: this.objectVote ? { options: this.objectVote.options, myVote: p.objectVote, open: this.objectVote.open } : null,
+      objectVote: null,
       hint: hints[hints.length - 1] ?? null,
       nasa:
         inMission && m?.nasa
@@ -1943,6 +2060,33 @@ export class HostEngine {
               health: m.nasa.health && crew ? { ...m.nasa.health, ...this.crewHealth(crew)! } : null,
             }
           : null,
+    };
+  }
+
+  private taskView(p: Player, crew: Crew, m: MissionRun): PlayerTaskView {
+    const role = p.roles[0];
+    const prog = this.crewTasks(crew);
+    const members = this.members(crew);
+    const nameOf = (r: RoleId) => members.find((x) => x.roles.includes(r))?.name ?? 'nadie';
+    const txt = m.tasks?.[role] ?? roleTaskText(m.id, role, conditionsFrom(m.nasa?.weather ?? null, m.id));
+    const link = TASK_LINKS[role];
+    const present = new Set<RoleId>();
+    for (const x of members) x.roles.forEach((r) => present.add(r));
+    return {
+      role,
+      title: txt.title,
+      text: txt.text,
+      facts: txt.facts,
+      station: ROLE_STATION[role],
+      place: ROLE_PLACE[role],
+      progress: prog[role],
+      points: Math.min(TASK_GOAL, Math.round(p.task ?? 0)),
+      goal: TASK_GOAL,
+      link: present.has(link.from) && !p.roles.includes(link.from) ? { from: link.from, kind: link.kind, text: link.text, progress: prog[link.from], name: nameOf(link.from) } : null,
+      feeds: ROLE_ORDER.filter((r) => TASK_LINKS[r].from === role && present.has(r) && !p.roles.includes(r)).map((r) => ({ role: r, name: nameOf(r) })),
+      crew: ROLE_ORDER.filter((r) => present.has(r)).map((r) => ({ role: r, name: nameOf(r), progress: prog[r] })),
+      open: this.phase === 'discovery',
+      done: prog[role] >= 1,
     };
   }
 

@@ -2,11 +2,12 @@
 // colonia en primera o tercera persona y ve a sus compañeros moverse en tiempo real.
 // Su pose viaja al proyector (unas 6 veces por segundo) y el proyector la reparte a los demás.
 //
-// Durante la misión aparece una estación junto al lugar del problema: ahí la tripulación lo
-// resuelve con un minijuego (y en la emergencia, con el minijuego de su especialidad).
+// Durante la misión aparece una estación con brújula: en la exploración, la de la tarea de su
+// especialidad (conectada con las de sus compañeros); en el reto, la del problema de la historia;
+// y en la emergencia, la del minijuego de su especialidad.
 
 import { useEffect, useMemo, useState } from 'react';
-import { MISSIONS } from '../../../shared/content';
+import { MISSIONS, ROLES } from '../../../shared/content';
 import { MISSION_PROBLEMS } from '../../../shared/minigames';
 import type { PlayerView } from '../../../shared/types';
 import type { PlayerNet } from '../../net/playerNet';
@@ -16,6 +17,7 @@ import { WorldPlay, type WorldBanner } from '../../world/react/WorldPlay';
 import type { Bearing, InteractEvent, WorldEngine } from '../../world/WorldEngine';
 import { StoryProblem, problemOpen } from './MissionProblem';
 import { TapGame } from './screens';
+import { RoleTask } from './RoleTask';
 
 interface Props {
   view: PlayerView;
@@ -25,13 +27,10 @@ interface Props {
 
 /** ¿El juego necesita al alumno en su pantalla de misión? */
 function needsYou(v: PlayerView): { text: string; tone: 'alert' | 'info' } | null {
-  if (v.objectVote?.open && !v.objectVote.myVote) return { text: '🗳️ IX pregunta qué objeto escanear: ¡vota!', tone: 'info' };
   switch (v.phase) {
     case 'discovery':
-      return v.quiz && !v.quiz.answered ? { text: '🔐 Llegó tu transmisión secreta: descífrala.', tone: 'info' } : null;
+      return null;
     case 'challenge':
-      if (v.quiz && !v.quiz.answered) return { text: '🔐 Descifra tu transmisión antes de votar.', tone: 'info' };
-      if (v.bonus && !v.bonus.answered) return { text: '🛰️ ¡Pregunta bonus de la NASA!', tone: 'info' };
       return v.challenge && !v.challenge.myVote && !v.challenge.locked ? { text: '🗳️ Tu tripulación necesita tu voto.', tone: 'info' } : null;
     case 'event':
       return { text: '🚨 ¡Emergencia en la colonia! Tu tripulación te necesita.', tone: 'alert' };
@@ -95,7 +94,7 @@ export default function PlayWorld({ view, net, onClose }: Props) {
 
   /* ---------------- problema de la misión ---------------- */
 
-  const [panel, setPanel] = useState<'story' | 'twist' | null>(null);
+  const [panel, setPanel] = useState<'story' | 'twist' | 'task' | null>(null);
   const [bearing, setBearing] = useState<Bearing | null>(null);
   const missionId = view.mission?.id ?? null;
   const prob = missionId ? MISSION_PROBLEMS[missionId] : null;
@@ -103,7 +102,10 @@ export default function PlayWorld({ view, net, onClose }: Props) {
   const storyOpen = problemOpen(view);
   const action = view.phase === 'event' && view.event?.stage === 'action';
   const solved = (view.problem?.crew ?? 0) >= 1;
-  const active = Boolean(prob && (storyOpen || action));
+  const task = view.phase === 'discovery' ? view.task : null;
+  const taskOpen = Boolean(task?.open);
+  const active = Boolean(prob && (storyOpen || action)) || taskOpen;
+  const taskRole = task ? ROLES[task.role] : null;
   const evTitle = view.event?.title ?? 'Emergencia';
   const evVerb = view.event?.action.verb ?? 'Ayuda a la colonia';
   const evEmoji = view.event?.action.emoji ?? '🚨';
@@ -111,6 +113,16 @@ export default function PlayWorld({ view, net, onClose }: Props) {
   // La estación aparece junto al lugar del problema mientras haya algo que resolver.
   useEffect(() => {
     if (!engine) return;
+    if (task && taskRole && taskOpen) {
+      engine.setMissionStation({
+        anchor: `sector:${task.station}`,
+        color: taskRole.color,
+        label: `${taskRole.emoji} ${task.title}`,
+        prompt: `Tu tarea: ${task.title}`,
+        solved: task.done,
+      });
+      return;
+    }
     if (!prob || !def || !active) {
       engine.setMissionStation(null);
       return;
@@ -120,7 +132,7 @@ export default function PlayWorld({ view, net, onClose }: Props) {
         ? { anchor: prob.station, color: '#FF6B5B', label: `🚨 ${evTitle}`, prompt: `¡Emergencia! ${evVerb}`, solved: false }
         : { anchor: prob.station, color: def.color, label: `${prob.emoji} ${prob.title}`, prompt: `Resolver: ${prob.title}`, solved },
     );
-  }, [engine, prob, def, active, action, solved, evTitle, evVerb]);
+  }, [engine, prob, def, active, action, solved, evTitle, evVerb, task?.station, task?.title, task?.done, taskOpen, taskRole]);
 
   // Brújula hacia la estación.
   useEffect(() => {
@@ -136,21 +148,24 @@ export default function PlayWorld({ view, net, onClose }: Props) {
   useEffect(() => {
     if (panel === 'story' && action) setPanel('twist');
     else if (panel === 'twist' && !action) setPanel(null);
-  }, [panel, action]);
+    else if (panel === 'task' && !taskOpen) setPanel(null);
+  }, [panel, action, taskOpen]);
 
   const onInteract = (ev: InteractEvent) => {
     if (ev.defId !== 'prop.station') return false;
-    setPanel(action ? 'twist' : storyOpen ? 'story' : null);
+    setPanel(action ? 'twist' : taskOpen ? 'task' : storyOpen ? 'story' : null);
     return true;
   };
 
   const need = needsYou(view);
-  const bannerKey = action ? 'twist' : need ? `need:${need.text}` : storyOpen && !solved && prob ? `story:${prob.title}` : '';
+  const bannerKey = action ? 'twist' : taskOpen && task && !task.done ? `task:${task.title}` : need ? `need:${need.text}` : storyOpen && !solved && prob ? `story:${prob.title}` : '';
   const banner: WorldBanner | null = useMemo(
     () =>
       action
         ? { text: `🚨 ${evTitle}: ${evEmoji} ${evVerb}`, tone: 'alert', action: 'Resolver', onAction: () => setPanel('twist') }
-        : need
+        : taskOpen && task && !task.done && taskRole
+          ? { text: `${taskRole.emoji} Tu tarea: ${task.title}. Ve a tu estación (${task.place}) o hazla desde aquí.`, tone: 'info', action: 'Hacer tarea', onAction: () => setPanel('task') }
+          : need
           ? { text: need.text, tone: need.tone, action: 'Ir a la misión', onAction: onClose }
           : storyOpen && !solved && prob
             ? { text: `${prob.emoji} ${prob.title}: ve a la estación (${prob.place}) o resuélvelo desde aquí.`, tone: 'info', action: 'Resolver', onAction: () => setPanel('story') }
@@ -160,7 +175,28 @@ export default function PlayWorld({ view, net, onClose }: Props) {
   );
 
   const objective =
-    active && prob ? (
+    taskOpen && task && taskRole ? (
+      <>
+        <button className="wp-quest" onClick={() => setPanel('task')}>
+          <span>
+            {taskRole.emoji} {task.title}
+          </span>
+          <b>{task.done ? '✅' : `${Math.round(task.progress * 100)}%`}</b>
+        </button>
+        {bearing && (
+          <p className="wp-compass" title="Estación de tu tarea">
+            {bearing.distance > 5 ? (
+              <>
+                <i style={{ transform: `rotate(${bearing.angle}rad)` }}>↑</i>
+                Tu estación en {task.place} · {Math.round(bearing.distance)} m
+              </>
+            ) : (
+              <>📍 Llegaste a tu estación</>
+            )}
+          </p>
+        )}
+      </>
+    ) : active && prob ? (
       <>
         <button className="wp-quest" onClick={() => setPanel(action ? 'twist' : 'story')}>
           <span>{action ? `${evEmoji} ${evVerb}` : `${prob.emoji} ${prob.title}`}</span>
@@ -192,8 +228,19 @@ export default function PlayWorld({ view, net, onClose }: Props) {
           if (import.meta.env.DEV) (window as unknown as { __world?: unknown }).__world = e;
         }}
       >
-        <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Volver" banner={banner} objective={objective} onInteract={onInteract}>
-          {panel && (panel === 'story' || action) && (
+        <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Panel de misión" banner={banner} objective={objective} onInteract={onInteract}>
+          {panel === 'task' && taskOpen && (
+            <section className="wp-panel wp-problem" role="dialog" aria-label="Tu tarea">
+              <header>
+                <h3>{taskRole ? `${taskRole.emoji} Estación de ${taskRole.specialty}` : 'Tu tarea'}</h3>
+                <button className="wp-close" onClick={() => setPanel(null)} aria-label="Cerrar">
+                  ✕
+                </button>
+              </header>
+              <RoleTask view={view} net={net} />
+            </section>
+          )}
+          {panel && panel !== 'task' && (panel === 'story' || action) && (
             <section className="wp-panel wp-problem" role="dialog" aria-label={panel === 'story' ? 'Problema de la misión' : 'Emergencia'}>
               <header>
                 <h3>{panel === 'story' ? `${prob?.emoji ?? '🔧'} Estación de la misión` : `🚨 ${evTitle}`}</h3>

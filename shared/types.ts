@@ -191,6 +191,8 @@ export interface CrewStatus {
 
 export interface HostCrew extends CrewSummary {
   status: CrewStatus;
+  /** Avance de la tarea de cada especialidad en la exploración (0–1). */
+  tasks: Record<RoleId, number>;
   outcome: CrewOutcome | null;
   health: CrewHealthStatus | null;
 }
@@ -216,6 +218,10 @@ export interface MissionPublic {
   twistsRevealed: number;
   aiNarrative: boolean;
   source: ScanResult['source'];
+  /** Por qué IX generó esta misión (condiciones reales de la NASA y estado de la colonia). */
+  reason: string;
+  /** La IA eligió la misión y escribió las tareas (si no, se usaron las reglas del motor). */
+  aiPlanned: boolean;
   puzzleTitle: string;
   puzzleQuestion: string;
 }
@@ -325,6 +331,10 @@ export interface HostView {
   finalUnlocked: boolean;
   missionsPlayed: MissionId[];
   nasa: MissionNasa | null;
+  /** IX generando la siguiente misión con datos de la NASA (etapa de misión). */
+  generator: MissionGenerator | null;
+  /** Máximo de tripulantes por partida. */
+  maxPlayers: number;
 }
 
 export interface PlayerChallengeView {
@@ -364,6 +374,43 @@ export interface PlayerOutcomeView extends CrewOutcome {
   crews: number;
 }
 
+/** IX genera la misión: consulta la NASA, decide con la IA y la arma. */
+export interface MissionGenerator {
+  stage: 'nasa' | 'ai' | 'ready' | 'error';
+  /** Qué está haciendo IX ahora. */
+  text: string;
+  /** Condiciones reales encontradas (para mostrarlas mientras se genera). */
+  conditions: string[];
+}
+
+export interface TaskMate {
+  role: RoleId;
+  name: string;
+  progress: number;
+}
+
+export interface PlayerTaskView {
+  role: RoleId;
+  title: string;
+  text: string;
+  facts: string[];
+  /** Estación en el mundo 3D (sector) y su nombre. */
+  station: SectorId;
+  place: string;
+  /** Avance efectivo de mi tarea (0–1) y mis puntos. */
+  progress: number;
+  points: number;
+  goal: number;
+  /** De quién depende mi tarea y cómo. */
+  link: { from: RoleId; kind: 'limit' | 'boost'; text: string; progress: number; name: string } | null;
+  /** Lo que mi avance permite a los demás. */
+  feeds: { role: RoleId; name: string }[];
+  /** Avance de toda la tripulación, por especialidad. */
+  crew: TaskMate[];
+  open: boolean;
+  done: boolean;
+}
+
 export interface PlayerView {
   role: 'player';
   now: number;
@@ -384,6 +431,8 @@ export interface PlayerView {
   event: PlayerEventView | null;
   /** Problema de la historia de la misión (se resuelve con un minijuego). */
   problem: { mine: number; goal: number; crew: number; open: boolean } | null;
+  /** Tarea de su especialidad durante la exploración (conectada con las de sus compañeros). */
+  task: PlayerTaskView | null;
   outcome: PlayerOutcomeView | null;
   debrief: DebriefPublic | null;
   objectVote: { options: CategoryId[]; myVote: CategoryId | null; open: boolean } | null;
@@ -404,10 +453,6 @@ export type HostAction =
   | { type: 'formCrews' }
   | { type: 'shuffleCrews' }
   | { type: 'toScan' }
-  | { type: 'objectVoteStart'; options: CategoryId[] }
-  | { type: 'objectVoteClose' }
-  | { type: 'chooseScan'; scan: ScanResult }
-  | { type: 'chooseMission'; missionId: MissionId }
   | { type: 'next' }
   | { type: 'pause' }
   | { type: 'resume' }
@@ -425,6 +470,8 @@ export type PlayerAction =
   | { type: 'share'; amount: number }
   | { type: 'taps'; count: number }
   | { type: 'fix'; count: number }
+  /** Puntos del minijuego de la tarea de su especialidad (exploración). */
+  | { type: 'task'; points: number }
   | { type: 'objectVote'; category: CategoryId }
   | { type: 'bonus'; choice: number }
   | { type: 'avatar'; avatar: AvatarConfig };

@@ -14,11 +14,11 @@ import { MISSION_ZONE, ROLE_AVATARS } from '../world/react/missionZones';
 import { PlanetView } from '../world/react/PlanetView';
 
 const OBJECTS: { emoji: string; obj: string; mission: MissionId }[] = [
-  { emoji: '🪴', obj: 'Una planta', mission: 'greenhouse' },
-  { emoji: '🧴', obj: 'Una botella', mission: 'water' },
-  { emoji: '💡', obj: 'Una lámpara', mission: 'darkness' },
-  { emoji: '📱', obj: 'Un celular', mission: 'signal' },
-  { emoji: '♻️', obj: 'Material reciclable', mission: 'habitat' },
+  { emoji: '🔆', obj: 'Fulguración solar fuerte', mission: 'signal' },
+  { emoji: '☢️', obj: 'Partículas del Sol', mission: 'habitat' },
+  { emoji: '🌪️', obj: 'Eyecciones de masa coronal', mission: 'darkness' },
+  { emoji: '🌱', obj: 'Alimentos de la colonia bajos', mission: 'greenhouse' },
+  { emoji: '💧', obj: 'Reserva de agua baja', mission: 'water' },
 ];
 
 function SectionHead({ kicker, title, children, center = false }: { kicker: string; title: string; children?: ReactNode; center?: boolean }) {
@@ -192,9 +192,9 @@ function ScanSection() {
           <IXOrb size={220} mood="talk" />
         </div>
         <div>
-          <SectionHead kicker="Scan to mission" title="Un objeto del salón desbloquea la misión">
-            El profesor fotografía un objeto del salón, o deja que la clase vote. IX identifica la categoría y abre una misión científicamente revisada. Con la
-            IA local la foto se analiza en el navegador y nunca sale del dispositivo.
+          <SectionHead kicker="Misiones generadas por IX" title="Cada misión nace de datos reales de la NASA">
+            Nadie elige la misión a mano: IX revisa el clima espacial real de la NASA (DONKI) y el estado de la colonia, y con la IA genera el problema y una
+            tarea para cada una de las 4 especialidades, conectadas entre sí.
           </SectionHead>
           <div className="objects">
             {OBJECTS.map((o) => (

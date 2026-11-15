@@ -221,10 +221,10 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
   let primary: { label: string; icon?: string; action: HostAction; cls?: string } | null = null;
   switch (view.phase) {
     case 'lobby':
-      primary = { label: 'Formar tripulaciones', icon: 'users', action: { type: 'formCrews' } };
+      primary = { label: 'Formar la tripulación', icon: 'users', action: { type: 'formCrews' } };
       break;
     case 'crews':
-      primary = { label: 'Escanear el mundo', icon: 'scan', action: { type: 'toScan' } };
+      primary = { label: 'Generar la misión', icon: 'spark', action: { type: 'toScan' } };
       break;
     case 'briefing':
       primary = { label: 'Enviar transmisiones', icon: 'arrow', action: { type: 'next' } };
@@ -303,13 +303,12 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
         <div className="dock-left">
           {view.phase === 'lobby' && (
             <>
-              <button className="btn small ghost" onClick={() => run({ type: 'addBots', count: 4 })}>
-                <Icon name="bot" size={18} /> +4 bots
+              <button className="btn small ghost" disabled={view.players.length >= view.maxPlayers} onClick={() => run({ type: 'addBots', count: view.maxPlayers - view.players.length })}>
+                <Icon name="bot" size={18} /> Completar con bots
               </button>
-              <button className="btn small ghost" onClick={() => run({ type: 'addBots', count: 12 })}>
-                <Icon name="bot" size={18} /> +12 bots
-              </button>
-              <span className="dock-note">{humans ? `${humans} alumno${humans > 1 ? 's' : ''} conectado${humans > 1 ? 's' : ''}` : 'Los bots sirven para probar o completar equipos'}</span>
+              <span className="dock-note">
+                {view.players.length}/{view.maxPlayers} tripulantes · {humans ? `${humans} alumno${humans > 1 ? 's' : ''}` : 'si entra un alumno, un bot le cede su lugar'}
+              </span>
             </>
           )}
           {view.phase === 'crews' && (
