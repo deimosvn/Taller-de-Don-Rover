@@ -263,7 +263,7 @@ export default async function handler(req: Req, res: Res) {
   try {
     if (op === 'status') {
       res.setHeader('Cache-Control', 'no-store');
-      res.status(200).json({ ok: true, key: KEY !== 'DEMO_KEY', sources: ['DONKI', 'NTRS', 'OSDR'] });
+      res.status(200).json({ ok: true, key: KEY !== 'DEMO_KEY', sources: ['DONKI', 'NTRS', 'OSDR', 'APOD', 'NeoWs'] });
       return;
     }
     if (op === 'check') {
@@ -310,6 +310,55 @@ export default async function handler(req: Req, res: Res) {
       });
       res.setHeader('Cache-Control', 'public, s-maxage=21600, stale-while-revalidate=86400');
       res.status(200).json({ ok: true, studies });
+      return;
+    }
+    if (op === 'apod') {
+      // Foto astronómica del día (APOD), con la explicación oficial de la NASA.
+      const apod = await cached('apod', 3 * 3600_000, async () => {
+        const o = (await getJson(`https://api.nasa.gov/planetary/apod?thumbs=true&api_key=${KEY}`)) as Record<string, unknown>;
+        const s = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+        return {
+          title: s(o.title, 200),
+          date: s(o.date, 10),
+          explanation: s(o.explanation, 900),
+          url: s(o.media_type === 'video' ? o.thumbnail_url || o.url : o.url, 500),
+          page: `https://apod.nasa.gov/apod/ap${s(o.date, 10).slice(2).replace(/-/g, '')}.html`,
+          media: s(o.media_type, 10),
+        };
+      });
+      res.setHeader('Cache-Control', 'public, s-maxage=10800, stale-while-revalidate=86400');
+      res.status(200).json({ ok: true, apod });
+      return;
+    }
+    if (op === 'neo') {
+      // Asteroides que pasan cerca de la Tierra hoy (NeoWs).
+      const day = new Date().toISOString().slice(0, 10);
+      const neo = await cached(`neo:${day}`, 3 * 3600_000, async () => {
+        const o = (await getJson(`https://api.nasa.gov/neo/rest/v1/feed?start_date=${day}&end_date=${day}&api_key=${KEY}`)) as {
+          element_count?: number;
+          near_earth_objects?: Record<string, Record<string, unknown>[]>;
+        };
+        const list = Object.values(o.near_earth_objects ?? {}).flat();
+        const items = list
+          .map((a) => {
+            const app = (a.close_approach_data as Record<string, Record<string, string>>[] | undefined)?.[0];
+            const dia = (a.estimated_diameter as Record<string, Record<string, number>> | undefined)?.meters;
+            return {
+              name: String(a.name ?? '').slice(0, 60),
+              diameterM: dia ? Math.round((dia.estimated_diameter_min + dia.estimated_diameter_max) / 2) : null,
+              hazardous: Boolean(a.is_potentially_hazardous_asteroid),
+              missKm: app ? Math.round(Number(app.miss_distance?.kilometers)) : null,
+              lunar: app ? Math.round(Number(app.miss_distance?.lunar) * 10) / 10 : null,
+              kmh: app ? Math.round(Number(app.relative_velocity?.kilometers_per_hour)) : null,
+              url: String(a.nasa_jpl_url ?? '').slice(0, 200),
+            };
+          })
+          .filter((a) => a.missKm !== null)
+          .sort((a, b) => (a.missKm ?? 0) - (b.missKm ?? 0));
+        return { date: day, count: o.element_count ?? items.length, hazardous: items.filter((a) => a.hazardous).length, closest: items.slice(0, 3) };
+      });
+      res.setHeader('Cache-Control', 'public, s-maxage=10800, stale-while-revalidate=43200');
+      res.status(200).json({ ok: true, neo });
       return;
     }
     if (op === 'weather') {

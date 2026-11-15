@@ -5,9 +5,9 @@
 import { useEffect, useRef } from 'react';
 import { DIFFICULTIES, MISSIONS, PACES } from '../../shared/content';
 import type { HostView } from '../../shared/types';
-import { greet, listenAndAnswer, setRoverContext } from './assistant';
+import { greet, setRoverContext } from './assistant';
 import { rover } from './link';
-import { repeat, say, setFace, voiceSettings, voiceState } from './voice';
+import { say, setFace, voiceSettings, voiceState } from './voice';
 
 function phaseTotal(v: HostView): number {
   const p = PACES[v.pace];
@@ -59,7 +59,8 @@ export function useRoverNarrator(view: HostView): void {
   viewRef.current = view;
   const prev = useRef<{ phase: string; stage: string | null; ix: Set<string>; humans: Set<string> } | null>(null);
 
-  // Reconectar sola al último camino que funcionó y responder a los botones de la placa.
+  // Reconectar sola al último camino que funcionó. Los botones de la placa los atiende el
+  // Don Rover flotante (RoverDock), que está en todas las secciones.
   useEffect(() => {
     void rover.auto();
     let greeted = false;
@@ -70,10 +71,6 @@ export function useRoverNarrator(view: HostView): void {
         sendBoardState(viewRef.current);
       } else if (e.t === 'hi') {
         sendBoardState(viewRef.current);
-      } else if (e.t === 'btn' && e.k === 'short') {
-        void repeat();
-      } else if (e.t === 'btn' && e.k === 'long') {
-        void listenAndAnswer();
       }
     });
     return off;

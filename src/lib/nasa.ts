@@ -38,6 +38,34 @@ export async function nasaCheck(): Promise<{ key: boolean; sources: NasaSource[]
   return data && Array.isArray(data.sources) ? { key: Boolean(data.key), sources: data.sources } : null;
 }
 
+export interface Apod {
+  title: string;
+  date: string;
+  explanation: string;
+  url: string;
+  page: string;
+  media: string;
+}
+
+/** Foto astronómica del día de la NASA (APOD). */
+export async function nasaApod(): Promise<Apod | null> {
+  const data = await get<{ apod: Apod }>('op=apod');
+  return data?.apod?.title ? data.apod : null;
+}
+
+export interface NeoToday {
+  date: string;
+  count: number;
+  hazardous: number;
+  closest: { name: string; diameterM: number | null; hazardous: boolean; missKm: number | null; lunar: number | null; kmh: number | null; url: string }[];
+}
+
+/** Asteroides que pasan cerca de la Tierra hoy (NeoWs). */
+export async function nasaNeo(): Promise<NeoToday | null> {
+  const data = await get<{ neo: NeoToday }>('op=neo');
+  return data?.neo ?? null;
+}
+
 let weatherCache: { at: number; value: SpaceWeather | null } | null = null;
 
 /** Clima espacial real de DONKI (últimos días), con nivel de riesgo. */

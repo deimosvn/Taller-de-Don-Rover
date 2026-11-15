@@ -9,6 +9,8 @@ const WorldExplorer = lazy(() => import('./world/react/WorldExplorer').then((m) 
 const MinigameLab = lazy(() => import('./pages/play/MinigameLab').then((m) => ({ default: m.MinigameLab })));
 const RoverSetup = lazy(() => import('./pages/rover/RoverSetup').then((m) => ({ default: m.RoverSetup })));
 const Trainer = lazy(() => import('./pages/trainer/Trainer').then((m) => ({ default: m.Trainer })));
+/** Don Rover flotante en todas las secciones (se carga aparte para no frenar la portada). */
+const RoverDock = lazy(() => import('./rover/RoverDock').then((m) => ({ default: m.RoverDock })));
 const FreePlay = lazy(() => import('./pages/free/FreePlay').then((m) => ({ default: m.FreePlay })));
 
 function Loading() {
@@ -24,6 +26,10 @@ function Loading() {
 export function App() {
   const route = useRoute();
   return (
+    <>
+    <Suspense fallback={null}>
+      <RoverDock />
+    </Suspense>
     <Suspense fallback={<Loading />}>
       {route.path === '/profe' ? (
         <HostApp />
@@ -43,5 +49,6 @@ export function App() {
         <Landing />
       )}
     </Suspense>
+    </>
   );
 }
