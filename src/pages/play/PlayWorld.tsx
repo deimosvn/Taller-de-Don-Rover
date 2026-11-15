@@ -95,7 +95,15 @@ export default function PlayWorld({ view, net, onClose }: Props) {
 
   return (
     <div className="world-overlay">
-      <WorldCanvas snapshot={snapshot} keyboard onEngine={setEngine}>
+      <WorldCanvas
+        snapshot={snapshot}
+        keyboard
+        onEngine={(e) => {
+          setEngine(e);
+          // Solo en desarrollo: acceso al motor desde la consola para depurar.
+          if (import.meta.env.DEV) (window as unknown as { __world?: unknown }).__world = e;
+        }}
+      >
         <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Volver" banner={banner} />
       </WorldCanvas>
     </div>

@@ -43,11 +43,31 @@ export function saveSettings(s: HostSettings) {
   }
 }
 
+/** Dominio público de producción (Vercel lo informa al compilar; vacío fuera de Vercel). */
+const PUBLIC_HOST: string = String(import.meta.env.VITE_PUBLIC_HOST ?? '');
+
+/**
+ * Cada despliegue de Vercel tiene además su propia URL (proyecto-hash-equipo.vercel.app) que,
+ * con la protección de despliegues, pide iniciar sesión en Vercel. Si el profesor abrió la
+ * consola desde una de esas, el QR debe llevar a los celulares al dominio público.
+ */
+function publicBase(url: URL): string | null {
+  const host = url.host;
+  if (!host.endsWith('.vercel.app')) return null;
+  const pub = PUBLIC_HOST || (host.startsWith('tallerdedonrover-') ? 'tallerdedonrover.vercel.app' : '');
+  if (!pub || host === pub) return null;
+  return `https://${pub}/`;
+}
+
 /** URL base que se codifica en el QR (la app publicada; por defecto, esta misma página). */
 export function joinBaseUrl(s: HostSettings = loadSettings()): string {
-  if (s.joinBase.trim()) return s.joinBase.trim().replace(/#.*$/, '').replace(/\/?$/, '/');
   const { origin, pathname } = window.location;
-  return origin + pathname.replace(/[^/]*$/, '');
+  const raw = s.joinBase.trim() ? s.joinBase.trim().replace(/#.*$/, '').replace(/\/?$/, '/') : origin + pathname.replace(/[^/]*$/, '');
+  try {
+    return publicBase(new URL(raw)) ?? raw;
+  } catch {
+    return raw;
+  }
 }
 
 export function joinUrl(code: string, s?: HostSettings) {

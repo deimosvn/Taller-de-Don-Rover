@@ -31,9 +31,18 @@ function pwaServiceWorker(): Plugin {
   };
 }
 
+/**
+ * Dominio público de producción. En Vercel llega como variable del sistema al compilar; con
+ * él, el QR nunca apunta a una URL de despliegue protegida (que pide iniciar sesión).
+ */
+const publicHost = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VITE_VERCEL_PROJECT_PRODUCTION_URL || '';
+
 export default defineConfig({
   base: './',
   plugins: [react(), pwaServiceWorker()],
+  define: {
+    'import.meta.env.VITE_PUBLIC_HOST': JSON.stringify(publicHost),
+  },
   server: { host: true, port: 5173 },
   preview: { host: true, port: 4173 },
   build: {

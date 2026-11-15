@@ -49,7 +49,16 @@ export default function HostWorld({ view, onClose }: { view: HostView; onClose: 
 
   return (
     <div className="world-overlay host-world">
-      <WorldCanvas snapshot={snapshot} keyboard options={{ autoRotate: true }} onEngine={setEngine}>
+      <WorldCanvas
+        snapshot={snapshot}
+        keyboard
+        options={{ autoRotate: true }}
+        onEngine={(e) => {
+          setEngine(e);
+          // Solo en desarrollo: acceso al motor desde la consola para depurar.
+          if (import.meta.env.DEV) (window as unknown as { __world?: unknown }).__world = e;
+        }}
+      >
         <div className="hw-top">
           <button className="wp-btn" onClick={onClose}>
             ✕ <span>Volver a la consola</span>
