@@ -32,8 +32,17 @@ export function isPose(p: unknown): p is PresencePose {
   return Array.isArray(p) && p.length === 6 && p.every((n) => typeof n === 'number' && Number.isFinite(n)) && Math.abs(Math.hypot(p[0], p[1], p[2]) - 1) < 0.05;
 }
 
+/**
+ * Servidores STUN que funcionan hoy. Los TURN que PeerJS trae por defecto
+ * (eu-0/us-0.turn.peerjs.com) ya no existen en DNS, así que no los usamos.
+ */
+export const ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+];
+
 export function peerOptions(sig: Signaling | null | undefined): PeerJSOption {
-  const base: PeerJSOption = { debug: 0 };
+  const base: PeerJSOption = { debug: 0, config: { iceServers: ICE_SERVERS } };
   if (sig?.host) return { ...base, host: sig.host, port: sig.port || 443, path: sig.path || '/', secure: sig.secure };
   return base;
 }

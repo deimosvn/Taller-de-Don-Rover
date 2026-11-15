@@ -80,7 +80,15 @@ export class HostNet {
     if (this.destroyed) return;
     const peer = new Peer(PEER_PREFIX + this.engine.code, peerOptions(this.signaling));
     this.peer = peer;
+    // Si el servidor de señalización nunca responde, no nos quedamos en "Abriendo la colonia…".
+    const openTimer = setTimeout(() => {
+      if (this.destroyed || this.peer !== peer || peer.open || peer.destroyed) return;
+      this.setStatus('reconnecting', 'El servidor de conexión no responde; reintentando…');
+      peer.destroy();
+      this.open();
+    }, 15000);
     peer.on('open', () => {
+      clearTimeout(openTimer);
       this.retries = 0;
       this.setStatus('online', 'Colonia en línea: los celulares pueden unirse');
     });

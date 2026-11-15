@@ -85,7 +85,17 @@ export class PlayerNet {
     }
     const peer = new Peer(peerOptions(this.signaling));
     this.peer = peer;
-    peer.on('open', () => this.connect());
+    // Si el servidor de señalización no responde, recreamos el peer en vez de esperar para siempre.
+    const openTimer = setTimeout(() => {
+      if (this.stopped || this.peer !== peer || peer.open || peer.destroyed) return;
+      peer.destroy();
+      this.setState('reconnecting');
+      this.retry(0);
+    }, 12000);
+    peer.on('open', () => {
+      clearTimeout(openTimer);
+      this.connect();
+    });
     peer.on('disconnected', () => {
       if (!this.stopped && !peer.destroyed) setTimeout(() => !peer.destroyed && peer.disconnected && peer.reconnect(), 1500);
     });
