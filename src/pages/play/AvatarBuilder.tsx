@@ -14,7 +14,7 @@ export function AvatarBuilder({ value, onChange }: { value: AvatarConfig; onChan
     <div className="avatar-builder">
       <div className="ab-preview">
         <div className="ab-platform" />
-        <Astronaut avatar={value} size={150} pose="cheer" />
+        <Astronaut avatar={value} size={150} pose="cheer" draggable />
         <button
           className="ab-dice"
           aria-label="Astronauta al azar"

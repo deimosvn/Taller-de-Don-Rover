@@ -163,7 +163,7 @@ export function createCatalog(): Map<string, EntityDef> {
   defs.push({
     id: 'building.cityTower',
     kind: 'building',
-    name: 'Torre de la Ciudad IXCHEL',
+    name: 'Torre de la Ciudad Don Rover',
     description: BUILDINGS.city.desc,
     source: 'Edificio final (misión M-06)',
     tags: ['colony', 'building', 'city'],

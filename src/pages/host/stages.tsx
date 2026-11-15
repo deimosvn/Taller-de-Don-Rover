@@ -2,15 +2,15 @@
 
 import type { CSSProperties } from 'react';
 import { BUILDINGS, CATEGORIES, MISSIONS, MISSION_ORDER, PACES, ROLES, ROLE_ORDER, SECTORS } from '../../../shared/content';
-import type { HostCrew, HostView, SectorId, Tier } from '../../../shared/types';
+import type { HostCrew, HostView, Tier } from '../../../shared/types';
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
-import { ColonyMap } from '../../components/ColonyMap';
+import { PlanetView } from '../../world/react/PlanetView';
+import { useHostSnapshot } from '../../world/react/useHostSnapshot';
+import { MISSION_ZONE } from '../../world/react/missionZones';
 import { Confetti, Icon, QR, RoleChip, Stars, Typewriter, useCountUp } from '../../components/ui';
 import { joinUrl, loadSettings } from '../../engine/settings';
 import { encodeSignaling } from '../../net/protocol';
 import type { Run } from './Console';
-
-const crewMap = (v: HostView) => Object.fromEntries(v.crews.map((c) => [c.sectorId, c.name])) as Partial<Record<SectorId, string>>;
 
 export const TIER_LABEL: Record<Tier, { label: string; emoji: string }> = {
   best: { label: 'Mejor decisión', emoji: '🌟' },
@@ -24,6 +24,7 @@ export const TIER_LABEL: Record<Tier, { label: string; emoji: string }> = {
 /* ------------------------------------------------------------------ */
 
 export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
+  const snapshot = useHostSnapshot(view);
   const settings = loadSettings();
   const sig = encodeSignaling(settings.signaling);
   const url = joinUrl(view.code, settings) + (sig ? `&s=${sig}` : '');
@@ -46,7 +47,7 @@ export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
         </p>
         {localhost && (
           <p className="join-warn">
-            <Icon name="alert" size={16} /> Estás en “localhost”: los celulares no pueden abrirlo. Publica la app (HTTPS) o abre IXCHEL con la IP de tu red.
+            <Icon name="alert" size={16} /> Estás en “localhost”: los celulares no pueden abrirlo. Publica la app (HTTPS) o abre el Taller de Don Rover con la IP de tu red.
           </p>
         )}
       </div>
@@ -56,36 +57,36 @@ export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
           <h2 className="sticker">{view.players.length ? `${view.players.length} astronauta${view.players.length > 1 ? 's' : ''} a bordo` : 'Esperando tripulantes…'}</h2>
           <p>Cada quien crea su astronauta en su celular. Cuando estén todos, IX formará tripulaciones de cuatro.</p>
         </div>
-        {view.players.length === 0 ? (
-          <div className="lobby-empty">
-            <ColonyMap sectors={view.colony.sectors} buildings={view.colony.buildings} labels={false} />
+        <div className="lobby-empty">
+          <PlanetView snapshot={snapshot} className="stage-planet" />
+          {view.players.length === 0 ? (
             <div className="lobby-empty-tip panel">
               <IXOrb size={64} mood="talk" />
               <p>
                 <b>¿Probando solo?</b> Agrega bots de práctica desde la barra inferior: juegan como alumnos reales para que veas toda la misión.
               </p>
             </div>
-          </div>
-        ) : (
-          <div className="landing-pad">
-            {view.players.map((p, i) => (
-              <div key={p.id} className={`pad-astro ${p.connected ? '' : 'off'}`} style={{ animationDelay: `${(i % 12) * 0.04}s` }}>
-                <Astronaut avatar={p.avatar} size={62} pose={i % 3 === 0 ? 'wave' : 'idle'} />
-                <span className="pad-name">
-                  {p.name}
-                  {p.isBot ? ' 🤖' : ''}
-                </span>
-                <button
-                  className="pad-kick"
-                  aria-label={`Quitar a ${p.name}`}
-                  onClick={() => confirm(`¿Quitar a ${p.name} de la colonia?`) && run({ type: 'kick', playerId: p.id })}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+          ) : (
+            <div className="landing-pad">
+              {view.players.map((p, i) => (
+                <div key={p.id} className={`pad-astro ${p.connected ? '' : 'off'}`} style={{ animationDelay: `${(i % 12) * 0.04}s` }}>
+                  <Astronaut avatar={p.avatar} size={view.players.length > 12 ? 52 : 70} pose={i % 3 === 0 ? 'wave' : 'idle'} />
+                  <span className="pad-name">
+                    {p.name}
+                    {p.isBot ? ' 🤖' : ''}
+                  </span>
+                  <button
+                    className="pad-kick"
+                    aria-label={`Quitar a ${p.name}`}
+                    onClick={() => confirm(`¿Quitar a ${p.name} de la colonia?`) && run({ type: 'kick', playerId: p.id })}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -97,12 +98,17 @@ export function LobbyStage({ view, run }: { view: HostView; run: Run }) {
 
 export function CrewsStage({ view }: { view: HostView }) {
   const byId = new Map(view.players.map((p) => [p.id, p]));
+  const snapshot = useHostSnapshot(view);
   return (
     <div className="crews-stage">
       <div className="stage-head">
         <p className="eyebrow">Crew assignment</p>
         <h2 className="sticker">¡Tripulaciones listas!</h2>
         <p>Cada tripulación cuida un sector de la colonia. Los cuatro roles reciben información distinta: nadie puede resolver la misión solo.</p>
+      </div>
+      <div className="crews-layout">
+      <div className="crews-planet">
+        <PlanetView snapshot={snapshot} focus="colony.mars01" autoRotate={false} className="stage-planet" />
       </div>
       <div className="crew-grid">
         {view.crews.map((c, i) => (
@@ -137,6 +143,7 @@ export function CrewsStage({ view }: { view: HostView }) {
           </article>
         ))}
       </div>
+      </div>
     </div>
   );
 }
@@ -147,12 +154,16 @@ export function CrewsStage({ view }: { view: HostView }) {
 
 export function BriefingStage({ view }: { view: HostView }) {
   const m = view.mission!;
+  const snapshot = useHostSnapshot(view);
   const def = MISSIONS[m.id];
   return (
     <div className="briefing">
       <div className="brief-left">
-        <div className="unlock-burst">
-          <MissionPatch id={m.id} size={250} />
+        <div className="brief-planet">
+          <PlanetView snapshot={snapshot} focus={MISSION_ZONE[m.id]} autoRotate={false} className="stage-planet" />
+          <div className="unlock-burst">
+            <MissionPatch id={m.id} size={150} live />
+          </div>
         </div>
         <span className="chip ix">
           {CATEGORIES[m.category].emoji} {m.source === 'teacher' ? 'Elegida por el profesor' : `Descubierto: ${m.objectLabel}`}
@@ -367,10 +378,11 @@ export function EventStage({ view }: { view: HostView }) {
   const target = Math.round(PACES[view.pace].action * 1.6);
   const progress = useCountUp(ev.progress, 400);
   const dark = m.id === 'darkness';
+  const snapshot = useHostSnapshot(view, dark ? { dark: true, storm: false } : { storm: true });
   return (
     <div className={`event-stage stage-${ev.stage}`}>
       <div className="event-map">
-        <ColonyMap sectors={view.colony.sectors} buildings={view.colony.buildings} crewBySector={crewMap(view)} storm={!dark} dark={dark} labels={false} cover />
+        <PlanetView snapshot={snapshot} interactive={false} className="stage-planet" />
       </div>
       <div className="event-overlay">
         <div className="alarm-title">
@@ -459,12 +471,15 @@ export function ResultsStage({ view }: { view: HostView }) {
   const r = view.results!;
   const def = MISSIONS[m.id];
   const crewName = (id: string) => view.crews.find((c) => c.id === id)?.name ?? id;
+  const snapshot = useHostSnapshot(view, { newBuilding: def.unlock });
   const ranked = r.ranking.map((x) => view.crews.find((c) => c.id === x.crewId)).filter((c): c is HostCrew => Boolean(c));
   return (
     <div className="results">
       <div className="res-left">
         <div className={`res-banner ${r.saved ? 'ok' : 'bad'}`}>{r.saved ? '🎉 ¡La colonia sigue en pie!' : '🛠️ La colonia resistió con daños'}</div>
-        <ColonyMap sectors={view.colony.sectors} buildings={view.colony.buildings} crewBySector={crewMap(view)} newBuilding={def.unlock} />
+        <div className="res-planet">
+          <PlanetView snapshot={snapshot} focus={zoneForBuilding(def.unlock)} className="stage-planet" />
+        </div>
         <div className="chain panel">
           <span className="eyebrow">Reacciones en cadena</span>
           <ul>
@@ -609,4 +624,8 @@ export function DebriefStage({ view }: { view: HostView }) {
       </div>
     </div>
   );
+}
+
+function zoneForBuilding(b: string): string {
+  return b === 'city' ? 'colony.hub' : `site.${b}`;
 }

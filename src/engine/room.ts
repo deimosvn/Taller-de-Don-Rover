@@ -1,4 +1,4 @@
-// Motor del juego de IXCHEL. Corre en el navegador del profesor (la pantalla del proyector)
+// Motor del juego del Taller de Don Rover. Corre en el navegador del profesor (la pantalla del proyector)
 // y es la única fuente de verdad: los celulares solo envían acciones y reciben su vista.
 //
 // "La IA narra, el motor decide": recursos, consecuencias y puntajes son deterministas.

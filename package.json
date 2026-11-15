@@ -2,7 +2,7 @@
   "name": "ixchel-classroom-space-mission",
   "version": "1.0.0",
   "private": true,
-  "description": "IXCHEL — The Classroom Space Mission. PWA multijugador nativa de IA que convierte un salón en una colonia espacial. Corre 100% en el navegador.",
+  "description": "Taller de Don Rover. PWA multijugador nativa de IA que convierte un salón en una colonia en Marte. Corre 100% en el navegador.",
   "type": "module",
   "scripts": {
     "dev": "vite",

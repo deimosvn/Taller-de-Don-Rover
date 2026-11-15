@@ -1,14 +1,14 @@
-# IXCHEL — The Classroom Space Mission
+# Taller de Don Rover
 
 **Un salón. Varias tripulaciones. Un planeta por salvar.**
 
-IXCHEL es una plataforma de aprendizaje multijugador nativa de IA que convierte cualquier salón de clases en una colonia espacial que debe sobrevivir. Los alumnos forman tripulaciones de cuatro, cada quien recibe una especialidad y una pieza secreta de información, la IA convierte objetos del salón en misiones científicas y las decisiones de cada tripulación cambian un planeta que comparte toda la clase.
+El Taller de Don Rover es una plataforma de aprendizaje multijugador nativa de IA que convierte cualquier salón de clases en una colonia espacial que debe sobrevivir. Los alumnos forman tripulaciones de cuatro, cada quien recibe una especialidad y una pieza secreta de información, la IA convierte objetos del salón en misiones científicas y las decisiones de cada tripulación cambian un planeta que comparte toda la clase.
 
 Es una **PWA que corre 100% en el navegador**: no hay servidor que instalar. El navegador del profesor (la pantalla del proyector) es el anfitrión del juego y los celulares de los alumnos se conectan directo por WebRTC escaneando un QR.
 
 ## Qué incluye
 
-- **Presentación** (`#/`): la propuesta completa del proyecto, con ilustraciones originales.
+- **Presentación** (`#/`): la propuesta completa del proyecto, con el planeta y los personajes en 3D.
 - **Consola del profesor** (`#/profe`): abordaje con QR, formación automática de tripulaciones, escáner del mundo, briefing, transmisiones cifradas, reto de tripulación, evento global, resultados y debrief. Incluye estado global del planeta, bitácora de IX, pistas, pausa y reporte descargable en CSV.
 - **App del alumno** (`#/jugar`): astronauta personalizable, descifrado de transmisiones con retos científicos, votación interna, bitácora de la tripulación, minijuego de emergencia, XP e insignias guardados en el dispositivo.
 - **6 misiones**: Greenhouse Rescue, The Water Crisis, Darkness Protocol, The Unknown Signal, Habitat Zero y The Final Colony. Cada tripulación recibe números distintos y cada rol tiene un dato imprescindible para encontrar la mejor decisión.
@@ -26,7 +26,7 @@ npm run dev
 
 Abre `http://localhost:5173/#/profe` en la computadora conectada al proyector. Sin alumnos, agrega **bots de práctica** desde la barra inferior para ver la misión completa.
 
-> Los celulares no pueden abrir `localhost`. Para jugar en un salón, publica la app (ver abajo) o abre IXCHEL con la IP de tu red local (`npm run dev` muestra la dirección `Network`). La cámara y la instalación como app requieren HTTPS.
+> Los celulares no pueden abrir `localhost`. Para jugar en un salón, publica la app (ver abajo) o abre el Taller de Don Rover con la IP de tu red local (`npm run dev` muestra la dirección `Network`). La cámara y la instalación como app requieren HTTPS.
 
 ## Publicar
 
@@ -84,4 +84,4 @@ React + TypeScript + Vite · PeerJS (WebRTC) · TensorFlow.js · Claude API (opc
 
 - Los datos científicos se basan en publicaciones de la NASA. Los porcentajes de la colonia son valores de juego.
 - La señal de la misión *The Unknown Signal* es un recurso ficticio de la historia, no una afirmación sobre señales extraterrestres reales.
-- Ixchel es la diosa maya de la Luna y del tejido: cada tripulación es un hilo y, juntas, forman la colonia.
+- Don Rover es el rover que recorre la colonia MARS-01: el taller donde cada clase aprende a sobrevivir en Marte.

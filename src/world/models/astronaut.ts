@@ -1,4 +1,4 @@
-// Astronauta 3D de IXCHEL. Es el mismo personaje que cada alumno arma en su celular (traje,
+// Astronauta 3D del Taller de Don Rover. Es el mismo personaje que cada alumno arma en su celular (traje,
 // casco, visor y accesorio) llevado a 3D, con un esqueleto de articulaciones para animarlo:
 //
 //   root ─ body ─ hips ─┬─ legL / legR

@@ -31,7 +31,7 @@ export function loadDetector(): Promise<Detector> {
   return loading;
 }
 
-/** Objetos de COCO que IXCHEL sabe convertir en misiones. */
+/** Objetos de COCO que el juego sabe convertir en misiones. */
 export const COCO_MAP: Record<string, [CategoryId, string]> = {
   'potted plant': ['plant', 'Planta en maceta'],
   broccoli: ['plant', 'Brócoli'],

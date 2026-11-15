@@ -1,10 +1,10 @@
-// Capa de IA de IXCHEL con Claude, ejecutada directamente desde el navegador del profesor.
+// Capa de IA del Taller de Don Rover con Claude, ejecutada directamente desde el navegador del profesor.
 //
 // Principio de diseño: "la IA narra, el motor decide". Claude clasifica la foto del escáner,
 // personaliza la narrativa, evalúa las bitácoras y redacta el debrief, siempre con salidas
 // estructuradas (JSON Schema). Recursos, consecuencias y puntajes los calcula el motor.
 // La clave de API la escribe el profesor y se guarda solo en su navegador; sin clave,
-// IXCHEL usa visión local (TensorFlow.js) y plantillas.
+// el juego usa visión local (TensorFlow.js) y plantillas.
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { CategoryId, ScanResult } from '../../shared/types';
@@ -92,7 +92,7 @@ async function structured<T>(system: string, content: Content, schema: Record<st
     return validate(JSON.parse(text));
   } catch (err) {
     if (err instanceof mod.default.AuthenticationError || err instanceof mod.default.PermissionDeniedError) {
-      console.warn('[ai] la clave no es válida; IXCHEL seguirá con IA local y plantillas.');
+      console.warn('[ai] la clave no es válida; el Taller de Don Rover seguirá con IA local y plantillas.');
       disabledKey = clientKey;
     } else if (err instanceof mod.default.RateLimitError) {
       console.warn('[ai] límite de uso alcanzado; se usan plantillas.');
@@ -112,7 +112,7 @@ const obj = (x: unknown) => (x && typeof x === 'object' ? (x as Record<string, u
 /* 1 · Escáner del mundo                                                */
 /* ------------------------------------------------------------------ */
 
-const SCAN_SYSTEM = `Eres IX, la inteligencia artificial de IXCHEL, un juego educativo de misiones espaciales para salones de clase (niñas y niños de 7 a 14 años).
+const SCAN_SYSTEM = `Eres IX, la inteligencia artificial del Taller de Don Rover, un juego educativo de misiones espaciales para salones de clase (niñas y niños de 7 a 14 años).
 Tu tarea: identificar el objeto principal de la foto y clasificarlo en UNA categoría:
 - plant: plantas, flores, hojas, árboles, frutas, verduras, semillas
 - water: botellas, vasos, tazas, termos, agua, recipientes para líquidos, llaves o lavabos
@@ -200,7 +200,7 @@ const NARRATIVE_SCHEMA = {
 };
 
 export async function generateNarrative(input: NarrativeInput): Promise<Narrative | null> {
-  const system = `Eres IX, la IA narradora de IXCHEL, un videojuego cooperativo de misiones espaciales para el salón de clases.
+  const system = `Eres IX, la IA narradora del Taller de Don Rover, un videojuego cooperativo de misiones espaciales para el salón de clases.
 Escribe en español de México, con tono de videojuego: urgente, emocionante y amable, para niñas y niños de ${input.ageGroup}.
 Reglas estrictas:
 - No inventes números, porcentajes, datos científicos nuevos ni reglas: el motor del juego controla recursos y consecuencias.
@@ -265,7 +265,7 @@ const LOG_SCHEMA = {
 
 export async function scoreLogs(missionTitle: string, ageGroup: string, logs: LogInput[]): Promise<Record<string, LogScore> | null> {
   if (!logs.length) return {};
-  const system = `Eres IX, la IA de IXCHEL. Evalúas bitácoras breves escritas por tripulaciones de niñas y niños (${ageGroup}) que explican su decisión en la misión "${missionTitle}".
+  const system = `Eres IX, la IA del Taller de Don Rover. Evalúas bitácoras breves escritas por tripulaciones de niñas y niños (${ageGroup}) que explican su decisión en la misión "${missionTitle}".
 Califica de 1 a 3 estrellas el razonamiento y la creatividad: 3 = explica con datos de su tripulación o propone una idea original; 2 = explica algo con sentido; 1 = muy breve o sin relación.
 Si el texto es ofensivo, inapropiado o contiene datos personales, marca appropriate=false y da 1 estrella.
 "comment": retroalimentación amable y específica en español, máximo 18 palabras, dirigida a la tripulación. No reveles cuál era la respuesta correcta.`;
@@ -326,7 +326,7 @@ const DEBRIEF_SCHEMA = {
 };
 
 export async function generateDebrief(input: DebriefInput): Promise<DebriefOut | null> {
-  const system = `Eres IX, la IA de IXCHEL. Escribe el debrief final de la misión para proyectarlo en el salón.
+  const system = `Eres IX, la IA del Taller de Don Rover. Escribe el debrief final de la misión para proyectarlo en el salón.
 Español claro y cálido para niñas y niños de ${input.ageGroup}. Usa SOLO la información proporcionada: no inventes cifras ni datos científicos nuevos.
 - "headline": máximo 10 palabras.
 - "learnings": exactamente 3 ideas clave (máximo 28 palabras cada una), basadas en los objetivos de aprendizaje y en lo que pasó en la colonia.

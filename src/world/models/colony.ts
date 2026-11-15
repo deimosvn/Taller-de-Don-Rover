@@ -1,6 +1,6 @@
 // Modelos de la colonia MARS-01: el centro de mando, los ocho sectores (cada uno con su
 // propio diseño), la plataforma de abordaje con su nave, los edificios que la clase
-// desbloquea, las torres de la Ciudad IXCHEL y los hallazgos del terreno.
+// desbloquea, las torres de la Ciudad Don Rover y los hallazgos del terreno.
 //
 // Todos los modelos miran hacia +Z (el hub, en el caso de los sectores) y apoyan en y = 0.
 // Las piezas grandes llevan un "faldón" bajo el suelo porque el planeta es diminuto y el
@@ -910,7 +910,7 @@ export function buildBuilding(id: Exclude<BuildingId, 'city'>) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Ciudad IXCHEL                                                        */
+/* Ciudad Don Rover                                                        */
 /* ------------------------------------------------------------------ */
 
 export function buildCityTower(ctx: BuildContext, params: Record<string, unknown>): BuiltModel {

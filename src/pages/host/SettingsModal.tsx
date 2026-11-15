@@ -24,7 +24,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </h3>
           <p className="muted">
             Con una clave de API, IX usa Claude para reconocer cualquier objeto del escáner, personalizar la historia, evaluar las bitácoras y escribir el
-            debrief. Sin clave, IXCHEL funciona igual: visión local en este dispositivo y narrativas de plantilla.
+            debrief. Sin clave, el taller funciona igual: visión local en este dispositivo y narrativas de plantilla.
           </p>
           <div className="field">
             <label htmlFor="apikey">Clave de API de Anthropic</label>
@@ -85,12 +85,12 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               value={s.joinBase}
               onChange={(e) => setS({ ...s, joinBase: e.target.value })}
             />
-            <p className="fine">Déjalo vacío para usar esta misma página. Si abriste IXCHEL como “localhost”, escribe aquí la dirección publicada (HTTPS).</p>
+            <p className="fine">Déjalo vacío para usar esta misma página. Si abriste el taller como “localhost”, escribe aquí la dirección publicada (HTTPS).</p>
           </div>
           <details>
             <summary>Servidor de señalización propio (avanzado)</summary>
             <p className="fine">
-              Por defecto IXCHEL usa el servidor público gratuito de PeerJS solo para presentar a los dispositivos; el juego viaja directo entre ellos. Si tu
+              Por defecto el taller usa el servidor público gratuito de PeerJS solo para presentar a los dispositivos; el juego viaja directo entre ellos. Si tu
               escuela tiene su propio PeerServer, configúralo aquí.
             </p>
             <div className="grid2">

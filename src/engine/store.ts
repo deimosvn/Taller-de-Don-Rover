@@ -85,7 +85,7 @@ export function exportColony(colony: ColonyState) {
 export async function importColony(file: File): Promise<ColonyState> {
   const data = JSON.parse(await file.text());
   const c = (data?.colony ?? data) as ColonyState;
-  if (!c || typeof c.id !== 'string' || !c.meters || !c.sectors) throw new Error('El archivo no es una colonia de IXCHEL.');
+  if (!c || typeof c.id !== 'string' || !c.meters || !c.sectors) throw new Error('El archivo no es una colonia del Taller de Don Rover.');
   saveColony(c);
   return c;
 }

@@ -54,7 +54,7 @@
   color: var(--ink);
   background: #fff;
   text-transform: uppercase;
-  box-shadow: inset 0 4px 0 rgba(33, 26, 74, 0.08);
+  box-shadow: inset 0 4px 0 rgba(52, 22, 16, 0.08);
   outline: none;
 }
 .code-input:focus {
@@ -78,7 +78,7 @@
   flex-direction: column;
   background:
     radial-gradient(120% 55% at 50% -12%, color-mix(in srgb, var(--rc, #3b48b0) 42%, transparent), transparent 72%),
-    linear-gradient(180deg, #0b0f38, #080b2c);
+    linear-gradient(180deg, #2b100b, #1f0b08);
 }
 .play-top {
   position: sticky;
@@ -89,7 +89,7 @@
   align-items: center;
   gap: 10px;
   padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
-  background: rgba(5, 7, 31, 0.74);
+  background: rgba(26, 9, 7, 0.74);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 2px solid color-mix(in srgb, var(--rc, #ffffff) 45%, transparent);
@@ -287,7 +287,7 @@
   background: rgba(255, 255, 255, 0.6);
   border-radius: 12px;
   padding: 6px 10px;
-  border: 2px solid rgba(33, 26, 74, 0.2);
+  border: 2px solid rgba(52, 22, 16, 0.2);
   font-size: 0.92rem;
 }
 .role-extra {
@@ -637,7 +637,7 @@
   gap: 10px;
   padding: 7px 10px;
   border-radius: 10px;
-  background: rgba(33, 26, 74, 0.05);
+  background: rgba(52, 22, 16, 0.05);
   font-weight: 700;
 }
 .intel-lines li b {
@@ -1117,7 +1117,7 @@
 .xp-track {
   height: 12px;
   border-radius: 999px;
-  background: rgba(33, 26, 74, 0.1);
+  background: rgba(52, 22, 16, 0.1);
   border: 2px solid var(--ink);
   overflow: hidden;
 }
@@ -1167,7 +1167,7 @@
   place-items: center;
   padding: 10px 0 2px;
   border-radius: 22px;
-  background: radial-gradient(circle at 50% 30%, #2a348f, #0b0f38);
+  background: radial-gradient(circle at 50% 30%, #8a3a22, #2b100b);
   border: 3px solid var(--ink);
 }
 .ab-platform {
@@ -1233,7 +1233,7 @@
   gap: 2px;
   padding: 6px 4px;
   border-radius: 14px;
-  border: 2.5px solid rgba(33, 26, 74, 0.18);
+  border: 2.5px solid rgba(52, 22, 16, 0.18);
   background: #fff;
   cursor: pointer;
   font: inherit;

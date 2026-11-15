@@ -3,12 +3,15 @@
 // 2) Si hay clave, Claude analiza la foto con visión multimodal.
 // 3) Alternativas: subir foto, votación de la clase o elegir la misión.
 
-import { useEffect, useRef, useState } from 'react';
-import { CATEGORIES, CATEGORY_LINES, MISSIONS, MISSION_ORDER, SCAN_CATEGORIES } from '../../../shared/content';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { CATEGORIES, CATEGORY_LINES, MISSIONS, MISSION_ORDER, ROLE_ORDER, SCAN_CATEGORIES } from '../../../shared/content';
 import type { CategoryId, HostView, MissionId, ScanResult } from '../../../shared/types';
 import { aiStatus, classifyImage } from '../../engine/ai';
 import { brightFraction, categorize, labelFor, loadDetector, type Prediction } from '../../engine/vision';
-import { IXOrb, MissionPatch } from '../../components/art';
+import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
+import { MISSION_ZONE, ROLE_AVATARS } from '../../world/react/missionZones';
+import { PlanetView } from '../../world/react/PlanetView';
+import { useHostSnapshot } from '../../world/react/useHostSnapshot';
 import { Icon } from '../../components/ui';
 import { sfx } from '../../lib/sound';
 import type { Run } from './Console';
@@ -107,7 +110,7 @@ function CameraScan({ onCapture }: { onCapture: (c: HTMLCanvasElement) => void }
         const tw = ctx.measureText(label).width + 14 * devicePixelRatio;
         ctx.fillStyle = '#FFC93C';
         ctx.fillRect(bx, by - 24 * devicePixelRatio, tw, 22 * devicePixelRatio);
-        ctx.fillStyle = '#211A4A';
+        ctx.fillStyle = '#2a120d';
         ctx.fillText(label, bx + 7 * devicePixelRatio, by - 8 * devicePixelRatio);
       }
     };
@@ -153,7 +156,7 @@ function CameraScan({ onCapture }: { onCapture: (c: HTMLCanvasElement) => void }
           <i className="c3" />
           <i className="c4" />
           <div className="sweep" />
-          <span className="hud-title">IXCHEL AI SCANNER</span>
+          <span className="hud-title">DON ROVER AI SCANNER</span>
           <span className="hud-status">
             {det === 'loading' ? 'cargando visión local…' : det === 'ready' ? (seen ? `detectando: ${seen}` : 'apunta a un objeto') : 'visión local no disponible'}
           </span>
@@ -273,21 +276,62 @@ function VoteScan({ view, run, onWinner }: { view: HostView; run: Run; onWinner:
 
 function MissionPick({ view, run }: { view: HostView; run: Run }) {
   const done = new Set(view.colony.missions.map((m) => m.id));
+  const [picked, setPicked] = useState<MissionId>(() => MISSION_ORDER.find((id) => !done.has(id)) ?? 'greenhouse');
+  const snapshot = useHostSnapshot(view);
+  const m = MISSIONS[picked];
+  const locked = (id: MissionId) => id === 'final' && !view.finalUnlocked;
   return (
     <div className="mission-pick">
-      {MISSION_ORDER.map((id) => {
-        const m = MISSIONS[id];
-        const locked = id === 'final' && !view.finalUnlocked;
-        return (
-          <button key={id} className={`mp card ${locked ? 'locked' : ''}`} disabled={locked} onClick={() => run({ type: 'chooseMission', missionId: id })}>
-            <MissionPatch id={id} size={112} locked={locked} />
-            <b>{m.title}</b>
-            <small>{m.titleEs}</small>
-            {done.has(id) && <span className="chip dark ok">✓ completada</span>}
-            {locked && <span className="chip dark">Completa 3 misiones</span>}
-          </button>
-        );
-      })}
+      <div className="mp-world" style={{ '--mc': m.color } as CSSProperties}>
+        <PlanetView snapshot={snapshot} focus={MISSION_ZONE[picked]} autoRotate={false} className="stage-planet" />
+        <div className="mp-world-tag">
+          <span className="mono">{m.code}</span> {m.titleEs}
+        </div>
+        <div className="mp-crew" aria-hidden="true">
+          <IXOrb size={96} mood="talk" />
+          {ROLE_ORDER.map((r, i) => (
+            <Astronaut key={r} avatar={ROLE_AVATARS[r]} role={r} size={86} pose={i % 2 ? 'wave' : 'idle'} />
+          ))}
+        </div>
+      </div>
+      <div className="mp-side">
+        <div className="mp-list">
+          {MISSION_ORDER.map((id) => {
+            const mm = MISSIONS[id];
+            const lock = locked(id);
+            return (
+              <button
+                key={id}
+                className={`mp ${picked === id ? 'on' : ''} ${lock ? 'locked' : ''}`}
+                style={{ '--mc': mm.color } as CSSProperties}
+                onClick={() => setPicked(id)}
+              >
+                <MissionPatch id={id} size={62} locked={lock} live={picked === id} />
+                <span>
+                  <b>{mm.title}</b>
+                  <small>{mm.titleEs}</small>
+                  {done.has(id) && <i className="mp-done">✓ completada</i>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <article className="mp-detail card" style={{ '--mc': m.color } as CSSProperties}>
+          <p className="eyebrow dark">{m.code} · {m.learning.join(' · ')}</p>
+          <h3>{m.title}</h3>
+          <p>{m.hook}</p>
+          <p className="fine">
+            <b>Objetivo:</b> {m.objective}
+          </p>
+          {locked(picked) ? (
+            <span className="chip dark">🔒 Completa 3 misiones distintas para desbloquearla</span>
+          ) : (
+            <button className="btn big food" onClick={() => run({ type: 'chooseMission', missionId: picked })}>
+              Iniciar esta misión 🚀
+            </button>
+          )}
+        </article>
+      </div>
     </div>
   );
 }
@@ -330,7 +374,7 @@ function ScanReveal({ analysis, onStart, onReset, onFix }: { analysis: Analysis;
     <div className="reveal">
       <div className="reveal-scan card">
         <div className="reveal-head">
-          <span className="eyebrow dark">IXCHEL AI scanner</span>
+          <span className="eyebrow dark">Escáner IA de Don Rover</span>
           {s && <span className="chip dark">{SOURCE_LABEL[s.source]}</span>}
         </div>
         <div className="reveal-body">
@@ -386,7 +430,7 @@ function ScanReveal({ analysis, onStart, onReset, onFix }: { analysis: Analysis;
       {analysis.status === 'done' && s && (
         <div className="reveal-mission card">
           <p className="eyebrow dark">New mission unlocked</p>
-          {missionId ? <MissionPatch id={missionId} size={140} /> : <div className="mystery-patch">❔</div>}
+          {missionId ? <MissionPatch id={missionId} size={140} live /> : <div className="mystery-patch">❔</div>}
           <h2>{missionId ? MISSIONS[missionId].title : 'MISIÓN SORPRESA'}</h2>
           <p>{missionId ? MISSIONS[missionId].titleEs : 'IX elegirá una misión que la colonia aún no ha jugado'}</p>
           <p className="fine">{CATEGORIES[cat].unlocks}</p>

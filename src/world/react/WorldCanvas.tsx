@@ -48,7 +48,7 @@ export function WorldCanvas({ snapshot, options, interactive = true, keyboard = 
       })
       .catch((err) => {
         if (cancelled) return;
-        console.warn('[IXCHEL] El mundo 3D no pudo iniciarse:', err);
+        console.warn('[Don Rover] El mundo 3D no pudo iniciarse:', err);
         latest.current.onFail?.();
       });
     return () => {

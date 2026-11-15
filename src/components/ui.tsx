@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { PHASE_FLOW, PHASE_LABELS, ROLES, SYSTEMS } from '../../shared/content';
 import type { Phase, RoleId, SystemId } from '../../shared/types';
 import { fmtTime, remaining, useTicker } from '../lib/clock';
+import { DonRover } from './art';
 
 /* ---------------- íconos ---------------- */
 
@@ -77,30 +78,23 @@ export function Icon({ name, size = 22, stroke = 2.4, className = '', style }: {
 
 export function LogoMark({ size = 44 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" className="logo-mark">
-      <circle cx="32" cy="32" r="30" fill="#151A5C" stroke="#211A4A" strokeWidth="3" />
-      <mask id="ixlogo-cres">
-        <rect width="64" height="64" fill="#fff" />
-        <circle cx="38" cy="25" r="17" fill="#000" />
-      </mask>
-      <circle cx="29" cy="33" r="20" fill="#FFF1D6" mask="url(#ixlogo-cres)" />
-      <ellipse cx="43" cy="41" rx="11" ry="3.6" fill="none" stroke="#3CC8FF" strokeWidth="2.4" />
-      <circle cx="43" cy="41" r="6.5" fill="#E86A3A" />
-      <path d="M32.5 41.8a11 3.6 0 0 0 21 0" fill="none" stroke="#55DB7A" strokeWidth="2.4" />
-    </svg>
+    <span className="logo-mark" style={{ width: size, height: size }} aria-hidden="true">
+      <DonRover size={size * 1.08} />
+    </span>
   );
 }
 
 export function Logo({ size = 'md', sub = true }: { size?: 'sm' | 'md' | 'lg' | 'xl'; sub?: boolean }) {
-  const mark = { sm: 34, md: 44, lg: 64, xl: 92 }[size];
+  const mark = { sm: 40, md: 52, lg: 74, xl: 110 }[size];
   return (
     <div className={`logo logo-${size}`}>
       <LogoMark size={mark} />
       <div className="logo-text">
+        <span className="logo-pre">Taller de</span>
         <span className="logo-word">
-          I<span className="logo-x">X</span>CHEL
+          Don <span className="logo-x">Rover</span>
         </span>
-        {sub && <span className="logo-sub">The Classroom Space Mission</span>}
+        {sub && <span className="logo-sub">Misiones en Marte para tu salón</span>}
       </div>
     </div>
   );
@@ -180,7 +174,7 @@ export function Countdown({
   return (
     <div className={`countdown ${urgent ? 'is-urgent' : ''} ${paused ? 'is-paused' : ''}`} style={{ width: size, height: size }} role="timer" aria-label={`Quedan ${fmtTime(ms)}`}>
       <svg viewBox="0 0 100 100" width={size} height={size}>
-        <circle cx="50" cy="50" r={r} fill="rgba(11,15,56,.75)" stroke="rgba(255,255,255,.12)" strokeWidth="9" />
+        <circle cx="50" cy="50" r={r} fill="rgba(43, 16, 11,.75)" stroke="rgba(255,255,255,.12)" strokeWidth="9" />
         <circle
           cx="50"
           cy="50"
@@ -209,7 +203,7 @@ export function QR({ value, size = 220 }: { value: string; size?: number }) {
   const [svg, setSvg] = useState('');
   useEffect(() => {
     let alive = true;
-    QRCode.toString(value, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#211A4A', light: '#FFFFFF' } })
+    QRCode.toString(value, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#2a120d', light: '#FFFFFF' } })
       .then((s) => alive && setSvg(s))
       .catch(() => alive && setSvg(''));
     return () => {

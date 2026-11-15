@@ -106,7 +106,7 @@ export function Setup({
             <input
               id="classname"
               className="input big-input"
-              placeholder="Ej. 5° B · Escuela Ixchel"
+              placeholder="Ej. 5° B · Escuela Marte"
               maxLength={32}
               value={className}
               onChange={(e) => setClassName(e.target.value)}

@@ -1,15 +1,15 @@
 /* ==========================================================================
-   IXCHEL · sistema visual
+   Taller de Don Rover · sistema visual
    Noche espacial + Marte terracota + colores de juguete para los 4 roles.
    Estilo "sticker": bordes gruesos de tinta, sombras sólidas y formas redondas.
    ========================================================================== */
 
 :root {
-  --night-950: #05071f;
-  --night-900: #0b0f38;
-  --night-800: #121852;
-  --night-700: #1c2470;
-  --night-600: #2a348f;
+  --night-950: #170806;
+  --night-900: #2b100b;
+  --night-800: #3d170f;
+  --night-700: #5a2216;
+  --night-600: #8a3a22;
   --mars-800: #6e2412;
   --mars-700: #9c3b22;
   --mars-600: #c2512e;
@@ -20,8 +20,8 @@
   --sand-100: #fff1e2;
   --moon: #fff4dc;
   --cream: #fff8ec;
-  --ink: #211a4a;
-  --ink-soft: #4b4675;
+  --ink: #2a120d;
+  --ink-soft: #6b3f33;
   --energy: #ffc93c;
   --water: #3cc8ff;
   --food: #55db7a;
@@ -112,33 +112,43 @@ svg {
 
 .space-bg {
   background:
-    radial-gradient(1100px 620px at 12% -12%, #2e3395 0%, transparent 60%),
-    radial-gradient(900px 520px at 108% 4%, #4b2276 0%, transparent 58%),
-    radial-gradient(800px 500px at 50% 120%, #7a2e1f 0%, transparent 60%),
-    linear-gradient(180deg, #0b0f38 0%, #080b2c 100%);
+    radial-gradient(1200px 700px at 85% -15%, rgba(255, 196, 140, 0.42) 0%, transparent 60%),
+    radial-gradient(900px 560px at -10% 10%, #8a3320 0%, transparent 62%),
+    radial-gradient(1000px 520px at 50% 125%, #c2512e 0%, transparent 62%),
+    linear-gradient(180deg, #4a1a0f 0%, #2b100b 55%, #1f0b08 100%);
 }
 
+/* Polvo marciano suspendido (sustituye al campo de estrellas). */
 .starfield {
   position: fixed;
   inset: -50px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.7;
+  opacity: 0.55;
   background-image:
-    radial-gradient(1.4px 1.4px at 24px 38px, #fff 50%, transparent 52%),
-    radial-gradient(1px 1px at 140px 90px, #fff4dc 50%, transparent 52%),
-    radial-gradient(1.6px 1.6px at 210px 170px, #c9d6ff 50%, transparent 52%),
-    radial-gradient(1px 1px at 70px 210px, #fff 50%, transparent 52%),
-    radial-gradient(1.2px 1.2px at 260px 40px, #ffe3c8 50%, transparent 52%),
-    radial-gradient(1px 1px at 180px 260px, #fff 50%, transparent 52%);
+    radial-gradient(2px 2px at 24px 38px, #ffd9b5 50%, transparent 55%),
+    radial-gradient(1.4px 1.4px at 140px 90px, #f6ae7e 50%, transparent 55%),
+    radial-gradient(2.4px 2.4px at 210px 170px, rgba(255, 228, 200, 0.8) 50%, transparent 55%),
+    radial-gradient(1.2px 1.2px at 70px 210px, #ffe3c8 50%, transparent 55%),
+    radial-gradient(1.8px 1.8px at 260px 40px, #f08a57 50%, transparent 55%),
+    radial-gradient(1.2px 1.2px at 180px 260px, #fff1e2 50%, transparent 55%);
   background-size: 290px 290px;
-  animation: drift 160s linear infinite;
+  animation: dust-drift 90s linear infinite;
 }
 
 .starfield.far {
-  opacity: 0.35;
+  opacity: 0.3;
   background-size: 180px 180px;
-  animation-duration: 260s;
+  animation-duration: 140s;
+}
+
+@keyframes dust-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 580px -290px;
+  }
 }
 
 /* ---------------- botones ---------------- */
@@ -262,8 +272,8 @@ svg {
   background: rgba(255, 255, 255, 0.16);
 }
 .icon-btn.dark {
-  border-color: rgba(33, 26, 74, 0.25);
-  background: rgba(33, 26, 74, 0.06);
+  border-color: rgba(52, 22, 16, 0.25);
+  background: rgba(52, 22, 16, 0.06);
   color: var(--ink);
 }
 
@@ -301,7 +311,7 @@ svg {
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ix);
+  color: var(--mars-300);
 }
 
 .chip {
@@ -317,8 +327,8 @@ svg {
   white-space: nowrap;
 }
 .chip.dark {
-  background: rgba(33, 26, 74, 0.08);
-  border-color: rgba(33, 26, 74, 0.2);
+  background: rgba(52, 22, 16, 0.08);
+  border-color: rgba(52, 22, 16, 0.2);
   color: var(--ink);
 }
 .chip.ok {
@@ -364,7 +374,7 @@ svg {
 
 .stars {
   letter-spacing: 0.06em;
-  color: rgba(33, 26, 74, 0.22);
+  color: rgba(52, 22, 16, 0.22);
   font-size: 1.1em;
 }
 .stars .on {
@@ -384,25 +394,34 @@ svg {
   flex-direction: column;
   line-height: 1;
 }
+.logo-pre {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sand-200);
+  margin-bottom: 0.15em;
+}
+.logo-xl .logo-pre {
+  font-size: clamp(1rem, 2vw, 1.4rem);
+}
 .logo-word {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.7rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   color: var(--moon);
 }
 .logo-x {
-  background: linear-gradient(135deg, var(--energy) 0 25%, var(--water) 25% 50%, var(--food) 50% 75%, var(--habitat) 75%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--mars-400);
 }
 .logo-sub {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--ix);
+  color: var(--sand-200);
   margin-top: 0.3em;
 }
 .logo-sm .logo-word {
@@ -615,7 +634,7 @@ svg {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(5, 7, 31, 0.72);
+  background: rgba(26, 9, 7, 0.72);
   backdrop-filter: blur(6px);
   display: grid;
   place-items: center;
@@ -667,7 +686,7 @@ svg {
   border-radius: 14px;
   padding: 0.7em 0.85em;
   outline: none;
-  box-shadow: inset 0 3px 0 rgba(33, 26, 74, 0.08);
+  box-shadow: inset 0 3px 0 rgba(52, 22, 16, 0.08);
 }
 .input:focus {
   border-color: var(--ix-deep);
@@ -688,128 +707,77 @@ textarea.input {
   gap: 0.6rem;
 }
 
-/* ---------------- arte SVG ---------------- */
+/* ---------------- modelos 3D ---------------- */
 
-.astro {
-  overflow: visible;
+.model3d {
+  display: block;
+  flex: none;
+  max-width: 100%;
 }
-.astro .eye {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: blink 4.6s infinite;
+.model3d.is-draggable {
+  cursor: grab;
+  touch-action: pan-y;
 }
-.astro-idle .astro-all {
-  animation: bob 3.2s ease-in-out infinite;
-}
-.astro-cheer .astro-all {
-  animation: hop 0.55s ease-in-out infinite alternate;
-}
-.astro-wave .arm-r {
-  transform-box: fill-box;
-  transform-origin: 30% 8%;
-  animation: wave 1.1s ease-in-out infinite;
-}
-.astro-wave .astro-all {
-  animation: bob 3.2s ease-in-out infinite;
-}
-.astro .acc-antenna,
-.astro .acc-sprout {
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: sway 2.4s ease-in-out infinite;
+.model3d.is-draggable:active {
+  cursor: grabbing;
 }
 
-.ix-orb {
-  overflow: visible;
-  animation: bob 4s ease-in-out infinite;
-}
-.ix-orb .eye {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: blink 5s infinite;
-}
-.ix-orb .ix-halo {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: breathe 3s ease-in-out infinite;
-}
-.ix-orb .ix-sat {
-  transform-origin: 60px 60px;
-  animation: spin 7s linear infinite;
-}
-.ix-talk .ix-mouth {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: talk 0.22s ease-in-out infinite alternate;
-}
-.ix-alert {
-  animation: shake 0.5s ease-in-out infinite;
-}
-
+/* Insignia de misión: el edificio que desbloquea, en 3D, dentro de un sello del color de la misión. */
 .patch {
-  overflow: visible;
-  filter: drop-shadow(0 6px 0 rgba(10, 8, 40, 0.55));
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 78%, color-mix(in srgb, var(--mc) 70%, #f3935c) 0%, color-mix(in srgb, var(--mc) 30%, #fbd9b5) 62%, #fff1e2 100%);
+  border: max(2px, 0.03em) solid var(--ink);
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 248, 236, 0.6),
+    0 4px 0 var(--ink);
+  overflow: hidden;
 }
-.patch-locked {
-  filter: grayscale(0.85) drop-shadow(0 6px 0 rgba(10, 8, 40, 0.55));
+.patch-model {
+  position: relative;
+  z-index: 1;
+}
+.patch-code {
+  position: absolute;
+  bottom: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--cream);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+.patch-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  font-size: 1.6rem;
+  background: rgba(43, 16, 11, 0.45);
+}
+.patch-locked .patch-model {
+  filter: grayscale(0.9) brightness(0.8);
 }
 
-.colony-map {
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius-lg);
-}
-.colony-map .map-flow {
-  animation: flow 1.6s linear infinite;
-}
-.colony-map .map-blink {
-  animation: twinkle 1.3s ease-in-out infinite;
-}
-.colony-map .map-stars circle {
-  animation: twinkle 3.4s ease-in-out infinite;
-}
-.colony-map .map-bubbles {
-  animation: rise 2.4s ease-out infinite;
-}
-.colony-map .map-smoke circle {
-  opacity: 0.55;
-  animation: rise 2.2s ease-out infinite;
-}
-.colony-map .map-smoke circle:nth-child(2) {
-  animation-delay: 0.5s;
-}
-.colony-map .map-smoke circle:nth-child(3) {
-  animation-delay: 1s;
-}
-.colony-map .map-pulse,
-.colony-map .map-glow {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: breathe 1.8s ease-in-out infinite;
-}
-.colony-map .map-twinkle {
-  animation: twinkle 1.6s ease-in-out infinite;
-}
-.colony-map .is-auto {
-  opacity: 0.6;
-  filter: saturate(0.45);
-}
-.colony-map .map-new {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation:
-    popIn 0.6s both,
-    bob 2s 0.6s ease-in-out infinite;
-}
-.colony-map .is-new {
-  animation: glowPulse 1.6s ease-in-out infinite;
-}
-.colony-map .map-dust {
-  animation: dust 0.9s linear infinite;
-}
-.colony-map.is-storm .map-sector,
-.colony-map.is-storm .map-hub {
-  filter: saturate(0.75) brightness(0.92);
+.logo-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 70%, #f08a57 0%, #c2512e 70%, #9c3b22 100%);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  overflow: hidden;
 }
 
 /* ---------------- utilidades ---------------- */

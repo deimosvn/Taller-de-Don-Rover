@@ -202,7 +202,7 @@ export const BUILDINGS: Record<BuildingId, { name: string; desc: string; emoji: 
   reactor: { name: 'Reactor compacto', desc: 'Energía estable aunque no haya Sol.', emoji: '⚛️', missionId: 'darkness' },
   antenna: { name: 'Antena de espacio profundo', desc: 'Comunicación directa con la Tierra.', emoji: '📡', missionId: 'signal' },
   module: { name: 'Módulo impreso en 3D', desc: 'Un nuevo hogar hecho con regolito.', emoji: '🏗️', missionId: 'habitat' },
-  city: { name: 'Ciudad IXCHEL', desc: 'La colonia es autosuficiente. ¡Rumbo a la Luna!', emoji: '🌙', missionId: 'final' },
+  city: { name: 'Ciudad Don Rover', desc: 'La colonia es autosuficiente. ¡Rumbo a la Luna!', emoji: '🌙', missionId: 'final' },
 };
 
 /* ------------------------------------------------------------------ */

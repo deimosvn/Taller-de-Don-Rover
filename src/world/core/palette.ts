@@ -3,7 +3,7 @@
 // La referencia es un "planeta diminuto": formas redondas y blandas, color plano con
 // degradados suaves, manchas circulares claras sobre el suelo, transiciones difuminadas
 // entre zonas, cielo luminoso que palidece hacia el horizonte y sombras teñidas (nunca negras).
-// Aquí ese mismo tratamiento se traduce a Marte usando los tonos que IXCHEL ya define en
+// Aquí ese mismo tratamiento se traduce a Marte usando los tonos que el taller ya define en
 // global.css (--mars-*, --sand-*, colores de los cuatro sistemas, tinta y crema).
 //
 //   Referencia (Tierra)            →  MARS-01
@@ -11,7 +11,7 @@
 //   claros amarillos al sol        →  campos de dunas ocre
 //   estanques azules difuminados   →  llanuras de basalto + placas de hielo celeste
 //   piedras grises moteadas        →  roca malva-óxido con estratos
-//   cielo cian → blanco menta      →  cielo durazno → crema (día) / noche IXCHEL (atardecer)
+//   cielo cian → blanco menta      →  cielo durazno → crema (día) / noche marciana (atardecer)
 //   sombras oliva                  →  sombras ciruela
 
 export const INK = '#211A4A';

@@ -100,7 +100,7 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 2.5px solid rgba(33, 26, 74, 0.16);
+  border: 2.5px solid rgba(52, 22, 16, 0.16);
   background: #fff;
   text-align: left;
   cursor: pointer;
@@ -158,7 +158,7 @@
 .opt {
   padding: 12px;
   border-radius: 14px;
-  border: 2.5px solid rgba(33, 26, 74, 0.16);
+  border: 2.5px solid rgba(52, 22, 16, 0.16);
   background: #fff;
   cursor: pointer;
   text-align: left;
@@ -219,7 +219,7 @@
   gap: 16px;
   padding: 10px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(5, 7, 31, 0.7), rgba(5, 7, 31, 0.2));
+  background: linear-gradient(180deg, rgba(26, 9, 7, 0.7), rgba(26, 9, 7, 0.2));
 }
 .mission-chip {
   display: flex;
@@ -487,7 +487,7 @@
   gap: 12px;
   padding: 10px 20px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 7, 31, 0.6);
+  background: rgba(26, 9, 7, 0.6);
   backdrop-filter: blur(8px);
 }
 .dock-left,
@@ -582,8 +582,8 @@
 .btn.dark-ghost {
   color: var(--ink);
   background: transparent;
-  border-color: rgba(33, 26, 74, 0.3);
-  box-shadow: 0 3px 0 rgba(33, 26, 74, 0.25);
+  border-color: rgba(52, 22, 16, 0.3);
+  box-shadow: 0 3px 0 rgba(52, 22, 16, 0.25);
 }
 button.chip {
   cursor: pointer;
@@ -670,6 +670,15 @@ button.chip {
   opacity: 0.85;
   margin-top: 4px;
 }
+.lobby-empty .landing-pad {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  max-height: 46%;
+  background: linear-gradient(0deg, rgba(43, 16, 11, 0.7), rgba(43, 16, 11, 0.25));
+  backdrop-filter: blur(4px);
+}
 .landing-pad {
   flex: 1;
   display: grid;
@@ -725,6 +734,10 @@ button.chip {
 }
 .lobby-empty {
   position: relative;
+  height: clamp(320px, 54vh, 600px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
 }
 .lobby-empty-tip {
   position: absolute;
@@ -737,7 +750,7 @@ button.chip {
   padding: 12px 14px;
   max-width: 580px;
   font-weight: 600;
-  background: rgba(11, 15, 56, 0.78);
+  background: rgba(43, 16, 11, 0.78);
 }
 
 /* ---------------- tripulaciones ---------------- */
@@ -900,7 +913,7 @@ button.chip {
   transform: translateX(-50%);
   font-family: var(--font-mono);
   font-weight: 700;
-  background: rgba(33, 26, 74, 0.78);
+  background: rgba(52, 22, 16, 0.78);
   padding: 4px 10px;
   border-radius: 8px;
   white-space: nowrap;
@@ -924,7 +937,7 @@ button.chip {
   gap: 10px;
   text-align: center;
   padding: 20px;
-  background: rgba(11, 15, 56, 0.88);
+  background: rgba(43, 16, 11, 0.88);
   font-weight: 700;
 }
 .cam-actions {
@@ -992,7 +1005,7 @@ button.chip {
   width: 40px;
   height: 120px;
   border-radius: 12px;
-  background: rgba(33, 26, 74, 0.08);
+  background: rgba(52, 22, 16, 0.08);
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -1009,33 +1022,116 @@ button.chip {
 }
 .mission-pick {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.mp-world {
+  position: relative;
+  height: clamp(320px, 52vh, 560px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
+}
+.mp-world-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  pointer-events: none;
+}
+.mp-world-tag .mono {
+  color: var(--mc);
+  -webkit-text-stroke: 0.6px var(--ink);
+}
+.mp-crew {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 30px 10px 6px;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(43, 16, 11, 0.55), transparent);
+}
+.mp-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.mp-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .mp {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 14px;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: rgba(255, 248, 236, 0.75);
+  color: var(--ink);
+  text-align: left;
   cursor: pointer;
   font: inherit;
   transition: transform 0.15s;
 }
 .mp b {
+  display: block;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 0.92rem;
+  line-height: 1.1;
 }
 .mp small {
   font-weight: 700;
+  font-size: 0.76rem;
   color: var(--ink-soft);
 }
-.mp:hover:not(:disabled) {
-  transform: translateY(-4px) rotate(-1deg);
+.mp-done {
+  display: block;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.72rem;
+  color: #17914a;
+}
+.mp:hover {
+  transform: translateY(-2px);
+}
+.mp.on {
+  background: var(--cream);
+  box-shadow: 0 4px 0 var(--ink), 0 0 0 4px color-mix(in srgb, var(--mc) 60%, transparent);
 }
 .mp.locked {
-  opacity: 0.75;
-  cursor: not-allowed;
+  opacity: 0.8;
+}
+.mp-detail {
+  padding: 16px 18px;
+  border-top: 10px solid var(--mc);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.mp-detail h3 {
+  font-size: 1.5rem;
+}
+.mp-detail p {
+  margin: 0;
+  font-weight: 600;
 }
 .reveal {
   display: grid;
@@ -1137,7 +1233,7 @@ button.chip {
   align-items: center;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 2px dashed rgba(33, 26, 74, 0.15);
+  border-top: 2px dashed rgba(52, 22, 16, 0.15);
   font-weight: 800;
 }
 .reveal-mission {
@@ -1167,7 +1263,7 @@ button.chip {
 
 .briefing {
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1fr);
   gap: 28px;
   align-items: center;
   min-height: 100%;
@@ -1177,6 +1273,20 @@ button.chip {
   flex-direction: column;
   align-items: center;
   gap: 16px;
+}
+.brief-planet {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 52vh, 560px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  box-shadow: 0 6px 0 var(--ink);
+}
+.brief-planet .unlock-burst {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
 }
 .unlock-burst {
   position: relative;
@@ -1474,7 +1584,7 @@ button.chip {
   position: absolute;
   inset: 0;
 }
-.event-map .colony-map {
+.event-map .world-view {
   width: 100%;
   height: 100%;
   border-radius: 0;
@@ -1487,7 +1597,7 @@ button.chip {
   flex-direction: column;
   gap: 12px;
   padding: 22px;
-  background: linear-gradient(180deg, rgba(11, 15, 56, 0.86), rgba(11, 15, 56, 0.35) 55%, rgba(11, 15, 56, 0.88));
+  background: linear-gradient(180deg, rgba(43, 16, 11, 0.86), rgba(43, 16, 11, 0.35) 55%, rgba(43, 16, 11, 0.88));
   overflow: auto;
 }
 .stage-alert .event-overlay {
@@ -1528,7 +1638,7 @@ button.chip {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  background: rgba(11, 15, 56, 0.7);
+  background: rgba(43, 16, 11, 0.7);
 }
 .share-cell b {
   font-family: var(--font-display);
@@ -1553,7 +1663,7 @@ button.chip {
   position: relative;
   height: 56px;
   border-radius: 999px;
-  background: rgba(5, 7, 31, 0.75);
+  background: rgba(26, 9, 7, 0.75);
   border: 3px solid var(--ink);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
 }
@@ -1618,7 +1728,7 @@ button.chip {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 14px;
-  background: rgba(5, 7, 31, 0.68);
+  background: rgba(26, 9, 7, 0.68);
 }
 .action-crew b {
   font-family: var(--font-display);
@@ -1649,12 +1759,12 @@ button.chip {
 .stamp.ok {
   color: var(--food);
   border-color: var(--food);
-  background: rgba(11, 15, 56, 0.6);
+  background: rgba(43, 16, 11, 0.6);
 }
 .stamp.bad {
   color: var(--habitat);
   border-color: var(--habitat);
-  background: rgba(11, 15, 56, 0.6);
+  background: rgba(43, 16, 11, 0.6);
 }
 
 /* ---------------- resultados ---------------- */
@@ -1810,7 +1920,7 @@ button.chip {
 .scorebar i {
   height: 10px;
   border-radius: 5px;
-  background: linear-gradient(90deg, var(--c) var(--w), rgba(33, 26, 74, 0.1) var(--w));
+  background: linear-gradient(90deg, var(--c) var(--w), rgba(52, 22, 16, 0.1) var(--w));
   border: 1.5px solid var(--ink);
 }
 .log {
@@ -2001,7 +2111,7 @@ button.chip {
 .report td {
   padding: 8px 10px;
   text-align: left;
-  border-bottom: 1px solid rgba(33, 26, 74, 0.12);
+  border-bottom: 1px solid rgba(52, 22, 16, 0.12);
   white-space: nowrap;
 }
 .report th {
@@ -2110,7 +2220,7 @@ details summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .mission-pick {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
   .dock {
     flex-direction: column;
@@ -2129,6 +2239,38 @@ details summary {
     flex-wrap: wrap;
   }
   .opt-grid.three {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------- planeta 3D en las etapas ---------------- */
+
+.stage-planet {
+  border-radius: inherit;
+}
+.res-planet {
+  position: relative;
+  height: clamp(260px, 38vh, 420px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
+}
+.crews-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  gap: 16px;
+  align-items: start;
+}
+.crews-planet {
+  position: sticky;
+  top: 0;
+  height: clamp(300px, 50vh, 540px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 3px solid var(--ink);
+}
+@media (max-width: 900px) {
+  .crews-layout {
     grid-template-columns: 1fr;
   }
 }

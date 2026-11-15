@@ -1,23 +1,49 @@
 {
-  "name": "IXCHEL — The Classroom Space Mission",
-  "short_name": "IXCHEL",
-  "description": "Un salón. Varias tripulaciones. Un planeta por salvar. Juego cooperativo de misiones espaciales con IA para el salón de clases.",
+  "name": "Taller de Don Rover",
+  "short_name": "Don Rover",
+  "description": "Un salón. Varias tripulaciones. Una colonia en Marte por salvar. Juego cooperativo de misiones en Marte con IA para el salón de clases.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "any",
-  "background_color": "#0B0F38",
-  "theme_color": "#0D1440",
-  "categories": ["education", "games"],
+  "background_color": "#2B100B",
+  "theme_color": "#2B100B",
+  "categories": [
+    "education",
+    "games"
+  ],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Crear misión (profe)", "short_name": "Profe", "url": "./#/profe", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Unirme a una misión", "short_name": "Jugar", "url": "./#/jugar", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+    {
+      "name": "Crear misión (profe)",
+      "short_name": "Profe",
+      "url": "./#/profe",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Unirme a una misión",
+      "short_name": "Jugar",
+      "url": "./#/jugar",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }
