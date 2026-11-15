@@ -1,4 +1,6 @@
 // Lado del profesor: abre un "peer" con el código de la sala y atiende a cada celular.
+// Los celulares llegan directo (WebRTC) o, si su red no lo permite, por el canal de respaldo
+// de Supabase Realtime (ver relay.ts). Para el juego las dos vías son iguales.
 
 import Peer, { type DataConnection } from 'peerjs';
 import type { HostEngine } from '../engine/room';
@@ -6,6 +8,7 @@ import type { Signaling } from '../engine/settings';
 import { snapshotFromHost } from '../world/colony/fromGame';
 import type { PresenceMap, PresencePose } from '../world/colony/snapshot';
 import { PEER_PREFIX, isPose, peerOptions, type ToHost, type ToPlayer } from './protocol';
+import { RelayHost, type Link } from './relay';
 
 export interface NetStatus {
   state: 'starting' | 'online' | 'reconnecting' | 'offline';
@@ -14,7 +17,7 @@ export interface NetStatus {
 }
 
 interface Entry {
-  conn: DataConnection;
+  conn: Link;
   playerId: string | null;
   lastSeen: number;
   lastSent: string;
@@ -38,6 +41,8 @@ export class HostNet {
   private beat = 0;
   private destroyed = false;
   private retries = 0;
+  private relay: RelayHost | null = null;
+  private relayOn = false;
   status: NetStatus = { state: 'starting', detail: 'Abriendo la colonia…', peers: 0 };
 
   /** Poses de los alumnos que juegan en 3D (para la vista 3D del proyector). */
@@ -56,6 +61,22 @@ export class HostNet {
 
   start() {
     this.open();
+    this.relay = new RelayHost(
+      this.engine.code,
+      {
+        onOpen: (link) => this.adopt(link),
+        onMessage: (link, msg) => {
+          const entry = this.conns.get(link.id);
+          if (entry) this.onData(entry, msg);
+        },
+        onClose: (link) => this.dropLink(link),
+      },
+      (on) => {
+        this.relayOn = on;
+        this.setStatus(this.status.state, this.status.detail);
+      },
+    );
+    void this.relay.start();
     this.unsub = this.engine.subscribe(() => this.pushViews(false));
     this.hb = setInterval(() => this.heartbeat(), 4000);
     this.presenceTimer = setInterval(() => this.broadcastPresence(), PRESENCE_MS);
@@ -68,10 +89,16 @@ export class HostNet {
     if (this.presenceTimer) clearInterval(this.presenceTimer);
     for (const e of this.conns.values()) e.conn.close();
     this.conns.clear();
+    this.relay?.stop();
     this.peer?.destroy();
   }
 
   private setStatus(state: NetStatus['state'], detail: string) {
+    // Con el respaldo activo los celulares pueden unirse aunque la vía directa falle.
+    if (this.relayOn && state !== 'online') {
+      state = 'online';
+      detail = 'Colonia en línea por el canal de respaldo: los celulares pueden unirse';
+    }
     this.status = { state, detail, peers: [...this.conns.values()].filter((e) => e.playerId).length };
     this.onStatus(this.status);
   }
@@ -128,26 +155,47 @@ export class HostNet {
     });
   }
 
+  /** Celular que llega directo por WebRTC. */
   private accept(conn: DataConnection) {
-    const entry: Entry = { conn, playerId: null, lastSeen: Date.now(), lastSent: '', lastWorld: '', lastPeers: '' };
-    conn.on('open', () => {
-      this.conns.set(conn.connectionId, entry);
-    });
-    conn.on('data', (raw) => this.onData(entry, raw as ToHost));
-    const drop = () => {
-      if (this.conns.get(conn.connectionId) !== entry) return;
-      this.conns.delete(conn.connectionId);
-      if (entry.playerId && ![...this.conns.values()].some((e) => e.playerId === entry.playerId)) {
-        this.engine.setConnected(entry.playerId, false);
-        if (this.presence.delete(entry.playerId)) this.presenceDirty = true;
-      }
-      this.setStatus(this.status.state, this.status.detail);
+    const link: Link = {
+      id: conn.connectionId,
+      via: 'p2p',
+      get open() {
+        return conn.open;
+      },
+      send: (msg) => void conn.send(msg),
+      close: () => conn.close(),
     };
+    conn.on('open', () => this.adopt(link));
+    conn.on('data', (raw) => {
+      const entry = this.conns.get(link.id) ?? this.adopt(link);
+      this.onData(entry, raw as ToHost);
+    });
+    const drop = () => this.dropLink(link);
     conn.on('close', drop);
     conn.on('error', drop);
   }
 
-  private send(conn: DataConnection, msg: ToPlayer) {
+  private adopt(link: Link): Entry {
+    const known = this.conns.get(link.id);
+    if (known && known.conn === link) return known;
+    const entry: Entry = { conn: link, playerId: null, lastSeen: Date.now(), lastSent: '', lastWorld: '', lastPeers: '' };
+    this.conns.set(link.id, entry);
+    return entry;
+  }
+
+  private dropLink(link: Link) {
+    const entry = this.conns.get(link.id);
+    if (!entry || entry.conn !== link) return;
+    this.conns.delete(link.id);
+    if (entry.playerId && ![...this.conns.values()].some((e) => e.playerId === entry.playerId)) {
+      this.engine.setConnected(entry.playerId, false);
+      if (this.presence.delete(entry.playerId)) this.presenceDirty = true;
+    }
+    this.setStatus(this.status.state, this.status.detail);
+  }
+
+  private send(conn: Link, msg: ToPlayer) {
     try {
       if (conn.open) void conn.send(msg);
     } catch (err) {
@@ -158,7 +206,6 @@ export class HostNet {
   private onData(entry: Entry, msg: ToHost) {
     if (!msg || typeof msg !== 'object') return;
     entry.lastSeen = Date.now();
-    if (!this.conns.has(entry.conn.connectionId)) this.conns.set(entry.conn.connectionId, entry);
     switch (msg.t) {
       case 'join': {
         const res = this.engine.join(msg);

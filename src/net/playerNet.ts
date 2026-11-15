@@ -1,11 +1,19 @@
 // Lado del celular: se conecta al navegador del profesor y se reconecta solo si el
 // teléfono se bloquea, cambia de red o el profesor recarga la página.
+//
+// Primero intenta la vía directa (WebRTC). Si en unos segundos no conecta —datos móviles,
+// Wi-Fi escolar con aislamiento, NAT simétrico— pasa solo al canal de respaldo de Supabase
+// Realtime (relay.ts) y se queda ahí el resto de la sesión.
 
 import Peer, { type DataConnection } from 'peerjs';
 import type { Signaling } from '../engine/settings';
 import type { Ack, AvatarConfig, PlayerAction, PlayerView } from '../../shared/types';
 import type { PresenceMap, PresencePose, WorldSnapshot } from '../world/colony/snapshot';
 import { PEER_PREFIX, isPose, peerOptions, type ToHost, type ToPlayer } from './protocol';
+import { RelayPlayer } from './relay';
+
+/** Segundos sin conexión directa antes de probar el canal de respaldo. */
+const RELAY_AFTER_MS = 6000;
 
 export type PlayerNetState = 'connecting' | 'connected' | 'reconnecting' | 'notfound' | 'error' | 'kicked';
 
@@ -40,6 +48,10 @@ export class PlayerNet {
   private attempts = 0;
   private stopped = false;
   private notFoundCount = 0;
+  private relay: RelayPlayer | null = null;
+  private relayTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Por dónde viaja el juego una vez conectado. */
+  via: 'p2p' | 'relay' | null = null;
   state: PlayerNetState = 'connecting';
 
   constructor(
@@ -51,6 +63,7 @@ export class PlayerNet {
 
   start() {
     this.ensurePeer();
+    this.relayTimer = setTimeout(() => this.startRelay(), RELAY_AFTER_MS);
     this.hb = setInterval(() => this.heartbeat(), 4000);
     document.addEventListener('visibilitychange', this.onVisible);
     window.addEventListener('online', this.onVisible);
@@ -60,14 +73,59 @@ export class PlayerNet {
     this.stopped = true;
     if (this.hb) clearInterval(this.hb);
     if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.relayTimer) clearTimeout(this.relayTimer);
     document.removeEventListener('visibilitychange', this.onVisible);
     window.removeEventListener('online', this.onVisible);
     this.conn?.close();
     this.peer?.destroy();
+    this.relay?.stop();
+  }
+
+  /** Abre el canal de respaldo (si el despliegue lo tiene) en paralelo a la vía directa. */
+  private startRelay() {
+    this.relayTimer = null;
+    if (this.stopped || this.relay || this.via === 'p2p') return;
+    const relay = new RelayPlayer(this.code, {
+      onOpen: () => {
+        if (this.stopped || this.relay !== relay) return;
+        if (this.via === 'p2p') {
+          relay.stop();
+          this.relay = null;
+          return;
+        }
+        // El respaldo llegó primero: la vía directa se abandona para no unirse dos veces.
+        this.via = 'relay';
+        if (this.retryTimer) clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        const conn = this.conn;
+        this.conn = null;
+        conn?.close();
+        this.peer?.destroy();
+        this.attempts = 0;
+        this.notFoundCount = 0;
+        this.lastMsg = Date.now();
+        this.send({ t: 'join', ...this.joinInfo() });
+      },
+      onMessage: (msg) => this.onData(msg),
+      onClose: () => {
+        if (this.via === 'relay' && !this.stopped && this.state !== 'kicked') this.setState('reconnecting');
+      },
+    });
+    this.relay = relay;
+    void relay.start().then((ok) => {
+      if (!ok && this.relay === relay) this.relay = null;
+    });
+  }
+
+  /** ¿Hay un canal abierto con la colonia (por cualquier vía)? */
+  private get linked(): boolean {
+    return this.via === 'relay' ? Boolean(this.relay?.open) : Boolean(this.conn?.open);
   }
 
   private onVisible = () => {
-    if (document.visibilityState === 'visible' && !this.stopped && !this.conn?.open) this.retry(0);
+    if (document.visibilityState !== 'visible' || this.stopped || this.linked) return;
+    if (this.via === 'relay') this.relay?.lost();
+    else this.retry(0);
   };
 
   private setState(s: PlayerNetState) {
@@ -77,7 +135,7 @@ export class PlayerNet {
   }
 
   private ensurePeer() {
-    if (this.stopped) return;
+    if (this.stopped || this.via === 'relay') return;
     if (this.peer && !this.peer.destroyed) {
       if (this.peer.open) this.connect();
       else if (this.peer.disconnected) this.peer.reconnect();
@@ -113,6 +171,11 @@ export class PlayerNet {
         this.setState('reconnecting');
         if (type === 'network' || type === 'server-error' || type === 'socket-error' || type === 'socket-closed') {
           peer.destroy();
+          // El servidor de señalización está bloqueado en esta red: el respaldo no espera.
+          if (this.relayTimer) {
+            clearTimeout(this.relayTimer);
+            this.startRelay();
+          }
         }
         this.retry();
       }
@@ -120,7 +183,7 @@ export class PlayerNet {
   }
 
   private retry(delay?: number) {
-    if (this.stopped) return;
+    if (this.stopped || this.via === 'relay') return;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.attempts++;
     const wait = delay ?? Math.min(8000, 800 * this.attempts);
@@ -131,7 +194,7 @@ export class PlayerNet {
   }
 
   private connect() {
-    if (this.stopped || !this.peer) return;
+    if (this.stopped || !this.peer || this.via === 'relay') return;
     this.conn?.close();
     const conn = this.peer.connect(PEER_PREFIX + this.code, { reliable: true, serialization: 'json' });
     this.conn = conn;
@@ -144,6 +207,15 @@ export class PlayerNet {
     }, 12000);
     conn.on('open', () => {
       clearTimeout(timeout);
+      if (this.via === 'relay' || this.conn !== conn) {
+        conn.close();
+        return;
+      }
+      this.via = 'p2p';
+      if (this.relayTimer) clearTimeout(this.relayTimer);
+      this.relayTimer = null;
+      this.relay?.stop();
+      this.relay = null;
       this.attempts = 0;
       this.notFoundCount = 0;
       this.lastMsg = Date.now();
@@ -162,7 +234,8 @@ export class PlayerNet {
 
   private send(msg: ToHost) {
     try {
-      if (this.conn?.open) void this.conn.send(msg);
+      if (this.via === 'relay') this.relay?.send(msg);
+      else if (this.conn?.open) void this.conn.send(msg);
     } catch (err) {
       console.warn('[ixchel/net] no se pudo enviar', err);
     }
@@ -218,7 +291,7 @@ export class PlayerNet {
   }
 
   act(action: PlayerAction): Promise<Ack> {
-    if (!this.conn?.open) return Promise.resolve({ ok: false, error: 'Sin conexión con la colonia… reintentando.' });
+    if (!this.linked) return Promise.resolve({ ok: false, error: 'Sin conexión con la colonia… reintentando.' });
     const rid = this.nextRid++;
     this.send({ t: 'act', rid, action });
     return new Promise((resolve) => {
@@ -239,17 +312,21 @@ export class PlayerNet {
 
   /** Reintentar el ingreso con nuevos datos (por ejemplo, después de un nombre rechazado). */
   rejoin() {
-    if (this.conn?.open) this.send({ t: 'join', ...this.joinInfo() });
-    else this.retry(0);
+    if (this.linked) this.send({ t: 'join', ...this.joinInfo() });
+    else if (this.via !== 'relay') this.retry(0);
   }
 
   private heartbeat() {
     if (this.stopped) return;
-    if (this.conn?.open) this.send({ t: 'hb' });
+    if (this.linked) this.send({ t: 'hb' });
     if (this.state === 'connected' && Date.now() - this.lastMsg > 15000) {
-      this.conn?.close();
       this.setState('reconnecting');
-      this.retry(0);
+      if (this.via === 'relay') {
+        this.relay?.lost();
+      } else {
+        this.conn?.close();
+        this.retry(0);
+      }
     }
   }
 }
