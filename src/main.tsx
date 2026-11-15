@@ -7,6 +7,7 @@ import './styles/global.css';
 import './styles/landing.css';
 import './styles/host.css';
 import './styles/play.css';
+import './styles/world.css';
 import { App } from './App';
 import { registerServiceWorker } from './lib/pwa';
 

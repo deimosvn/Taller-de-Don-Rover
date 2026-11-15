@@ -5,6 +5,7 @@ import { IXOrb } from './components/art';
 
 const HostApp = lazy(() => import('./pages/host/HostApp').then((m) => ({ default: m.HostApp })));
 const PlayApp = lazy(() => import('./pages/play/PlayApp').then((m) => ({ default: m.PlayApp })));
+const WorldExplorer = lazy(() => import('./world/react/WorldExplorer').then((m) => ({ default: m.WorldExplorer })));
 
 function Loading() {
   return (
@@ -24,6 +25,8 @@ export function App() {
         <HostApp />
       ) : route.path === '/jugar' ? (
         <PlayApp initialCode={(route.params.get('c') ?? '').toUpperCase()} sig={route.params.get('s')} />
+      ) : route.path === '/mundo' ? (
+        <WorldExplorer />
       ) : (
         <Landing />
       )}
