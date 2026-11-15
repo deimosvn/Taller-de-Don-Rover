@@ -199,7 +199,7 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
           </form>
           <div className="nocode">
             <p className="nocode-title">¿No tienes código?</p>
-            <p className="muted">Explora Marte en modo libre: mina, fabrica y construye tu base.</p>
+            <p className="muted">Explora Marte en modo libre: recolecta recursos y construye tu propia base.</p>
             <div className="nocode-actions">
               <a className="btn block mars" href="#/libre?modo=solo">
                 🚀 Jugar solo

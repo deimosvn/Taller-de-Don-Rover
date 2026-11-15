@@ -16,9 +16,12 @@ import {
   buildLander,
   buildLandingPad,
   buildMeteorite,
+  buildColonyModule,
   buildSector,
 } from '../models/colony';
 import { buildIx, buildRover } from '../models/machines';
+import { buildMissionStation, buildResourceNode } from '../models/outpost';
+import { MODULES, MODULE_ORDER, RESOURCES, RESOURCE_ORDER } from '../outpost/types';
 import type { EntityDef, FocusPreset, InteractionDef } from './types';
 
 const focus = (distance: number, minDistance: number, maxDistance: number, pitch: number, lift: number): FocusPreset => ({ distance, minDistance, maxDistance, pitch, lift });
@@ -239,6 +242,59 @@ export function createCatalog(): Map<string, EntityDef> {
     lodDistance: 45,
     build: buildDiscovery,
   });
+
+  defs.push({
+    id: 'prop.station',
+    kind: 'prop',
+    name: 'Estación de la misión',
+    description: 'Consola donde la tripulación resuelve el problema de la misión con un minijuego.',
+    source: 'Problemas de las misiones (MISSION_PROBLEMS, shared/minigames.ts)',
+    tags: ['mission'],
+    collider: { radius: 1.1, height: 1.6 },
+    focus: focus(8, 3, 30, 18, 1.2),
+    interactions: [act('solve', 'repair', 'console', 3.4, 'Resolver el problema')],
+    initialState: { solved: false },
+    selectable: true,
+    lodDistance: 60,
+    build: buildMissionStation,
+  });
+
+  for (const r of RESOURCE_ORDER) {
+    defs.push({
+      id: `resource.${r}`,
+      kind: 'resource',
+      name: RESOURCES[r].name,
+      description: RESOURCES[r].desc,
+      source: 'Recursos del modo libre (src/world/outpost/types.ts)',
+      tags: ['resource', r],
+      collider: { radius: 0.9, height: 1 },
+      focus: focus(7, 3, 30, 22, 0.6),
+      interactions: [act('collect', 'collect', 'center', 3.0, `Recolectar ${RESOURCES[r].name.toLowerCase()}`)],
+      initialState: { amount: 1 },
+      selectable: true,
+      lodDistance: 45,
+      build: buildResourceNode(r),
+    });
+  }
+
+  for (const k of MODULE_ORDER) {
+    const m = MODULES[k];
+    defs.push({
+      id: `module.${k}`,
+      kind: 'building',
+      name: m.name,
+      description: m.desc,
+      source: 'Módulos del modo libre (src/world/outpost/types.ts)',
+      tags: ['module'],
+      collider: { radius: m.radius * 0.85, height: 4 },
+      focus: focus(14, 6, 50, 26, 1),
+      interactions: [act('inspect', 'use', 'door', 3.0, `Revisar ${m.name.toLowerCase()}`)],
+      initialState: {},
+      selectable: true,
+      lodDistance: 60,
+      build: buildColonyModule(m.design),
+    });
+  }
 
   return new Map(defs.map((d) => [d.id, d]));
 }

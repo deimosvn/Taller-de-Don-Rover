@@ -196,6 +196,11 @@ export class EntityManager {
     return e;
   }
 
+  /** Definición del catálogo (para construir vistas previas sin crear una instancia). */
+  definition(defId: string): EntityDef | null {
+    return this.catalog.get(defId) ?? null;
+  }
+
   remove(uid: string): void {
     const e = this.entities.get(uid);
     if (!e) return;

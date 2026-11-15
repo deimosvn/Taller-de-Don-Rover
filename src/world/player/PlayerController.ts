@@ -7,8 +7,6 @@ import { Quaternion, Vector3 } from 'three';
 import type { RigCollider } from '../camera/CameraRig';
 import { PLANET_RADIUS } from '../core/config';
 import { angleDelta, clamp, tangentFrame, travel } from '../core/math';
-import type { BlockWorld } from '../blocks/BlockWorld';
-import { gridAxes } from '../blocks/grid';
 import type { AnimName } from '../models/astronaut';
 import { terrainRadius } from '../planet/heightfield';
 
@@ -84,7 +82,6 @@ export class PlayerController {
   /** Distancia recorrida (para estadísticas y sonidos de pasos). */
   travelled = 0;
   /** Bloques del modo libre: se pueden pisar y hacen de pared. */
-  blocks: BlockWorld | null = null;
 
   constructor(start: Vector3, heading: number) {
     this.dir.copy(start).normalize();
@@ -155,7 +152,6 @@ export class PlayerController {
 
     // 3) Choques con edificios, máquinas y otros astronautas.
     this.collide(colliders, characters);
-    if (this.blocks) this.collideBlocks(_prev);
 
     // 4) Salto y gravedad marciana.
     const feetR = this.lastGround + this.alt;
@@ -184,11 +180,6 @@ export class PlayerController {
     }
     if (!this.grounded) {
       this.vy -= PLAYER.gravity * dt;
-      // Techo: un bloque justo encima de la cabeza detiene el salto.
-      if (this.vy > 0 && this.blocks) {
-        const head = ground + this.alt + PLAYER.body;
-        if (this.blocks.blocked(this.dir, head, head + 0.12 + this.vy * dt)) this.vy = 0;
-      }
       this.alt += this.vy * dt;
       if (this.alt <= 0) {
         this.alt = 0;
@@ -233,58 +224,9 @@ export class PlayerController {
     }
   }
 
-  /** Suelo bajo los pies: el terreno o la cara superior de un bloque que se pueda pisar. */
-  private groundAt(feetR: number): number {
-    let ground = terrainRadius(this.dir);
-    const b = this.blocks;
-    if (!b) return ground;
-    const max = feetR + PLAYER.step;
-    ground = Math.max(ground, b.top(this.dir, max));
-    const k = (PLAYER.radius * 0.7) / Math.max(1, feetR);
-    tangentFrame(this.dir, _east, _north);
-    for (let i = 0; i < 8; i += 2) {
-      _s.copy(this.dir).addScaledVector(_east, FOOT[i][0] * k).addScaledVector(_north, FOOT[i][1] * k);
-      ground = Math.max(ground, b.top(_s, max));
-    }
-    return ground;
-  }
-
-  /** ¿El cuerpo (del escalón a la cabeza) se mete en algún bloque estando en `dir`? */
-  private hitsBlocks(dir: Vector3, feetR: number): boolean {
-    const b = this.blocks!;
-    const r0 = feetR + PLAYER.step;
-    const r1 = feetR + PLAYER.body;
-    if (b.blocked(dir, r0, r1)) return true;
-    const k = (PLAYER.radius * 0.9) / Math.max(1, feetR);
-    tangentFrame(dir, _east, _north);
-    for (const [c, s] of FOOT) {
-      _s.copy(dir).addScaledVector(_east, c * k).addScaledVector(_north, s * k);
-      if (b.blocked(_s, r0, r1)) return true;
-    }
-    return false;
-  }
-
-  /** Paredes de bloques: si el paso choca, se intenta deslizar por los ejes de la rejilla. */
-  private collideBlocks(prev: Vector3): void {
-    const feetR = this.lastGround + this.alt;
-    if (!this.hitsBlocks(this.dir, feetR)) return;
-    // Si ya estaba dentro de un bloque (alguien construyó encima), se le deja salir.
-    if (this.hitsBlocks(prev, feetR)) return;
-    gridAxes(prev, _ga, _gb);
-    const dx = _a.copy(this.dir).sub(prev).dot(_ga);
-    const dz = _a.dot(_gb);
-    const tryAxis = (axis: Vector3, amount: number, other: Vector3): boolean => {
-      if (Math.abs(amount) < 1e-7) return false;
-      _b.copy(prev).addScaledVector(axis, amount).normalize();
-      if (this.hitsBlocks(_b, feetR)) return false;
-      this.dir.copy(_b);
-      this.vel.addScaledVector(other, -this.vel.dot(other));
-      return true;
-    };
-    const first = Math.abs(dx) >= Math.abs(dz);
-    if (first ? tryAxis(_ga, dx, _gb) || tryAxis(_gb, dz, _ga) : tryAxis(_gb, dz, _ga) || tryAxis(_ga, dx, _gb)) return;
-    this.dir.copy(prev);
-    this.vel.set(0, 0, 0);
+  /** Suelo bajo los pies. */
+  private groundAt(_feetR: number): number {
+    return terrainRadius(this.dir);
   }
 
   /** Empuja al jugador fuera de los colisionadores (solo en horizontal, sin trepar). */

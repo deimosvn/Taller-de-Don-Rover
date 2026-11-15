@@ -538,7 +538,7 @@
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7));
 }
 
-/* ---------- barra de bloques ---------- */
+/* ---------- barra inferior: recursos y construir (modo libre) ---------- */
 .wp-build {
   position: absolute;
   left: 50%;
@@ -553,137 +553,105 @@
 .wp-build > * {
   pointer-events: auto;
 }
-.wp-hotbar {
+.wp-res {
   display: flex;
   gap: 4px;
-  max-width: 100%;
   padding: 5px;
   border-radius: 16px;
   border: 1px solid var(--line);
   background: var(--glass);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.wp-hotbar::-webkit-scrollbar {
-  display: none;
-}
-.wp-slot {
-  position: relative;
-  flex: none;
-  width: 50px;
-  height: 50px;
-  padding: 0;
-  border-radius: 11px;
-  border: 2px solid transparent;
-  background: rgba(255, 248, 236, 0.07);
-  transition:
-    transform 0.12s ease,
-    border-color 0.12s ease;
-}
-.wp-slot img {
-  width: 30px;
-  height: 30px;
-  image-rendering: pixelated;
-  border-radius: 5px;
-  display: block;
-  margin: 6px auto 0;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
-}
-.wp-slot b {
-  position: absolute;
-  right: 4px;
-  bottom: 1px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-}
-.wp-slot small {
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  font-size: 0.58rem;
-  color: var(--txt-soft);
-}
-.wp-slot.empty img {
-  opacity: 0.28;
-  filter: grayscale(0.7);
-}
-.wp-slot.empty b {
-  opacity: 0.5;
-}
-.wp-slot.on {
-  border-color: var(--txt);
-  background: rgba(255, 248, 236, 0.2);
-  transform: translateY(-4px);
-}
-.wp-slot-name {
-  margin: 0;
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: var(--glass);
-  font-size: 0.8rem;
-  font-weight: 600;
-  animation: wp-name 1.8s ease forwards;
-  pointer-events: none !important;
-}
-@keyframes wp-name {
-  0%,
-  70% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-.wp-mine {
+.wp-res span {
   display: grid;
-  gap: 4px;
-  justify-items: center;
-  min-width: 170px;
-  padding: 6px 12px 8px;
-  border-radius: 12px;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  min-width: 78px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 11px;
+  background: rgba(255, 248, 236, 0.07);
+  border-bottom: 3px solid var(--rc, var(--accent));
+}
+.wp-res i {
+  grid-row: span 2;
+  font-style: normal;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.wp-res b {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.wp-res small {
+  font-size: 0.66rem;
+  color: var(--txt-soft);
+  line-height: 1.1;
+}
+.wp-place {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid #7cf29c;
   background: var(--glass-strong);
-  font-size: 0.8rem;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.wp-place.bad {
+  border-left-color: #ff6b5b;
+}
+.wp-place-name {
+  display: grid;
+  margin-right: 4px;
+  font-size: 0.9rem;
   font-weight: 600;
-  pointer-events: none !important;
+  line-height: 1.2;
 }
-.wp-mine-bar {
-  width: 100%;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 248, 236, 0.18);
-  overflow: hidden;
+.wp-place-name small {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #7cf29c;
 }
-.wp-mine-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
+.wp-place.bad .wp-place-name small {
+  color: #ff9d8f;
 }
 .wp.is-touch .wp-build {
   bottom: max(10px, env(safe-area-inset-bottom));
 }
-/* Con la barra de bloques, la ayuda y los gestos suben para no taparla. */
+/* Con la barra inferior, la ayuda y los gestos suben para no taparla. */
 @media (max-width: 1240px) {
   .wp.is-build .wp-keys,
   .wp.is-build .wp-emote-bar {
-    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 76px);
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 70px);
   }
 }
 .wp.is-touch.is-build .wp-stick,
 .wp.is-touch.is-build .wp-actions {
-  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
+  bottom: calc(max(10px, env(safe-area-inset-bottom)) + 70px);
 }
-.wp.is-touch .wp-slot {
-  width: 44px;
-  height: 44px;
+.wp.is-touch .wp-res span {
+  min-width: 0;
+  padding: 4px 8px 4px 6px;
 }
-.wp.is-touch .wp-slot img {
-  width: 26px;
-  height: 26px;
-  margin-top: 5px;
+.wp.is-touch .wp-res small {
+  display: none;
+}
+@media (max-width: 520px) {
+  .wp-place {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 8px;
+  }
+  .wp-place-name {
+    flex-basis: 100%;
+    text-align: center;
+    margin: 0 0 2px;
+  }
 }
 @media (max-width: 900px) and (orientation: landscape) {
   .wp.is-touch .wp-build {
@@ -847,7 +815,7 @@
   color: var(--txt);
   font-weight: 600;
 }
-.wp-recipes,
+.wp-modules,
 .wp-quests,
 .wp-people {
   list-style: none;
@@ -856,54 +824,102 @@
   display: grid;
   gap: 8px;
 }
-.wp-recipes li {
+.wp-balance {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.wp-balance span {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: 12px;
+  background: rgba(255, 248, 236, 0.07);
+  font-size: 0.95rem;
+}
+.wp-balance b {
+  font-size: 0.95rem;
+}
+.wp-balance small {
+  font-size: 0.66rem;
+  color: var(--txt-soft);
+}
+.wp-balance .ok b {
+  color: #7cf29c;
+}
+.wp-balance .bad {
+  background: rgba(255, 107, 91, 0.18);
+}
+.wp-balance .bad b {
+  color: #ff9d8f;
+}
+.wp-modules li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
   border-radius: 12px;
   background: rgba(255, 248, 236, 0.07);
 }
-.wp-recipes li.off {
+.wp-modules li.off {
   opacity: 0.72;
 }
-.wp-recipes img {
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  image-rendering: pixelated;
-  display: block;
-}
-.wp-recipe-in {
-  display: flex;
-  gap: 8px;
-}
-.wp-recipe-in span {
+.wp-module-emoji {
   display: grid;
-  justify-items: center;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: rgba(255, 248, 236, 0.1);
+  font-size: 1.35rem;
+}
+.wp-module-info {
+  display: grid;
   gap: 2px;
-  font-size: 0.7rem;
-}
-.wp-recipe-in span.missing b {
-  color: #ff9d8f;
-}
-.wp-recipe-arrow {
-  color: var(--txt-soft);
-}
-.wp-recipe-out {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-.wp-recipe-out span {
-  display: grid;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   line-height: 1.2;
 }
-.wp-recipe-out small {
-  font-size: 0.72rem;
+.wp-module-info small {
+  font-size: 0.74rem;
+  color: var(--txt-soft);
+}
+.wp-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.wp-cost em {
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.1);
+}
+.wp-cost em.missing {
+  color: #ff9d8f;
+  background: rgba(255, 107, 91, 0.16);
+}
+.wp-build-panel {
+  width: min(520px, calc(100% - 24px));
+}
+
+/* ---------- estación del problema de la misión ---------- */
+.wp-problem {
+  width: min(500px, calc(100% - 16px));
+  max-height: calc(100% - 24px);
+  padding: 12px 12px 16px;
+}
+.wp-problem .tapgame,
+.wp-problem .problem {
+  color: var(--txt);
+}
+.wp-problem .problem-text {
   color: var(--txt-soft);
 }
 .wp-invite {

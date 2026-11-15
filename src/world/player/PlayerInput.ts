@@ -22,14 +22,10 @@ export interface PlayerInputHost {
   firstPerson(): boolean;
   /** Avisa de actividad real del jugador. */
   activity(): void;
-  /** ¿Está activo el modo de minar y construir? */
-  building?(): boolean;
-  /** Acción sobre el mundo: primaria = minar, secundaria = construir. */
-  action?(kind: 'primary' | 'secondary', phase: 'down' | 'up' | 'tap', x: number, y: number): void;
-  /** El ratón pasa por encima (para resaltar el bloque apuntado). */
-  hover?(x: number, y: number): void;
-  /** Elegir una casilla de la barra de bloques (0–9). */
-  slot?(index: number): void;
+  /** ¿Hay un módulo en vista previa para construir (modo libre)? */
+  placing?(): boolean;
+  /** Clic al construir: primario = colocar el módulo, secundario = girarlo. */
+  place?(kind: 'primary' | 'secondary'): void;
 }
 
 const MOVE_KEYS: Record<string, [number, number]> = {
@@ -165,8 +161,8 @@ export class PlayerInput {
       /* el puntero ya no existe */
     }
     this.drags.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0, button: e.button, at: performance.now() });
-    // Con el ratón capturado, los botones minan (izq.) y construyen (der.) al instante.
-    if (this.locked && this.host.building?.()) this.host.action?.(e.button === 2 ? 'secondary' : 'primary', 'down', e.clientX, e.clientY);
+    // Con el ratón capturado, al construir: clic izq. coloca y clic der. gira el módulo.
+    if (this.locked && this.host.placing?.()) this.host.place?.(e.button === 2 ? 'secondary' : 'primary');
     if (this.drags.size === 2) {
       const [a, b] = [...this.drags.values()];
       this.pinch = Math.hypot(a.x - b.x, a.y - b.y);
@@ -176,10 +172,7 @@ export class PlayerInput {
   private onMove = (e: PointerEvent): void => {
     if (!this.enabled) return;
     const d = this.drags.get(e.pointerId);
-    if (!d) {
-      if (e.pointerType === 'mouse' && !this.locked) this.host.hover?.(e.clientX, e.clientY);
-      return;
-    }
+    if (!d) return;
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     d.x = e.clientX;
@@ -206,15 +199,13 @@ export class PlayerInput {
     } catch {
       /* ya liberado */
     }
-    const building = this.enabled && e.type === 'pointerup' && Boolean(this.host.building?.());
-    if (building && this.locked) {
-      this.host.action?.(d.button === 2 ? 'secondary' : 'primary', 'up', e.clientX, e.clientY);
-      return;
-    }
+    const placing = this.enabled && e.type === 'pointerup' && Boolean(this.host.placing?.());
+    if (placing && this.locked) return;
     const tap = d.moved < (e.pointerType === 'touch' ? 14 : 6) && performance.now() - d.at < 450 && this.drags.size === 0;
     const lockable = e.pointerType === 'mouse' && this.host.firstPerson() && !this.locked;
-    if (building && tap && !lockable) {
-      this.host.action?.(d.button === 2 ? 'secondary' : 'primary', 'tap', e.clientX, e.clientY);
+    // Un clic con el ratón (sin arrastrar) coloca el módulo; en táctil se usan los botones.
+    if (placing && tap && !lockable && e.pointerType === 'mouse') {
+      this.host.place?.(d.button === 2 ? 'secondary' : 'primary');
       return;
     }
     // Un clic de ratón sin arrastrar, en primera persona, captura el ratón para mirar.
@@ -260,10 +251,10 @@ export class PlayerInput {
     if (code === 'Space') {
       e.preventDefault();
       this.host.jump();
-    } else if (code === 'KeyV' || (code === 'KeyC' && !this.host.building?.())) {
+    } else if (code === 'KeyV' || code === 'KeyC') {
       this.host.toggleView();
-    } else if (this.host.building?.() && /^Digit\d$/.test(code)) {
-      this.host.slot?.((Number(code.slice(5)) + 9) % 10);
+    } else if (code === 'KeyR' && this.host.placing?.()) {
+      this.host.place?.('secondary');
     } else if (code === 'KeyE' || code === 'Enter') {
       e.preventDefault();
       this.host.interact();

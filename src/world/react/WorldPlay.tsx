@@ -1,13 +1,13 @@
 // Interfaz del modo jugador sobre el mundo 3D: joystick y botones táctiles, atajos de
 // teclado, cambio de primera a tercera persona, aviso de interacción ("E · Revisar…"),
-// tarjetas con lo que el jugador descubre, el visor del casco en primera persona y, en el
-// modo libre, la barra de bloques para minar y construir.
+// tarjetas con lo que el jugador descubre y el visor del casco en primera persona. Las
+// pantallas que la usan (misión, modo libre) agregan sus propias piezas: barra de recursos,
+// botones de construir, la estación del problema…
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { BLOCKS, blockIcon, type BlockId } from '../blocks/types';
 import type { WorldSnapshot } from '../colony/snapshot';
 import type { AnimName } from '../models/astronaut';
-import type { BuildAim, PlayerHud, WorldEngine } from '../WorldEngine';
+import type { InteractEvent, PlayerHud, WorldEngine } from '../WorldEngine';
 import { cardFor, type WorldCard } from './interactions';
 
 export interface WorldBanner {
@@ -17,20 +17,20 @@ export interface WorldBanner {
   tone?: 'alert' | 'info';
 }
 
-/** Barra de bloques del modo libre. */
-export interface BuildUi {
-  slots: { id: BlockId; count: number }[];
-  selected: number;
-  onSelect(index: number): void;
-}
-
 interface Props {
   engine: WorldEngine | null;
   snapshot: WorldSnapshot | null;
   onExit?: () => void;
   exitLabel?: string;
   banner?: WorldBanner | null;
-  build?: BuildUi;
+  /** Barra inferior propia de la pantalla (recursos, construir…). */
+  hotbar?: ReactNode;
+  /** Botones redondos extra en táctil (junto a saltar). */
+  touchActions?: ReactNode;
+  /** Líneas propias en la ayuda de controles del teclado. */
+  keysHelp?: ReactNode;
+  /** La pantalla atiende esta interacción (devuelve true) en vez de mostrar la tarjeta. */
+  onInteract?: (ev: InteractEvent) => boolean;
   /** Botones extra de la barra superior (invitar, fabricar…). */
   actions?: ReactNode;
   /** Objetivo actual, bajo la barra superior. */
@@ -51,7 +51,7 @@ const EMOTES: { anim: AnimName; emoji: string; label: string }[] = [
 
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
-export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banner, build, actions, objective, notice, onEmote, children }: Props) {
+export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banner, hotbar, touchActions, keysHelp, onInteract, actions, objective, notice, onEmote, children }: Props) {
   const [hud, setHud] = useState<PlayerHud | null>(null);
   const [zone, setZone] = useState<string | null>(null);
   const [card, setCard] = useState<WorldCard | null>(null);
@@ -60,14 +60,11 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
   // En ventanas pequeñas la ayuda empieza cerrada para no tapar el mundo.
   const [showKeys, setShowKeys] = useState(() => typeof window === 'undefined' || window.innerWidth >= 900);
   const [showEmotes, setShowEmotes] = useState(false);
-  const [aim, setAim] = useState<BuildAim | null>(null);
-  const [mode, setMode] = useState<'mine' | 'place'>('mine');
   const snapRef = useRef(snapshot);
   snapRef.current = snapshot;
-  const buildRef = useRef(build);
-  buildRef.current = build;
+  const interactRef = useRef(onInteract);
+  interactRef.current = onInteract;
   const talks = useRef(0);
-  const building = Boolean(build);
 
   useEffect(() => {
     if (!engine) return;
@@ -75,12 +72,8 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
     const offs = [
       engine.events.on('player', (h) => setHud(h)),
       engine.events.on('zone', (z) => setZone(z ? z.name : null)),
-      engine.events.on('build', (a) => setAim(a)),
-      engine.events.on('slot', (i) => {
-        const b = buildRef.current;
-        if (b && i < b.slots.length) b.onSelect(i);
-      }),
       engine.events.on('interact', (ev) => {
+        if (interactRef.current?.(ev)) return;
         if (ev.defId === 'character.astronaut') {
           setToast(`👋 Saludaste a ${String(ev.params.label ?? 'tu compañero')}`);
           return;
@@ -91,11 +84,6 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
     ];
     return () => offs.forEach((off) => off());
   }, [engine]);
-
-  // En táctil el jugador elige qué hace un toque; con ratón: clic izquierdo y derecho.
-  useEffect(() => {
-    if (engine) engine.buildMode = building && touch ? mode : 'auto';
-  }, [engine, building, touch, mode]);
 
   useEffect(() => {
     if (!toast) return;
@@ -125,11 +113,10 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
     onEmote?.(anim);
     setShowEmotes(false);
   };
-  const selected = build?.slots[build.selected];
   const message = notice ?? toast;
 
   return (
-    <div className={`wp ${first ? 'is-first' : 'is-third'} ${touch ? 'is-touch' : 'is-mouse'} ${building ? 'is-build' : ''}`}>
+    <div className={`wp ${first ? 'is-first' : 'is-third'} ${touch ? 'is-touch' : 'is-mouse'} ${hotbar ? 'is-build' : ''}`}>
       {first && <div className="wp-visor" aria-hidden />}
       {first && <div className="wp-crosshair" aria-hidden />}
 
@@ -166,39 +153,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
         </button>
       )}
 
-      {build && (
-        <div className="wp-build">
-          {aim && aim.progress > 0 && (
-            <div className="wp-mine" role="progressbar" aria-valuenow={Math.round(aim.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-              <span>⛏️ {aim.block ? BLOCKS[aim.block].name : ''}</span>
-              <div className="wp-mine-bar">
-                <i style={{ width: `${Math.round(aim.progress * 100)}%` }} />
-              </div>
-            </div>
-          )}
-          {selected && (
-            <p className="wp-slot-name" key={selected.id}>
-              {BLOCKS[selected.id].name}
-            </p>
-          )}
-          <div className="wp-hotbar" role="listbox" aria-label="Bloques">
-            {build.slots.map((s, i) => (
-              <button
-                key={s.id}
-                role="option"
-                aria-selected={i === build.selected}
-                aria-label={`${BLOCKS[s.id].name}: ${s.count}`}
-                className={`wp-slot ${i === build.selected ? 'on' : ''} ${s.count ? '' : 'empty'}`}
-                onClick={() => build.onSelect(i)}
-              >
-                <img src={blockIcon(s.id)} alt="" draggable={false} />
-                {!touch && <small>{(i + 1) % 10}</small>}
-                <b>{s.count > 999 ? '999+' : s.count}</b>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {hotbar && <div className="wp-build">{hotbar}</div>}
 
       {touch ? (
         <>
@@ -217,12 +172,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
               <button className={`wp-round small ${showEmotes ? 'on' : ''}`} aria-label="Gestos" onClick={() => setShowEmotes((v) => !v)}>
                 👋
               </button>
-              {build && (
-                <button className="wp-round mode" aria-label={mode === 'mine' ? 'Cambiar a construir' : 'Cambiar a minar'} onClick={() => setMode((m) => (m === 'mine' ? 'place' : 'mine'))}>
-                  {mode === 'mine' ? '⛏️' : '🧱'}
-                  <small>{mode === 'mine' ? 'Minar' : 'Construir'}</small>
-                </button>
-              )}
+              {touchActions}
               <button className="wp-round jump" aria-label="Saltar" onPointerDown={() => engine.playerJump()}>
                 ⤒<small>Saltar</small>
               </button>
@@ -240,25 +190,13 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
                 <kbd>S</kbd>
                 <kbd>D</kbd> caminar · <kbd>Mayús</kbd> correr · <kbd>Espacio</kbd> saltar
               </span>
-              {build ? (
-                <>
-                  <span>
-                    <kbd>Clic</kbd> minar · <kbd>Clic der.</kbd> construir
-                  </span>
-                  <span>
-                    <kbd>1</kbd>–<kbd>0</kbd> bloque · <kbd>C</kbd> fabricar · <kbd>V</kbd> vista
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span>
-                    <kbd>V</kbd> 1.ª / 3.ª persona · <kbd>E</kbd> interactuar
-                  </span>
-                  <span>
-                    <kbd>1</kbd>–<kbd>4</kbd> gestos 👋 🎉 📡 👉
-                  </span>
-                </>
-              )}
+              <span>
+                <kbd>V</kbd> 1.ª / 3.ª persona · <kbd>E</kbd> interactuar
+              </span>
+              <span>
+                <kbd>1</kbd>–<kbd>4</kbd> gestos 👋 🎉 📡 👉
+              </span>
+              {keysHelp}
               <span>
                 <kbd>Arrastrar</kbd> mirar · <kbd>Rueda</kbd> acercar
               </span>
@@ -269,7 +207,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
         </button>
       )}
 
-      {!touch && build && (
+      {!touch && hotbar && (
         <div className="wp-emote-bar">
           {EMOTES.map((e) => (
             <button key={e.anim} className="wp-round small" aria-label={e.label} title={e.label} onClick={() => emote(e.anim)}>

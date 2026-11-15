@@ -1,9 +1,11 @@
 // Modo libre (#/libre): sin código de clase. El jugador explora Marte con su astronauta,
-// mina el planeta, fabrica bloques y construye su base. Puede jugar solo o crear una sala y
-// compartir el enlace (o el QR) para que sus amigos entren al mismo mundo.
+// recolecta regolito, hielo y hematita en el terreno y construye su propia base con módulos
+// de la colonia (paneles solares, extractores, invernaderos, domos, antenas…). Puede jugar
+// solo o crear una sala y compartir el enlace (o el QR) para que sus amigos entren al mismo
+// mundo y construyan juntos.
 //
-// Todo vive en el dispositivo: el inventario, las misiones del explorador y los bloques del
-// mundo se guardan en el navegador; en una sala, los cambios viajan entre los amigos.
+// Todo vive en el dispositivo: los recursos, las misiones del explorador y los módulos de la
+// base se guardan en el navegador; en una sala, los módulos viajan entre los amigos.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QR, Logo } from '../../components/ui';
@@ -11,41 +13,55 @@ import { loadProfile, saveProfile, type PlayerProfile } from '../../lib/profile'
 import { useWakeLock, vibrate } from '../../lib/pwa';
 import { primeAudio, sfx } from '../../lib/sound';
 import { FreeNet, ROOM_RE, newRoomCode, roomLink, type FreeNetState, type FreePeer } from '../../net/freeNet';
-import type { BlockEdit, BlockWorld } from '../../world/blocks/BlockWorld';
-import { BLOCKS, BLOCK_ORDER, RECIPES, blockIcon, type BlockId, type Recipe } from '../../world/blocks/types';
 import { demoSnapshot, type PresenceMap, type WorldSnapshot } from '../../world/colony/snapshot';
 import { PLANET_RADIUS } from '../../world/core/config';
+import type { Outpost, OutpostHost, PlacingState } from '../../world/outpost/Outpost';
+import {
+  MODULES,
+  MODULE_ORDER,
+  RESOURCES,
+  RESOURCE_ORDER,
+  SUPPLIES,
+  SUPPLY_ORDER,
+  baseBalance,
+  isModuleEdit,
+  type ModuleEdit,
+  type ModuleKind,
+  type ResourceId,
+} from '../../world/outpost/types';
 import { WorldCanvas } from '../../world/react/WorldCanvas';
 import { WorldPlay } from '../../world/react/WorldPlay';
-import type { BuildHost, WorldEngine } from '../../world/WorldEngine';
+import type { InteractEvent, WorldEngine } from '../../world/WorldEngine';
 import { AvatarBuilder } from '../play/AvatarBuilder';
 
 /* ---------------- partida guardada ---------------- */
 
+type Inventory = Record<ResourceId, number>;
+
 interface Stats {
   walked: number;
-  mined: number;
-  rare: number;
-  placed: number;
-  crafted: number;
-  lamps: number;
+  gathered: number;
+  built: number;
+  /** Tipos de módulo que este jugador ya construyó. */
+  kinds: ModuleKind[];
 }
 
 interface Save {
-  inv: Record<number, number>;
+  inv: Inventory;
   stats: Stats;
   done: string[];
-  sel: number;
+  /** Módulos construidos en este dispositivo (solo esos se pueden desmontar aquí). */
+  mine: string[];
 }
 
-const SAVE_KEY = 'donrover.libre.v1';
-const worldKey = (room: string | null) => `donrover.libre.mundo.${room ?? 'solo'}`;
+const SAVE_KEY = 'donrover.libre.v2';
+const baseKey = (room: string | null) => `donrover.libre.base.${room ?? 'solo'}`;
 
 const newSave = (): Save => ({
-  inv: { 1: 8, 6: 16, 7: 6, 9: 2 },
-  stats: { walked: 0, mined: 0, rare: 0, placed: 0, crafted: 0, lamps: 0 },
+  inv: { regolith: 6, ice: 2, metal: 3 },
+  stats: { walked: 0, gathered: 0, built: 0, kinds: [] },
   done: [],
-  sel: 5,
+  mine: [],
 });
 
 function loadSave(): Save {
@@ -53,22 +69,37 @@ function loadSave(): Save {
     const raw = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') as Partial<Save> | null;
     if (!raw) return newSave();
     const base = newSave();
-    return { inv: { ...raw.inv }, stats: { ...base.stats, ...raw.stats }, done: Array.isArray(raw.done) ? raw.done : [], sel: Number.isInteger(raw.sel) ? Math.min(9, Math.max(0, raw.sel!)) : 5 };
+    const inv = { ...base.inv };
+    for (const r of RESOURCE_ORDER) if (Number.isFinite(raw.inv?.[r])) inv[r] = Math.max(0, Math.floor(raw.inv![r]));
+    return {
+      inv,
+      stats: { ...base.stats, ...raw.stats, kinds: Array.isArray(raw.stats?.kinds) ? raw.stats!.kinds.filter((k) => k in MODULES) : [] },
+      done: Array.isArray(raw.done) ? raw.done : [],
+      mine: Array.isArray(raw.mine) ? raw.mine.slice(-400) : [],
+    };
   } catch {
     return newSave();
   }
 }
 
-function loadWorld(room: string | null): BlockEdit[] {
+function loadBase(room: string | null): ModuleEdit[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(worldKey(room)) || '[]');
-    return Array.isArray(raw) ? raw : [];
+    const raw = JSON.parse(localStorage.getItem(baseKey(room)) || '[]');
+    return Array.isArray(raw) ? raw.filter(isModuleEdit) : [];
   } catch {
     return [];
   }
 }
 
+const canAfford = (kind: ModuleKind, inv: Inventory) => RESOURCE_ORDER.every((r) => inv[r] >= (MODULES[kind].cost[r] ?? 0));
+
 /* ---------------- misiones del explorador ---------------- */
+
+interface QuestCtx {
+  stats: Stats;
+  /** Módulos en pie en el mundo (los tuyos y los de tus amigos). */
+  modules: ModuleKind[];
+}
 
 interface Quest {
   id: string;
@@ -76,27 +107,35 @@ interface Quest {
   title: string;
   tip: string;
   goal: number;
-  value(s: Stats): number;
+  value(c: QuestCtx): number;
   xp: number;
 }
 
-const QUESTS: Quest[] = [
-  { id: 'walk', emoji: '🥾', title: 'Camina 40 m por la colonia', tip: 'Muévete con el joystick o con W A S D.', goal: 40, value: (s) => Math.floor(s.walked), xp: 20 },
-  { id: 'mine', emoji: '⛏️', title: 'Mina 6 bloques', tip: 'Toca o haz clic en el suelo para sacar regolito.', goal: 6, value: (s) => s.mined, xp: 30 },
-  { id: 'place', emoji: '🧱', title: 'Coloca 8 bloques', tip: 'Elige un bloque de la barra y constrúyelo donde apuntes.', goal: 8, value: (s) => s.placed, xp: 30 },
-  { id: 'craft', emoji: '🖨️', title: 'Fabrica 4 bloques en la impresora 3D', tip: 'Abre «Fabricar» y convierte regolito en ladrillos.', goal: 4, value: (s) => s.crafted, xp: 40 },
-  { id: 'rare', emoji: '💎', title: 'Mina 3 bloques de un depósito', tip: 'Fuera de la colonia hay hielo, hematita y cristal.', goal: 3, value: (s) => s.rare, xp: 50 },
-  { id: 'lamp', emoji: '💡', title: 'Coloca una lámpara para la noche', tip: 'Las lámparas se fabrican con cristal y un panel.', goal: 1, value: (s) => s.lamps, xp: 40 },
-  { id: 'base', emoji: '🏠', title: 'Construye tu base: 40 bloques', tip: 'Paredes, techo, ventanas de vidrio… ¡tú decides!', goal: 40, value: (s) => s.placed, xp: 80 },
-  { id: 'mega', emoji: '🏙️', title: 'Gran obra: 150 bloques', tip: 'Invita a tus amigos y construyan juntos.', goal: 150, value: (s) => s.placed, xp: 150 },
-];
+const builtKind = (k: ModuleKind) => (c: QuestCtx) => (c.stats.kinds.includes(k) ? 1 : 0);
 
-const canCraft = (r: Recipe, inv: Record<number, number>) => r.needs.every(([id, n]) => (inv[id] ?? 0) >= n);
+/** Base en equilibrio: produce al menos lo que gasta de energía, agua, aire y comida. */
+function balanced(mods: ModuleKind[]): boolean {
+  if (mods.length < 4) return false;
+  const b = baseBalance(mods);
+  return (['energy', 'water', 'air', 'food'] as const).every((s) => b[s].made >= b[s].used);
+}
+
+const QUESTS: Quest[] = [
+  { id: 'walk', emoji: '🥾', title: 'Camina 40 m por la colonia', tip: 'Muévete con el joystick o con W A S D.', goal: 40, value: (c) => Math.floor(c.stats.walked), xp: 20 },
+  { id: 'gather', emoji: '🧺', title: 'Recolecta recursos 5 veces', tip: 'Busca montículos de regolito, hielo o hematita y toca «Recolectar».', goal: 5, value: (c) => c.stats.gathered, xp: 30 },
+  { id: 'solar', emoji: '☀️', title: 'Construye paneles solares', tip: 'Abre «Construir»: la energía es lo primero que necesita una base.', goal: 1, value: builtKind('solar'), xp: 40 },
+  { id: 'water', emoji: '💧', title: 'Saca agua con un extractor de hielo', tip: 'El extractor necesita energía: ponlo cerca de tus paneles.', goal: 1, value: builtKind('extractor'), xp: 40 },
+  { id: 'food', emoji: '🌿', title: 'Cultiva comida en un invernadero', tip: 'Los cultivos necesitan agua y luz.', goal: 1, value: builtKind('greenhouse'), xp: 40 },
+  { id: 'home', emoji: '🏠', title: 'Construye un domo habitable', tip: 'Necesitará aire, agua y comida para quienes duermen ahí.', goal: 1, value: builtKind('habitat'), xp: 50 },
+  { id: 'balance', emoji: '⚖️', title: 'Base en equilibrio', tip: 'Que nada falte: energía, agua, aire y comida sin números rojos (mín. 4 módulos).', goal: 1, value: (c) => (balanced(c.modules) ? 1 : 0), xp: 80 },
+  { id: 'antenna', emoji: '📡', title: 'Llama a la Tierra con una antena', tip: 'Un mensaje tarda de 3 a 22 minutos en llegar.', goal: 1, value: builtKind('antenna'), xp: 50 },
+  { id: 'city', emoji: '🏙️', title: 'Gran colonia: 12 módulos', tip: 'Invita a tus amigos y construyan juntos.', goal: 12, value: (c) => c.modules.length, xp: 150 },
+];
 
 /** Marte tiene día y noche: todos los de la sala ven la misma hora. */
 const isNight = () => (Date.now() / 1000) % 260 > 175;
 
-type Panel = 'craft' | 'invite' | 'quests' | null;
+type Panel = 'build' | 'invite' | 'quests' | null;
 
 interface Props {
   /** Sala del enlace de invitación (vacío si no hay). */
@@ -118,7 +157,10 @@ export function FreePlay({ initialRoom, mode }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [compass, setCompass] = useState<{ block: BlockId; distance: number; angle: number } | null>(null);
+  const [compass, setCompass] = useState<{ res: ResourceId; distance: number; angle: number } | null>(null);
+  const [placing, setPlacing] = useState<PlacingState | null>(null);
+  const [modules, setModules] = useState<ModuleKind[]>([]);
+  const [inspect, setInspect] = useState<ModuleEdit | null>(null);
 
   const gameRef = useRef(game);
   const profileRef = useRef(profile);
@@ -126,13 +168,12 @@ export function FreePlay({ initialRoom, mode }: Props) {
   const roomRef = useRef(room);
   roomRef.current = room;
   const engineRef = useRef<WorldEngine | null>(null);
-  const blocksRef = useRef<BlockWorld | null>(null);
+  const outpostRef = useRef<Outpost | null>(null);
   const netRef = useRef<FreeNet | null>(null);
   const presence = useRef<PresenceMap>({});
-  const pendingEdits = useRef<BlockEdit[]>([]);
+  const pendingEdits = useRef<ModuleEdit[]>([]);
   const dirty = useRef(false);
   const created = useRef<string | null>(null);
-  const lastDenied = useRef(0);
   useWakeLock(stage === 'game');
 
   const name = profile.name.trim() || 'Astronauta';
@@ -150,7 +191,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
     setGame(next);
   };
 
-  // Guardar el inventario y el avance.
+  // Guardar los recursos y el avance.
   useEffect(() => {
     const t = setTimeout(() => {
       try {
@@ -162,22 +203,25 @@ export function FreePlay({ initialRoom, mode }: Props) {
     return () => clearTimeout(t);
   }, [game]);
 
-  const saveWorld = () => {
-    const b = blocksRef.current;
-    if (!b) return;
+  const saveBase = () => {
+    const o = outpostRef.current;
+    if (!o) return;
     dirty.current = false;
     try {
-      localStorage.setItem(worldKey(roomRef.current), JSON.stringify(b.edits()));
+      localStorage.setItem(baseKey(roomRef.current), JSON.stringify(o.edits()));
     } catch {
       /* almacenamiento lleno */
     }
   };
 
+  const refreshModules = () => setModules(outpostRef.current?.kinds() ?? []);
+
   /* ---------------- misiones ---------------- */
 
   const quest = QUESTS.find((q) => !game.done.includes(q.id)) ?? null;
+  const questCtx: QuestCtx = { stats: game.stats, modules };
   useEffect(() => {
-    if (!quest || quest.value(game.stats) < quest.goal) return;
+    if (!quest || quest.value(questCtx) < quest.goal) return;
     update((g) => ({ ...g, done: [...g.done, quest.id] }));
     const p = profileRef.current;
     const next = { ...p, xp: p.xp + quest.xp };
@@ -187,42 +231,25 @@ export function FreePlay({ initialRoom, mode }: Props) {
     vibrate([40, 60, 40]);
     say(`✅ ${quest.title} · +${quest.xp} XP`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quest?.id, game.stats]);
+  }, [quest?.id, game.stats, modules]);
 
-  /* ---------------- motor: bloques, jugador, día y noche ---------------- */
+  /* ---------------- motor: recursos, módulos, jugador, día y noche ---------------- */
 
-  const host = useMemo<BuildHost>(
+  const host = useMemo<OutpostHost>(
     () => ({
-      selected: () => {
-        const id = BLOCK_ORDER[gameRef.current.sel];
-        return (gameRef.current.inv[id] ?? 0) > 0 ? id : 0;
+      afford: (kind) => canAfford(kind, gameRef.current.inv),
+      built: (kind) => {
+        sfx.unlock();
+        vibrate([20, 30, 20]);
+        update((g) => {
+          const inv = { ...g.inv };
+          for (const r of RESOURCE_ORDER) inv[r] -= MODULES[kind].cost[r] ?? 0;
+          const kinds = g.stats.kinds.includes(kind) ? g.stats.kinds : [...g.stats.kinds, kind];
+          return { ...g, inv, stats: { ...g.stats, built: g.stats.built + 1, kinds } };
+        });
+        say(`${MODULES[kind].emoji} ¡${MODULES[kind].name} construido!`);
       },
-      mined: (block, fromGround) => {
-        sfx.pop();
-        vibrate(18);
-        update((g) => ({
-          ...g,
-          inv: { ...g.inv, [block]: (g.inv[block] ?? 0) + 1 },
-          stats: { ...g.stats, mined: g.stats.mined + 1, rare: g.stats.rare + (!fromGround && block >= 3 && block <= 5 ? 1 : 0) },
-        }));
-      },
-      placed: (block) => {
-        sfx.select();
-        vibrate(10);
-        update((g) => ({
-          ...g,
-          inv: { ...g.inv, [block]: Math.max(0, (g.inv[block] ?? 0) - 1) },
-          stats: { ...g.stats, placed: g.stats.placed + 1, lamps: g.stats.lamps + (block === 9 ? 1 : 0) },
-        }));
-      },
-      denied: (reason) => {
-        const now = Date.now();
-        if (now - lastDenied.current < 1500) return;
-        lastDenied.current = now;
-        if (reason === 'empty') say(`No te queda ${BLOCKS[BLOCK_ORDER[gameRef.current.sel]].name.toLowerCase()}: mina o fabrica más`);
-        else if (reason === 'self') say('Ahí estás tú: muévete un poco');
-        else say('Acércate más para alcanzarlo');
-      },
+      placing: (st) => setPlacing(st),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -231,21 +258,24 @@ export function FreePlay({ initialRoom, mode }: Props) {
   useEffect(() => {
     if (!engine) return;
     engineRef.current = engine;
-    const blocks = engine.enableBuilding(host);
-    blocksRef.current = blocks;
-    blocks.load(loadWorld(roomRef.current));
-    blocks.load(pendingEdits.current.splice(0));
-    blocks.onEdit = (e) => {
+    const outpost = engine.enableOutpost(host);
+    outpostRef.current = outpost;
+    outpost.apply(loadBase(roomRef.current));
+    outpost.apply(pendingEdits.current.splice(0));
+    outpost.onEdit = (e) => {
       dirty.current = true;
+      if (e.k) update((g) => ({ ...g, mine: [...g.mine, e.id].slice(-400) }));
       netRef.current?.sendEdit(e);
+      refreshModules();
     };
+    refreshModules();
     const p = profileRef.current;
     // Un id al azar: cada jugador aparece en un punto distinto de la plaza.
     engine.enterPlayer({ id: `libre-${Math.random().toString(36).slice(2, 8)}`, name: p.name.trim() || 'Astronauta', avatar: p.avatar, role: null }, 'third');
     engine.setPresence(presence.current);
     engine.setLighting(isNight() ? 'dusk' : 'day');
     const clock = setInterval(() => engine.setLighting(isNight() ? 'dusk' : 'day'), 5000);
-    const saver = setInterval(() => dirty.current && saveWorld(), 2500);
+    const saver = setInterval(() => dirty.current && saveBase(), 2500);
 
     // Pose para los amigos y metros caminados.
     let last = '';
@@ -264,32 +294,77 @@ export function FreePlay({ initialRoom, mode }: Props) {
       last = key;
       netRef.current?.sendPose(pose);
     };
-    const radar = setInterval(() => setCompass(engine.nearestDeposit()), 500);
-    // Golpecitos mientras se mina.
-    let hits = -1;
-    const offBuild = engine.events.on('build', (aim) => {
-      const step = aim.progress > 0 ? Math.floor(aim.progress * 4) : -1;
-      if (step !== hits && step >= 0) sfx.tap();
-      hits = step;
-    });
+    const radar = setInterval(() => setCompass(engine.nearestResource()), 500);
     const fast = setInterval(() => tick(false), 170);
     const keep = setInterval(() => tick(true), 3000);
-    window.addEventListener('pagehide', saveWorld);
+    window.addEventListener('pagehide', saveBase);
     return () => {
       clearInterval(clock);
       clearInterval(saver);
       clearInterval(fast);
       clearInterval(keep);
       clearInterval(radar);
-      offBuild();
-      window.removeEventListener('pagehide', saveWorld);
-      saveWorld();
-      blocks.onEdit = null;
-      blocksRef.current = null;
+      window.removeEventListener('pagehide', saveBase);
+      saveBase();
+      outpost.onEdit = null;
+      outpostRef.current = null;
       engineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine]);
+
+  /** Recolectar o revisar un módulo: lo atiende esta pantalla en lugar de la tarjeta genérica. */
+  const onInteract = (ev: InteractEvent): boolean => {
+    const o = outpostRef.current;
+    if (!o) return false;
+    if (ev.defId.startsWith('resource.')) {
+      const got = o.collect(ev.uid);
+      if (!got) {
+        say('Este punto está agotado: vuelve a crecer en un rato');
+        return true;
+      }
+      sfx.pop();
+      vibrate(18);
+      update((g) => ({ ...g, inv: { ...g.inv, [got.res]: g.inv[got.res] + got.amount }, stats: { ...g.stats, gathered: g.stats.gathered + 1 } }));
+      say(`+${got.amount} ${RESOURCES[got.res].emoji} ${RESOURCES[got.res].name}`);
+      return true;
+    }
+    if (ev.defId.startsWith('module.')) {
+      const m = o.moduleAt(ev.uid);
+      if (m) {
+        setPanel(null);
+        setInspect(m);
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const startBuild = (kind: ModuleKind) => {
+    const o = outpostRef.current;
+    if (!o || !canAfford(kind, gameRef.current.inv)) return;
+    sfx.select();
+    o.startPlacing(kind);
+    setPanel(null);
+    setInspect(null);
+    say('Muévete para elegir el lugar y toca «Construir aquí»');
+  };
+
+  const dismantle = (m: ModuleEdit) => {
+    const o = outpostRef.current;
+    if (!o || !m.k) return;
+    const def = MODULES[m.k];
+    o.dismantle(m.id);
+    // Se recupera la mitad de lo que costó.
+    update((g) => {
+      const inv = { ...g.inv };
+      for (const r of RESOURCE_ORDER) inv[r] += Math.floor((def.cost[r] ?? 0) / 2);
+      return { ...g, inv };
+    });
+    sfx.whoosh();
+    setInspect(null);
+    say(`♻️ Desmontaste: ${def.name}`);
+  };
 
   /* ---------------- sala de amigos ---------------- */
 
@@ -319,11 +394,13 @@ export function FreePlay({ initialRoom, mode }: Props) {
         },
         onEdits: (edits) => {
           dirty.current = true;
-          if (blocksRef.current) blocksRef.current.load(edits);
-          else pendingEdits.current.push(...edits);
+          if (outpostRef.current) {
+            outpostRef.current.apply(edits);
+            refreshModules();
+          } else pendingEdits.current.push(...edits);
         },
         onEmote: (peer, e) => say(`${e} ${peer.name}`),
-        snapshot: () => blocksRef.current?.edits() ?? [],
+        snapshot: () => outpostRef.current?.edits() ?? [],
       },
     );
     if (created.current === room) net.markSynced();
@@ -344,7 +421,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
     created.current = code;
     roomRef.current = code;
     setRoom(code);
-    saveWorld();
+    saveBase();
     history.replaceState(null, '', `#/libre?sala=${code}`);
     return code;
   };
@@ -355,7 +432,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
     const nav = navigator as Navigator & { share?: (d: { title: string; text: string; url: string }) => Promise<void> };
     try {
       if (nav.share) {
-        await nav.share({ title: 'Taller de Don Rover', text: '¡Ven a construir conmigo en Marte! 🚀', url });
+        await nav.share({ title: 'Taller de Don Rover', text: '¡Ven a construir una colonia conmigo en Marte! 🚀', url });
         return;
       }
     } catch {
@@ -373,33 +450,28 @@ export function FreePlay({ initialRoom, mode }: Props) {
     else say('Copia el enlace manualmente');
   };
 
-  /* ---------------- fabricar ---------------- */
-
-  const craft = (r: Recipe) => {
-    if (!canCraft(r, gameRef.current.inv)) return;
-    sfx.unlock();
-    update((g) => {
-      const inv = { ...g.inv };
-      for (const [id, n] of r.needs) inv[id] = (inv[id] ?? 0) - n;
-      inv[r.out] = (inv[r.out] ?? 0) + r.count;
-      return { ...g, inv, stats: { ...g.stats, crafted: g.stats.crafted + r.count }, sel: BLOCK_ORDER.indexOf(r.out) };
-    });
-  };
-
-  // Atajos: C abre la impresora 3D y Esc cierra los paneles.
+  // Atajos: B abre «Construir» y Esc cancela la construcción o cierra los paneles.
   useEffect(() => {
     if (stage !== 'game') return;
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.code === 'KeyC') setPanel((p) => (p === 'craft' ? null : 'craft'));
-      else if (e.code === 'Escape') setPanel(null);
+      if (e.code === 'KeyB') {
+        outpostRef.current?.cancel();
+        setInspect(null);
+        setPanel((p) => (p === 'build' ? null : 'build'));
+      } else if (e.code === 'Escape') {
+        if (outpostRef.current?.placing) outpostRef.current.cancel();
+        setPanel(null);
+        setInspect(null);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [stage]);
 
   const snapshot = useMemo<WorldSnapshot>(() => ({ ...demoSnapshot(), boarding: peers.map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, role: null })) }), [peers]);
+  const balance = useMemo(() => baseBalance(modules), [modules]);
 
   const start = (withFriends: boolean) => {
     primeAudio();
@@ -429,7 +501,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
           <div className="free-head">
             <p className="free-kicker">{invited ? `Sala ${room}` : 'Modo libre'}</p>
             <h1>{invited ? 'Tus amigos te esperan en Marte' : 'Explora Marte a tu manera'}</h1>
-            <p className="muted">Mina el planeta, fabrica bloques y construye tu base. Juega solo o comparte un enlace con tus amigos.</p>
+            <p className="muted">Recolecta recursos del planeta y construye tu propia base: paneles solares, extractores de hielo, invernaderos y domos. Juega solo o comparte un enlace con tus amigos.</p>
           </div>
           <div className="free-avatar">
             <AvatarBuilder
@@ -442,51 +514,51 @@ export function FreePlay({ initialRoom, mode }: Props) {
             />
           </div>
           <div className="free-form">
-          <div className="field">
-            <label htmlFor="fname">Tu nombre de astronauta</label>
-            <input
-              id="fname"
-              className="input big-input"
-              maxLength={16}
-              placeholder="Astronauta"
-              value={profile.name}
-              autoComplete="nickname"
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            />
-          </div>
-          {invited ? (
-            <div className="free-actions">
-              <button className="btn huge block mars" onClick={() => start(true)}>
-                👥 Entrar a la sala
-              </button>
-              <button
-                className="btn block cream"
-                onClick={() => {
-                  setRoom(null);
-                  history.replaceState(null, '', '#/libre');
-                  start(false);
-                }}
-              >
-                Mejor jugar solo
-              </button>
+            <div className="field">
+              <label htmlFor="fname">Tu nombre de astronauta</label>
+              <input
+                id="fname"
+                className="input big-input"
+                maxLength={16}
+                placeholder="Astronauta"
+                value={profile.name}
+                autoComplete="nickname"
+                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              />
             </div>
-          ) : (
-            <div className="free-actions two">
-              <button className={`btn huge block ${mode === 'amigos' ? 'cream' : 'mars'}`} onClick={() => start(false)}>
-                🚀 Jugar solo
-              </button>
-              <button className={`btn huge block ${mode === 'amigos' ? 'mars' : 'ix'}`} onClick={() => start(true)}>
-                👥 Con amigos
-              </button>
-            </div>
-          )}
-          <ul className="free-feats">
-            <li>⛏️ Mina</li>
-            <li>🖨️ Fabrica</li>
-            <li>🧱 Construye</li>
-            <li>🔗 Invita con un enlace</li>
-          </ul>
-          <p className="fine center">Sin cuentas: tu astronauta y tu mundo se guardan en este dispositivo.</p>
+            {invited ? (
+              <div className="free-actions">
+                <button className="btn huge block mars" onClick={() => start(true)}>
+                  👥 Entrar a la sala
+                </button>
+                <button
+                  className="btn block cream"
+                  onClick={() => {
+                    setRoom(null);
+                    history.replaceState(null, '', '#/libre');
+                    start(false);
+                  }}
+                >
+                  Mejor jugar solo
+                </button>
+              </div>
+            ) : (
+              <div className="free-actions two">
+                <button className={`btn huge block ${mode === 'amigos' ? 'cream' : 'mars'}`} onClick={() => start(false)}>
+                  🚀 Jugar solo
+                </button>
+                <button className={`btn huge block ${mode === 'amigos' ? 'mars' : 'ix'}`} onClick={() => start(true)}>
+                  👥 Con amigos
+                </button>
+              </div>
+            )}
+            <ul className="free-feats">
+              <li>🧊 Recolecta</li>
+              <li>☀️ Construye módulos</li>
+              <li>⚖️ Equilibra tu base</li>
+              <li>🔗 Invita con un enlace</li>
+            </ul>
+            <p className="fine center">Sin cuentas: tu astronauta y tu base se guardan en este dispositivo.</p>
           </div>
         </main>
       </div>
@@ -497,6 +569,36 @@ export function FreePlay({ initialRoom, mode }: Props) {
 
   const link = room ? roomLink(room) : '';
   const done = game.done.length;
+  const placingDef = placing ? MODULES[placing.kind] : null;
+  const inspectDef = inspect?.k ? MODULES[inspect.k] : null;
+
+  const hotbar = placingDef ? (
+    <div className={`wp-place ${placing!.valid ? '' : 'bad'}`} role="group" aria-label={`Construir ${placingDef.name}`}>
+      <span className="wp-place-name">
+        {placingDef.emoji} {placingDef.name}
+        <small>{placing!.valid ? 'Aquí se puede construir' : placing!.problem === 'cost' ? 'Te faltan recursos' : 'Hay algo estorbando: muévete'}</small>
+      </span>
+      <button className="wp-btn" onClick={() => outpostRef.current?.rotate()} aria-label="Girar el módulo">
+        ↻ <span>Girar</span>
+      </button>
+      <button className="wp-btn solid" disabled={!placing!.valid} onClick={() => outpostRef.current?.confirm()}>
+        ✓ Construir aquí
+      </button>
+      <button className="wp-btn" onClick={() => outpostRef.current?.cancel()} aria-label="Cancelar">
+        ✕
+      </button>
+    </div>
+  ) : (
+    <div className="wp-res" aria-label="Tus recursos">
+      {RESOURCE_ORDER.map((r) => (
+        <span key={r} title={RESOURCES[r].desc} style={{ ['--rc' as string]: RESOURCES[r].color }}>
+          <i>{RESOURCES[r].emoji}</i>
+          <b>{game.inv[r]}</b>
+          <small>{RESOURCES[r].name}</small>
+        </span>
+      ))}
+    </div>
+  );
 
   return (
     <div className="world-overlay free-world">
@@ -514,105 +616,157 @@ export function FreePlay({ initialRoom, mode }: Props) {
           engine={engine}
           snapshot={snapshot}
           onExit={() => {
-            saveWorld();
+            saveBase();
             window.location.hash = '/';
           }}
           exitLabel="Salir"
           notice={notice}
           onEmote={(anim) => netRef.current?.sendEmote(anim === 'wave' ? '👋' : anim === 'cheer' ? '🎉' : anim === 'scan' ? '📡' : '👉')}
-          build={{
-            slots: BLOCK_ORDER.map((id) => ({ id, count: game.inv[id] ?? 0 })),
-            selected: game.sel,
-            onSelect: (i) => {
-              sfx.tick();
-              update((g) => ({ ...g, sel: i }));
-            },
-          }}
+          onInteract={onInteract}
+          hotbar={hotbar}
+          touchActions={
+            !placing && (
+              <button className="wp-round mode" aria-label="Construir" onClick={() => setPanel(panel === 'build' ? null : 'build')}>
+                🏗️<small>Construir</small>
+              </button>
+            )
+          }
+          keysHelp={
+            <span>
+              <kbd>B</kbd> construir · <kbd>R</kbd> girar · <kbd>Clic</kbd> o <kbd>E</kbd> colocar
+            </span>
+          }
           actions={
             <>
               <button className={`wp-btn ${room ? 'live' : ''}`} onClick={() => setPanel(panel === 'invite' ? null : 'invite')} aria-label="Amigos">
                 👥 <span>{room ? peers.length + 1 : 'Invitar'}</span>
                 {room && <i className={`wp-dot ${netState}`} />}
               </button>
-              <button className="wp-btn" onClick={() => setPanel(panel === 'craft' ? null : 'craft')} aria-label="Fabricar">
-                🖨️ <span>Fabricar</span>
+              <button
+                className="wp-btn"
+                onClick={() => {
+                  outpostRef.current?.cancel();
+                  setInspect(null);
+                  setPanel(panel === 'build' ? null : 'build');
+                }}
+                aria-label="Construir"
+              >
+                🏗️ <span>Construir</span>
               </button>
             </>
           }
           objective={
             <>
-            <button className="wp-quest" onClick={() => setPanel(panel === 'quests' ? null : 'quests')}>
-              {quest ? (
-                <>
-                  <span>
-                    {quest.emoji} {quest.title}
-                  </span>
-                  <b>
-                    {Math.min(quest.goal, quest.value(game.stats))}/{quest.goal}
-                  </b>
-                </>
-              ) : (
-                <span>🏆 ¡Completaste todas las misiones del explorador!</span>
+              <button className="wp-quest" onClick={() => setPanel(panel === 'quests' ? null : 'quests')}>
+                {quest ? (
+                  <>
+                    <span>
+                      {quest.emoji} {quest.title}
+                    </span>
+                    <b>
+                      {Math.min(quest.goal, quest.value(questCtx))}/{quest.goal}
+                    </b>
+                  </>
+                ) : (
+                  <span>🏆 ¡Completaste todas las misiones del explorador!</span>
+                )}
+              </button>
+              {compass && compass.distance > 4 && !placing && (
+                <p className="wp-compass" title="Recurso más cercano">
+                  <i style={{ transform: `rotate(${compass.angle}rad)` }}>↑</i>
+                  {RESOURCES[compass.res].emoji} {RESOURCES[compass.res].name} a {Math.round(compass.distance)} m
+                </p>
               )}
-            </button>
-            {compass && compass.distance > 4 && (
-              <p className="wp-compass" title="Depósito más cercano">
-                <i style={{ transform: `rotate(${compass.angle}rad)` }}>↑</i>
-                <img src={blockIcon(compass.block)} alt="" />
-                {BLOCKS[compass.block].name} a {Math.round(compass.distance)} m
-              </p>
-            )}
             </>
           }
         >
-          {panel === 'craft' && (
-            <section className="wp-panel" role="dialog" aria-label="Impresora 3D">
+          {panel === 'build' && (
+            <section className="wp-panel wp-build-panel" role="dialog" aria-label="Construir módulos">
               <header>
-                <h3>🖨️ Impresora 3D</h3>
+                <h3>🏗️ Construir</h3>
                 <button className="wp-close" onClick={() => setPanel(null)} aria-label="Cerrar">
                   ✕
                 </button>
               </header>
-              <p className="wp-panel-lead">En Marte se fabrica con lo que hay en el planeta. Mina materiales y conviértelos en piezas para tu base.</p>
-              <ul className="wp-recipes">
-                {RECIPES.map((r) => {
-                  const ok = canCraft(r, game.inv);
+              <p className="wp-panel-lead">En Marte se construye con lo que hay en el planeta. Cada módulo produce algo y gasta algo: que a tu base no le falte nada.</p>
+              <div className="wp-balance" aria-label="Balance de tu base">
+                {SUPPLY_ORDER.map((s) => {
+                  const net = balance[s].made - balance[s].used;
                   return (
-                    <li key={r.out} className={ok ? '' : 'off'}>
-                      <div className="wp-recipe-in">
-                        {r.needs.map(([id, n]) => (
-                          <span key={id} className={(game.inv[id] ?? 0) >= n ? '' : 'missing'} title={BLOCKS[id].name}>
-                            <img src={blockIcon(id)} alt={BLOCKS[id].name} />
-                            <b>
-                              {game.inv[id] ?? 0}/{n}
-                            </b>
-                          </span>
-                        ))}
-                      </div>
-                      <span className="wp-recipe-arrow">→</span>
-                      <div className="wp-recipe-out">
-                        <img src={blockIcon(r.out)} alt="" />
-                        <span>
-                          <b>
-                            {BLOCKS[r.out].name} ×{r.count}
-                          </b>
-                          <small>Tienes {game.inv[r.out] ?? 0}</small>
+                    <span key={s} className={net < 0 ? 'bad' : net > 0 ? 'ok' : ''} title={`${SUPPLIES[s].name}: produce ${balance[s].made}, gasta ${balance[s].used}`}>
+                      {SUPPLIES[s].emoji} <b>{net > 0 ? `+${net}` : net}</b>
+                      <small>{SUPPLIES[s].name}</small>
+                    </span>
+                  );
+                })}
+              </div>
+              <ul className="wp-modules">
+                {MODULE_ORDER.map((k) => {
+                  const m = MODULES[k];
+                  const ok = canAfford(k, game.inv);
+                  return (
+                    <li key={k} className={ok ? '' : 'off'}>
+                      <span className="wp-module-emoji">{m.emoji}</span>
+                      <span className="wp-module-info">
+                        <b>{m.name}</b>
+                        <small>
+                          {SUPPLY_ORDER.filter((s) => m.makes[s]).map((s) => `+${m.makes[s]} ${SUPPLIES[s].emoji}`).join(' ')}
+                          {SUPPLY_ORDER.some((s) => m.uses[s]) ? ` · gasta ${SUPPLY_ORDER.filter((s) => m.uses[s]).map((s) => `${m.uses[s]} ${SUPPLIES[s].emoji}`).join(' ')}` : ''}
+                        </small>
+                        <span className="wp-cost">
+                          {RESOURCE_ORDER.filter((r) => m.cost[r]).map((r) => (
+                            <em key={r} className={game.inv[r] >= m.cost[r]! ? '' : 'missing'} title={RESOURCES[r].name}>
+                              {RESOURCES[r].emoji} {game.inv[r]}/{m.cost[r]}
+                            </em>
+                          ))}
                         </span>
-                      </div>
-                      <button className="wp-btn solid" disabled={!ok} onClick={() => craft(r)}>
-                        Fabricar
+                      </span>
+                      <button className="wp-btn solid" disabled={!ok} onClick={() => startBuild(k)}>
+                        Construir
                       </button>
                     </li>
                   );
                 })}
               </ul>
               <p className="wp-panel-foot">
-                {BLOCK_ORDER.slice(0, 5).map((id: BlockId) => (
-                  <span key={id}>
-                    {BLOCKS[id].emoji} <b>{BLOCKS[id].name}:</b> {BLOCKS[id].source}
+                {RESOURCE_ORDER.map((r) => (
+                  <span key={r}>
+                    {RESOURCES[r].emoji} <b>{RESOURCES[r].name}:</b> {RESOURCES[r].desc}
                   </span>
                 ))}
               </p>
+            </section>
+          )}
+
+          {inspect && inspectDef && (
+            <section className="wp-card" role="dialog" aria-label={inspectDef.name} style={{ ['--wc' as string]: '#FFC93C' }}>
+              <div className="wp-card-head">
+                <span className="wp-card-emoji">{inspectDef.emoji}</span>
+                <h3>{inspectDef.name}</h3>
+                <button className="wp-close" onClick={() => setInspect(null)} aria-label="Cerrar">
+                  ✕
+                </button>
+              </div>
+              <p>{inspectDef.desc}</p>
+              {SUPPLY_ORDER.some((s) => inspectDef.makes[s]) && (
+                <div className="wp-line">
+                  <span>Produce</span>
+                  <b>{SUPPLY_ORDER.filter((s) => inspectDef.makes[s]).map((s) => `${inspectDef.makes[s]} ${SUPPLIES[s].emoji} ${SUPPLIES[s].name.toLowerCase()}`).join(' · ')}</b>
+                </div>
+              )}
+              {SUPPLY_ORDER.some((s) => inspectDef.uses[s]) && (
+                <div className="wp-line">
+                  <span>Gasta</span>
+                  <b>{SUPPLY_ORDER.filter((s) => inspectDef.uses[s]).map((s) => `${inspectDef.uses[s]} ${SUPPLIES[s].emoji} ${SUPPLIES[s].name.toLowerCase()}`).join(' · ')}</b>
+                </div>
+              )}
+              {game.mine.includes(inspect.id) ? (
+                <button className="wp-btn wide" onClick={() => dismantle(inspect)}>
+                  ♻️ Desmontar (recuperas la mitad)
+                </button>
+              ) : (
+                <p className="wp-panel-foot">Lo construyó alguien de tu sala.</p>
+              )}
             </section>
           )}
 
@@ -626,7 +780,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
               </header>
               {room ? (
                 <>
-                  <p className="wp-panel-lead">Comparte este enlace o el código QR. Quien lo abra entra a tu mundo y puede minar y construir contigo.</p>
+                  <p className="wp-panel-lead">Comparte este enlace o el código QR. Quien lo abra entra a tu mundo y puede recolectar y construir contigo.</p>
                   <div className="wp-invite">
                     <div className="wp-invite-qr">
                       <QR value={link} size={132} />
@@ -709,7 +863,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
                       </span>
                       {now && (
                         <em>
-                          {Math.min(q.goal, q.value(game.stats))}/{q.goal}
+                          {Math.min(q.goal, q.value(questCtx))}/{q.goal}
                         </em>
                       )}
                     </li>

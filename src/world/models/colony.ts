@@ -1045,3 +1045,57 @@ export function buildDiscovery(ctx: BuildContext, params: Record<string, unknown
   };
   return { object: root, anchors: { center: new Vector3(0, 1.2, 0), label: new Vector3(0, 2.25, 0) }, update };
 }
+
+/* ------------------------------------------------------------------ */
+/* Módulos del modo libre                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Módulo que el jugador construye en el modo libre: el mismo diseño de un sector de la colonia
+ * (o de la antena), sobre su propia losa y sin muelle, baliza ni letrero.
+ */
+export function buildColonyModule(design: SectorId | 'antenna') {
+  return (ctx: BuildContext): BuiltModel => {
+    const kit = ctx.kit;
+    const d = ctx.detail;
+    const root = new Group();
+    root.name = `module:${design}`;
+    const base = new Sculpt(d);
+    let lights: Sculpt;
+    let main: Sculpt;
+    let extra: Group;
+    let radius: number;
+    let animate: ((t: number, dt: number) => void) | null = null;
+    if (design === 'antenna') {
+      main = new Sculpt(d);
+      lights = new Sculpt(d);
+      extra = new Group();
+      radius = 3.6;
+      pad(base, radius, CONCRETE, SYSTEMS.energy.color);
+      const dish = antenna(main, lights, extra, kit, d);
+      animate = (t) => {
+        dish.rotation.y = Math.sin(t * 0.25) * 1.2;
+        dish.rotation.x = -0.7 + Math.sin(t * 0.17) * 0.15;
+      };
+    } else {
+      const parts = SECTOR_DESIGNS[design](kit, d);
+      main = parts.s;
+      lights = parts.lights;
+      extra = parts.extra;
+      radius = parts.collider + 0.8;
+      pad(base, radius, CONCRETE, SYSTEMS[SECTORS[design].system].color);
+      if (parts.animate) animate = (t, dt) => parts.animate!(t, dt, 1);
+    }
+    root.add(base.mesh(kit.paint, 'module:base')!);
+    const mainMesh = main.mesh(kit.paint, `module:${design}`);
+    if (mainMesh) root.add(mainMesh);
+    const lightMesh = lights.mesh(kit.paint, 'module:lights', false);
+    if (lightMesh) root.add(lightMesh);
+    root.add(extra);
+    return {
+      object: root,
+      anchors: { door: new Vector3(0, 1, radius), center: new Vector3(0, 1, 0) },
+      update: animate ? (_s, uc) => animate!(uc.time, uc.dt) : undefined,
+    };
+  };
+}

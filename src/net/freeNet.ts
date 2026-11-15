@@ -12,7 +12,7 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { RealtimeChannel, RealtimeClient } from '@supabase/realtime-js';
 import type { AvatarConfig } from '../../shared/types';
-import type { BlockEdit } from '../world/blocks/BlockWorld';
+import { isModuleEdit, type ModuleEdit } from '../world/outpost/types';
 import type { PresencePose } from '../world/colony/snapshot';
 import type { Signaling } from '../engine/settings';
 import { PEER_PREFIX, isPose, peerOptions } from './protocol';
@@ -27,8 +27,8 @@ export interface FreePeer {
 type Msg =
   | { t: 'hi'; id: string; name: string; avatar: AvatarConfig; want?: boolean }
   | { t: 'pos'; id: string; p: PresencePose | null }
-  | { t: 'blk'; id: string; e: BlockEdit[] }
-  | { t: 'state'; id: string; to: string; e: BlockEdit[] }
+  | { t: 'mod'; id: string; e: ModuleEdit[] }
+  | { t: 'state'; id: string; to: string; e: ModuleEdit[] }
   | { t: 'emote'; id: string; e: string }
   | { t: 'bye'; id: string };
 
@@ -38,10 +38,10 @@ export interface FreeNetHandlers {
   onState(state: FreeNetState): void;
   onPeers(peers: FreePeer[]): void;
   onPose(id: string, pose: PresencePose | null): void;
-  onEdits(edits: BlockEdit[]): void;
+  onEdits(edits: ModuleEdit[]): void;
   onEmote?(peer: FreePeer, emote: string): void;
   /** Todos los cambios del mundo, para mandárselos a quien acaba de entrar. */
-  snapshot(): BlockEdit[];
+  snapshot(): ModuleEdit[];
 }
 
 const ROOM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -99,7 +99,7 @@ export class FreeNet {
   private state: FreeNetState = 'connecting';
   private timers: ReturnType<typeof setInterval>[] = [];
   private retry: ReturnType<typeof setTimeout> | null = null;
-  private pending: BlockEdit[] = [];
+  private pending: ModuleEdit[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -154,14 +154,14 @@ export class FreeNet {
     this.send({ t: 'emote', id: this.id, e: emote });
   }
 
-  /** Cambios de bloques: se agrupan unos milisegundos para mandarlos juntos. */
-  sendEdit(edit: BlockEdit): void {
+  /** Módulos construidos o desmontados: se agrupan unos milisegundos para mandarlos juntos. */
+  sendEdit(edit: ModuleEdit): void {
     this.pending.push(edit);
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;
       const e = this.pending.splice(0);
-      if (e.length) this.send({ t: 'blk', id: this.id, e });
+      if (e.length) this.send({ t: 'mod', id: this.id, e });
     }, 60);
   }
 
@@ -231,12 +231,12 @@ export class FreeNet {
       case 'pos':
         if (msg.p === null || isPose(msg.p)) this.handlers.onPose(msg.id, msg.p);
         break;
-      case 'blk':
-        if (Array.isArray(msg.e)) this.handlers.onEdits(msg.e.slice(0, 4000));
+      case 'mod':
+        if (Array.isArray(msg.e)) this.handlers.onEdits(msg.e.slice(0, 500).filter(isModuleEdit));
         break;
       case 'state':
         if (msg.to === this.id && Array.isArray(msg.e)) {
-          this.handlers.onEdits(msg.e.slice(0, 20000));
+          this.handlers.onEdits(msg.e.slice(0, 3000).filter(isModuleEdit));
           this.synced = true;
         }
         break;

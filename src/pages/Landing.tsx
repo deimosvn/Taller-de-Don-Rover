@@ -287,11 +287,11 @@ export function Landing() {
           </div>
           <a className="hero-free" href="#/libre">
             <span className="hero-free-icon" aria-hidden="true">
-              ⛏️
+              🏗️
             </span>
             <span>
               <b>¿Sin código? Juega ahora</b>
-              <small>Mina, fabrica y construye en Marte · solo o con amigos por enlace</small>
+              <small>Recolecta recursos y construye tu base en Marte · solo o con amigos por enlace</small>
             </span>
             <span className="hero-free-go">Jugar →</span>
           </a>
