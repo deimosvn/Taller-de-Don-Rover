@@ -317,7 +317,7 @@ class RoverLink {
     let port: SerialPortLike;
     try {
       const known = await api.getPorts();
-      port = !opts.ask && known.length ? known[0] : await api.requestPort({ filters: USB_FILTERS });
+      port = !opts.ask && known.length ? known[0] : await api.requestPort({});
     } catch {
       this.set({ state: 'off', via: null, detail: 'No se eligió ningún puerto USB.' });
       return false;

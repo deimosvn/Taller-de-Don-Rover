@@ -36,9 +36,9 @@ export function RoverSetup() {
     return off;
   }, []);
 
-  const install = async () => {
+  const install = async (manual = false) => {
     setLog([]);
-    const ok = await flashFirmware(setFlash, (line) => setLog((l) => [...l.slice(-60), line.trim()].filter(Boolean)));
+    const ok = await flashFirmware(setFlash, (line) => setLog((l) => [...l.slice(-80), line.trim()].filter(Boolean)), { manual });
     if (ok) {
       // Al reiniciar, la placa saluda: se conecta sola por USB.
       setTimeout(() => void rover.connectUsb().then((c) => c && greet()), 2500);
@@ -100,6 +100,11 @@ export function RoverSetup() {
             <button className="btn mars" disabled={!usbSupported() || (flash !== null && !['done', 'error'].includes(flash.stage))} onClick={() => void install()}>
               ⬇️ Instalar en la placa
             </button>
+            {flash?.stage === 'error' && (
+              <button className="btn cream" onClick={() => void install(true)}>
+                🔘 Reintentar en modo manual (BOOT)
+              </button>
+            )}
           </div>
           {!usbSupported() && <p className="rs-warn">Este navegador no puede usar USB. Abre esta página en Chrome o Edge en una computadora.</p>}
           {flash && (
@@ -118,9 +123,21 @@ export function RoverSetup() {
               <pre>{log.join('\n')}</pre>
             </details>
           )}
-          <p className="rs-note">
-            ¿Prefieres la terminal? En la carpeta <code>firmware/donrover-knomi</code>: <code>pio run -t upload</code>.
-          </p>
+          <details className="rs-log" open={flash?.stage === 'error'}>
+            <summary>¿No se instala? Hazlo desde la terminal</summary>
+            <p className="rs-note">
+              Con Python 3 instalado, en <b>Windows (PowerShell)</b>:
+            </p>
+            <pre>{'py -m pip install esptool\niwr https://tallerdedonrover.vercel.app/firmware/donrover-knomi.bin -OutFile donrover.bin\npy -m esptool --chip esp32 --baud 230400 write_flash -z 0x0 donrover.bin'}</pre>
+            <p className="rs-note">
+              En <b>macOS o Linux</b>:
+            </p>
+            <pre>{'python3 -m pip install esptool\ncurl -LO https://tallerdedonrover.vercel.app/firmware/donrover-knomi.bin\npython3 -m esptool --chip esp32 --baud 230400 write_flash -z 0x0 donrover-knomi.bin'}</pre>
+            <p className="rs-note">
+              En el repositorio también están <code>firmware/donrover-knomi/flash.ps1</code> y <code>flash.sh</code>, o con PlatformIO: <code>pio run -t upload</code>. Si no conecta, mantén
+              presionado BOOT al conectar el cable.
+            </p>
+          </details>
         </section>
 
         <section className="rs-card">

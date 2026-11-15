@@ -8,7 +8,27 @@ La placa **no tiene micrófono ni bocina**: la computadora del profe habla por s
 
 **Desde el navegador (recomendado).** Abre la plataforma en Chrome o Edge → `#/donrover` → *Instalar en la placa*. Usa la imagen ya compilada de `public/firmware/donrover-knomi.bin` y la herramienta oficial de Espressif (`esptool-js`).
 
-**Desde la terminal** (con [PlatformIO](https://platformio.org/install/cli)):
+**Desde la terminal, sin compilar** (solo necesita Python 3; detecta el puerto solo):
+
+```powershell
+# Windows (PowerShell), en esta carpeta
+powershell -ExecutionPolicy Bypass -File .\flash.ps1          # o: .\flash.ps1 -Port COM5
+```
+
+```bash
+# macOS o Linux
+./flash.sh                                                    # o: ./flash.sh /dev/ttyUSB0
+```
+
+Sin clonar el repositorio:
+
+```bash
+python3 -m pip install esptool
+curl -LO https://tallerdedonrover.vercel.app/firmware/donrover-knomi.bin
+python3 -m esptool --chip esp32 --baud 230400 write_flash -z 0x0 donrover-knomi.bin
+```
+
+**Compilando** (con [PlatformIO](https://platformio.org/install/cli)):
 
 ```bash
 cd firmware/donrover-knomi
