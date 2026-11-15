@@ -700,6 +700,7 @@ function Outcome({ view }: { view: PlayerView }) {
           </div>
         ))}
       </div>
+      {o.scores.creativity === 0 && <p className="fine center">💡 La próxima vez escriban la bitácora de la tripulación: suma puntos de creatividad.</p>}
     </div>
   );
 }

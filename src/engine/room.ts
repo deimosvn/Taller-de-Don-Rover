@@ -7,6 +7,7 @@ import {
   ACCESSORIES,
   BOT_LOGS,
   BOT_NAMES,
+  BUILDINGS,
   CATEGORIES,
   CATEGORY_LINES,
   CREWS,
@@ -294,8 +295,10 @@ export class HostEngine {
     if (active && !e.paused) {
       e.paused = true;
       e.pausedRemaining = Math.max(5000, active - s.savedAt);
+      e.pushIx('info', 'Sala restaurada. El cronómetro quedó en pausa: reanúdalo cuando todos estén conectados.');
+    } else {
+      e.pushIx('info', 'Sala restaurada: los celulares se reconectan solos.');
     }
-    e.pushIx('info', 'Sala restaurada. El cronómetro quedó en pausa: reanúdalo cuando todos estén conectados.');
     return e;
   }
 
@@ -1024,7 +1027,9 @@ export class HostEngine {
 
   private scoreCrew(c: Crew, tier: Tier) {
     const ms = this.members(c);
-    const efficiency = Math.round(TIER_SCORE[tier] * 0.7 + this.crewAction(c) * 30);
+    // La calidad de la decisión pesa más: una buena decisión nunca debe quedar por debajo
+    // de una mala solo por la bitácora o por la velocidad en la emergencia.
+    const efficiency = Math.round(TIER_SCORE[tier] * 0.8 + this.crewAction(c) * 20);
     const participation = ms.length
       ? ms.reduce((s, p) => s + ((p.quizChoice !== null ? 1 : 0) + (p.vote ? 1 : 0) + (p.taps >= 5 ? 1 : 0)) / 3, 0) / ms.length
       : 0;
@@ -1035,7 +1040,7 @@ export class HostEngine {
     const cooperation = Math.min(100, Math.round(participation * 50 + consensus + shareBonus));
     const stars = c.log ? (c.logStars ?? heuristicStars(c.log.text)) : 0;
     const creativity = stars ? Math.min(100, stars * 33 + 1) : 0;
-    const total = Math.round(0.4 * efficiency + 0.4 * cooperation + 0.2 * creativity);
+    const total = Math.round(0.5 * efficiency + 0.3 * cooperation + 0.2 * creativity);
     return { efficiency, cooperation, creativity, total };
   }
 
@@ -1085,17 +1090,21 @@ export class HostEngine {
 
     const saved = Boolean(m.event.saved);
     const after: Meters = { ...before };
-    for (const k of SYSTEM_ORDER) after[k] = clamp(Math.round(before[k] + agg[k] / n + (saved ? 4 : -6)), 0, 100);
+    // Cada misión pasan varios sols: la colonia consume recursos (−5 por sistema), así que
+    // los sistemas que nadie atiende se desgastan y la colonia siempre necesita cuidados.
+    const UPKEEP = 5;
+    for (const k of SYSTEM_ORDER) after[k] = clamp(Math.round(before[k] - UPKEEP + agg[k] / n + (saved ? 4 : -6)), 0, 100);
 
     // Reacciones en cadena: las decisiones de un sector afectan a los demás.
     const chain: string[] = [];
     const foodCrew = this.crews.find((c) => SECTORS[c.sectorId].system === 'food');
-    const energyHit = this.crews.find((c) => c.outcome && c.outcome.tier !== 'best' && (c.outcome.effects.energy ?? 0) < 0);
-    if (energyHit && foodCrew && foodCrew !== energyHit) {
+    const hurt = (c: Crew, sys: 'energy' | 'water') => c !== foodCrew && c.outcome && c.outcome.tier !== 'best' && (c.outcome.effects[sys] ?? 0) < 0;
+    const energyHit = this.crews.find((c) => hurt(c, 'energy'));
+    if (energyHit && foodCrew) {
       chain.push(`⚡ La decisión de ${energyHit.name} gastó energía extra y dejó con menos luz a los cultivos de ${foodCrew.name}.`);
     }
-    const waterHit = this.crews.find((c) => c.outcome && c.outcome.tier !== 'best' && (c.outcome.effects.water ?? 0) < 0);
-    if (waterHit && foodCrew && foodCrew !== waterHit) {
+    const waterHit = this.crews.find((c) => hurt(c, 'water'));
+    if (waterHit && foodCrew) {
       chain.push(`💧 ${waterHit.name} usó agua de la reserva y los cultivos de ${foodCrew.name} recibieron menos riego.`);
     }
     if (after.energy < 40) {
@@ -1201,7 +1210,7 @@ export class HostEngine {
       aiScored: false,
     };
     m.debrief = this.templateDebrief(m);
-    this.pushIx('info', `Resultados listos. Nuevo edificio: ${def.unlock}.`);
+    this.pushIx('info', `Resultados listos. Nuevo en la colonia: ${BUILDINGS[def.unlock].emoji} ${BUILDINGS[def.unlock].name}.`);
     this.setPhase('results');
     this.enrichWithAi(m);
   }

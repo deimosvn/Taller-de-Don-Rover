@@ -1,72 +1,58 @@
 // Aplicación del profesor: crea la sala, arranca el motor del juego en este navegador y
-// abre el canal WebRTC para que los celulares se unan.
+// abre el canal WebRTC para que los celulares se unan. La sesión vive fuera de React
+// (ver engine/session.ts), así que navegar por la app no cierra la sala.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { HostEngine, clearSnapshot, loadSnapshot, makeRoomCode } from '../../engine/room';
-import { loadSettings } from '../../engine/settings';
+import { currentSession, endSession, startSession, type HostSession } from '../../engine/session';
 import { getColony, newColony, saveColony } from '../../engine/store';
-import { HostNet, type NetStatus } from '../../net/hostNet';
+import type { NetStatus } from '../../net/hostNet';
 import type { Ack, Difficulty, HostAction, HostView, Pace } from '../../../shared/types';
 import { Console } from './Console';
 import { Setup } from './Setup';
 
+const STARTING: NetStatus = { state: 'starting', detail: 'Abriendo la colonia…', peers: 0 };
+
 export function HostApp() {
-  const [engine, setEngine] = useState<HostEngine | null>(null);
-  const [view, setView] = useState<HostView | null>(null);
-  const [net, setNet] = useState<NetStatus>({ state: 'starting', detail: 'Abriendo la colonia…', peers: 0 });
+  const [session, setSession] = useState<HostSession | null>(() => currentSession());
+  const [view, setView] = useState<HostView | null>(() => currentSession()?.engine.hostView() ?? null);
+  const [net, setNet] = useState<NetStatus>(() => currentSession()?.status ?? STARTING);
   const [snapshot, setSnapshot] = useState(() => loadSnapshot());
-  const engineRef = useRef<HostEngine | null>(null);
-  const netRef = useRef<HostNet | null>(null);
 
-  const launch = useCallback((e: HostEngine) => {
-    engineRef.current = e;
-    e.start();
-    e.subscribe(() => setView(e.hostView()));
-    const n = new HostNet(
-      e,
-      loadSettings().signaling,
-      (s) => setNet({ ...s }),
-      () => setNet({ state: 'offline', detail: 'Ese código de sala está ocupado. Sal y crea una sala nueva.', peers: 0 }),
-    );
-    n.start();
-    netRef.current = n;
-    setEngine(e);
-    setView(e.hostView());
-  }, []);
-
-  useEffect(
-    () => () => {
-      netRef.current?.stop();
-      engineRef.current?.stop();
-    },
-    [],
-  );
+  useEffect(() => {
+    if (!session) return;
+    const update = () => {
+      setView(session.engine.hostView());
+      setNet(session.status);
+    };
+    update();
+    return session.subscribe(update);
+  }, [session]);
 
   const create = (opts: { className: string; difficulty: Difficulty; pace: Pace; colonyId: string | null }) => {
     const colony = (opts.colonyId && getColony(opts.colonyId)) || newColony(opts.className);
     saveColony(colony);
-    launch(new HostEngine({ code: makeRoomCode(), className: opts.className.trim() || colony.name, difficulty: opts.difficulty, pace: opts.pace, colony }));
+    const engine = new HostEngine({ code: makeRoomCode(), className: opts.className.trim() || colony.name, difficulty: opts.difficulty, pace: opts.pace, colony });
+    setSession(startSession(engine));
   };
 
-  const act = useCallback((a: HostAction): Ack => engineRef.current?.hostAction(a) ?? { ok: false, error: 'No hay una sala abierta.' }, []);
+  const act = useCallback((a: HostAction): Ack => session?.engine.hostAction(a) ?? { ok: false, error: 'No hay una sala abierta.' }, [session]);
 
   const exit = () => {
-    netRef.current?.stop();
-    engineRef.current?.stop();
+    endSession();
     clearSnapshot();
-    engineRef.current = null;
-    netRef.current = null;
-    setEngine(null);
+    setSession(null);
     setView(null);
+    setNet(STARTING);
     setSnapshot(null);
   };
 
-  if (!engine || !view) {
+  if (!session || !view) {
     return (
       <Setup
         snapshot={snapshot}
         onCreate={create}
-        onResume={() => snapshot && launch(HostEngine.restore(snapshot))}
+        onResume={() => snapshot && setSession(startSession(HostEngine.restore(snapshot)))}
         onDiscard={() => {
           clearSnapshot();
           setSnapshot(null);
