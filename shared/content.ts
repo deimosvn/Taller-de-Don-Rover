@@ -5,13 +5,11 @@
 import type {
   BadgeId,
   BuildingId,
-  CategoryId,
   Difficulty,
   Meters,
   MissionId,
   Pace,
   Phase,
-  Quiz,
   RoleId,
   SectorId,
   SystemId,
@@ -147,50 +145,17 @@ export const SECTORS: Record<SectorId, { name: string; system: SystemId; desc: s
 };
 
 /* ------------------------------------------------------------------ */
-/* Escáner: categorías de objetos                                       */
+/* Datos curiosos de Marte (los dice IX en el mundo 3D)                 */
 /* ------------------------------------------------------------------ */
 
-export const CATEGORIES: Record<
-  CategoryId,
-  { id: CategoryId; label: string; emoji: string; examples: string; missionId: MissionId; unlocks: string }
-> = {
-  plant: { id: 'plant', label: 'Planta', emoji: '🪴', examples: 'plantas, flores, frutas, árboles', missionId: 'greenhouse', unlocks: 'Crear un ecosistema agrícola en Marte' },
-  water: { id: 'water', label: 'Agua', emoji: '🧴', examples: 'botellas, vasos, recipientes', missionId: 'water', unlocks: 'Resolver una crisis de agua' },
-  light: { id: 'light', label: 'Luz', emoji: '💡', examples: 'lámparas, focos, ventanas, linternas', missionId: 'darkness', unlocks: 'Superar una falla energética' },
-  signal: { id: 'signal', label: 'Señal', emoji: '📡', examples: 'celulares, radios, bocinas, computadoras', missionId: 'signal', unlocks: 'Investigar una señal desconocida' },
-  material: { id: 'material', label: 'Material', emoji: '♻️', examples: 'cartón, plástico, latas, papel', missionId: 'habitat', unlocks: 'Construir un módulo virtual de hábitat' },
-  mystery: { id: 'mystery', label: 'Misterio', emoji: '❔', examples: 'cualquier otra cosa', missionId: 'greenhouse', unlocks: 'Un descubrimiento sorpresa' },
-};
-
-export const SCAN_CATEGORIES: CategoryId[] = ['plant', 'water', 'light', 'signal', 'material'];
-
-/** Textos de respaldo del escáner cuando la IA en la nube no está disponible. */
-export const CATEGORY_LINES: Record<CategoryId, { discovery: string; funFact: string }> = {
-  plant: {
-    discovery: '¡Hemos descubierto un organismo vegetal! Necesitamos aprender a crear un ecosistema capaz de producir alimentos en Marte.',
-    funFact: 'En la Estación Espacial Internacional ya se han cultivado lechugas, flores de zinnia y chiles.',
-  },
-  water: {
-    discovery: '¡Un contenedor de agua! En Marte cada gota cuenta: hay que encontrarla, limpiarla y reciclarla.',
-    funFact: 'La Estación Espacial Internacional recupera cerca del 98% de su agua.',
-  },
-  light: {
-    discovery: '¡Una fuente de luz! Sin luz no hay energía solar… ni cultivos. ¿Qué pasaría si el Sol desapareciera por días?',
-    funFact: 'Marte recibe menos de la mitad de la luz solar que llega a la Tierra.',
-  },
-  signal: {
-    discovery: '¡Un aparato de comunicación! Detectamos ondas… y una señal misteriosa en Marte.',
-    funFact: 'Un mensaje de radio tarda entre 3 y 22 minutos en viajar entre la Tierra y Marte.',
-  },
-  material: {
-    discovery: '¡Material de construcción! Con ingenio, la colonia puede convertir materiales en un nuevo hogar.',
-    funFact: 'La NASA ha probado hábitats impresos en 3D, como Mars Dune Alpha en Houston.',
-  },
-  mystery: {
-    discovery: '¡Objeto misterioso detectado! IX lo registró en la bitácora de descubrimientos.',
-    funFact: 'Marte tiene el volcán más grande del sistema solar: el Monte Olimpo.',
-  },
-};
+export const MARS_FACTS: string[] = [
+  'En la Estación Espacial Internacional ya se han cultivado lechugas, flores de zinnia y chiles.',
+  'La Estación Espacial Internacional recupera cerca del 98% de su agua.',
+  'Marte recibe menos de la mitad de la luz solar que llega a la Tierra.',
+  'Un mensaje de radio tarda entre 3 y 22 minutos en viajar entre la Tierra y Marte.',
+  'La NASA ha probado hábitats impresos en 3D, como Mars Dune Alpha en Houston.',
+  'Marte tiene el volcán más grande del sistema solar: el Monte Olimpo.',
+];
 
 /* ------------------------------------------------------------------ */
 /* Edificios que se desbloquean (progresión de la colonia)              */
@@ -211,13 +176,13 @@ export const BUILDINGS: Record<BuildingId, { name: string; desc: string; emoji: 
 
 export const BADGES: Record<BadgeId, { name: string; emoji: string; desc: string }> = {
   first: { name: 'Primer contacto', emoji: '🚀', desc: 'Primera persona en abordar la colonia' },
-  decoder: { name: 'Decodificador', emoji: '🔓', desc: 'Descifró su transmisión al primer intento' },
+  decoder: { name: 'Rastreador', emoji: '📡', desc: 'Encontró su transmisión secreta en el mundo 3D' },
   voice: { name: 'Voz de la tripulación', emoji: '🗳️', desc: 'Votó en la decisión de su tripulación' },
   brain: { name: 'Mente brillante', emoji: '🧠', desc: 'Su tripulación encontró la mejor solución' },
   hands: { name: 'Manos a la obra', emoji: '🛠️', desc: 'La mayor cantidad de acciones de su tripulación' },
   hero: { name: 'Héroe de la colonia', emoji: '🏅', desc: 'La clase salvó a la colonia en la emergencia' },
   writer: { name: 'Bitácora', emoji: '📓', desc: 'Escribió el plan de su tripulación' },
-  expert: { name: 'Experto NASA', emoji: '🛰️', desc: 'Respondió bien la pregunta bonus' },
+  expert: { name: 'Mecánico estrella', emoji: '🔧', desc: 'Reparó problemas de la colonia en la emergencia' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -249,9 +214,9 @@ export const PACES: Record<Pace, { label: string; desc: string; discovery: numbe
 export const PHASE_LABELS: Record<Phase, string> = {
   lobby: 'Abordaje',
   crews: 'Tripulaciones',
-  scan: 'Escáner',
+  scan: 'Misión',
   briefing: 'Briefing',
-  discovery: 'Descubrimiento',
+  discovery: 'Exploración',
   challenge: 'Reto de tripulación',
   event: 'Evento global',
   results: 'Resultados',
@@ -261,12 +226,12 @@ export const PHASE_LABELS: Record<Phase, string> = {
 export const PHASE_FLOW: Phase[] = ['lobby', 'crews', 'scan', 'briefing', 'discovery', 'challenge', 'event', 'results', 'debrief'];
 
 export const CLASS_PLAN: { from: string; to: string; stage: string; es: string; text: string }[] = [
-  { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR, crean su astronauta y aparecen en la colonia.' },
+  { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR, crean su astronauta y aparecen en la colonia 3D.' },
   { from: '03', to: '05', stage: 'CREW ASSIGNMENT', es: 'Tripulaciones', text: 'IX forma tripulaciones de cuatro y asigna las especialidades.' },
-  { from: '05', to: '08', stage: 'WORLD SCANNER', es: 'Escáner', text: 'Se fotografía un objeto del salón y la IA desbloquea la misión.' },
-  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien descifra una transmisión secreta con un reto científico.' },
-  { from: '15', to: '22', stage: 'CREW CHALLENGE', es: 'Reto de tripulación', text: 'Los cuatro roles combinan sus datos y votan una decisión.' },
-  { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Evento global', text: 'Toda la clase enfrenta una emergencia y decide cuánto compartir.' },
+  { from: '05', to: '07', stage: 'MISSION SELECT', es: 'Misión', text: 'El profesor elige la misión y el planeta viaja a su lugar.' },
+  { from: '07', to: '14', stage: 'EXPLORATION', es: 'Exploración', text: 'Cada quien recorre Marte hasta la baliza con su transmisión secreta.' },
+  { from: '14', to: '22', stage: 'CREW CHALLENGE', es: 'Reto de tripulación', text: 'La tripulación se reúne en su consola, combina sus datos y vota.' },
+  { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Evento global', text: 'Aparecen problemas por toda la colonia: cada especialidad corre a repararlos.' },
   { from: '30', to: '35', stage: 'MISSION RESULTS', es: 'Resultados', text: 'La colonia cambia según las decisiones de cada tripulación.' },
   { from: '35', to: '40', stage: 'DEBRIEF', es: 'Debrief', text: 'IX explica lo aprendido y desbloquea un nuevo edificio.' },
 ];
@@ -301,8 +266,6 @@ export interface MissionDef {
   focus: SystemId;
   conceptHint: string;
   twists: [string, string, string];
-  quiz: Record<RoleId, Quiz>;
-  bonus: Quiz;
   event: EventDef;
   debrief: { learnings: string[]; nasaFact: string; reflection: string; teaser: string };
   unlock: BuildingId;
@@ -334,38 +297,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: una tormenta de polvo cubre toda la colonia.',
       'Descubrimiento: algo brilla bajo la arena del invernadero…',
     ],
-    quiz: {
-      power: {
-        q: '¿Qué colores de luz LED aprovechan más las plantas para hacer fotosíntesis?',
-        options: ['Rojo y azul', 'Verde y amarillo', 'Solo luz blanca'],
-        answer: 0,
-        explain: 'Las plantas absorben sobre todo luz roja y azul. La verde la reflejan: ¡por eso las vemos verdes!',
-      },
-      life: {
-        q: 'En la fotosíntesis las plantas toman agua y dióxido de carbono. ¿Qué gas liberan?',
-        options: ['Oxígeno', 'Nitrógeno', 'Helio'],
-        answer: 0,
-        explain: 'Liberan oxígeno. En Marte, los cultivos ayudarían a renovar el aire de la base.',
-      },
-      bio: {
-        q: '¿Qué necesita una planta para hacer fotosíntesis?',
-        options: ['Luz, agua y dióxido de carbono', 'Solo tierra', 'Oscuridad y frío'],
-        answer: 0,
-        explain: 'Con luz, agua y CO₂ la planta fabrica su propio alimento (glucosa) y libera oxígeno.',
-      },
-      habitat: {
-        q: '¿Por qué un invernadero en Marte necesita una cubierta cerrada y protegida?',
-        options: ['Afuera hace muchísimo frío y el aire es muy delgado', 'Porque en Marte llueve mucho', 'Para que no entren insectos marcianos'],
-        answer: 0,
-        explain: 'Marte tiene en promedio unos −60 °C y una atmósfera muy delgada. Sin protección, el agua de las plantas se congelaría o evaporaría.',
-      },
-    },
-    bonus: {
-      q: 'La atmósfera de Marte está hecha casi toda de un gas que las plantas usan. ¿Cuál es?',
-      options: ['Dióxido de carbono', 'Oxígeno', 'Hidrógeno'],
-      answer: 0,
-      explain: 'Cerca del 95% de la atmósfera marciana es dióxido de carbono: ¡ingrediente de la fotosíntesis!',
-    },
     event: {
       title: 'TORMENTA DE POLVO',
       narrative:
@@ -373,10 +304,10 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       shareLabel: 'Compartir energía con la red de invernaderos',
       shareUnit: '⚡',
       actions: {
-        power: { verb: 'Limpia los paneles', emoji: '🧽', hint: 'Toca rápido para quitar el polvo' },
-        life: { verb: 'Bombea agua', emoji: '💧', hint: 'Toca para mantener el riego' },
-        bio: { verb: 'Cubre los brotes', emoji: '🌱', hint: 'Toca para proteger cada planta' },
-        habitat: { verb: 'Sella las compuertas', emoji: '🔧', hint: 'Toca para cerrar las fugas' },
+        power: { verb: 'Conecta los cables', emoji: '🔌', hint: 'Gira las piezas hasta cerrar el circuito' },
+        life: { verb: 'Presuriza el módulo', emoji: '🎈', hint: 'Toca al ritmo de la bomba de aire' },
+        bio: { verb: 'Muda los cultivos', emoji: '🪴', hint: 'Dale a cada planta lo que pide' },
+        habitat: { verb: 'Imprime el módulo en 3D', emoji: '🏗️', hint: 'Apila cada capa bien alineada' },
       },
       savedText: '¡La red de energía mantuvo encendidas las luces de todos los invernaderos!',
       failText: 'La energía no alcanzó y algunos invernaderos se quedaron a oscuras.',
@@ -416,38 +347,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: una zona de cultivo bebe más agua de lo previsto.',
       'Descubrimiento: el radar detecta una cueva de hielo…',
     ],
-    quiz: {
-      power: {
-        q: '¿Qué se necesita para convertir el hielo marciano en agua líquida?',
-        options: ['Calor, es decir, energía', 'Viento', 'Sombra'],
-        answer: 0,
-        explain: 'Derretir hielo requiere energía en forma de calor. Por eso el agua y la energía están conectadas en la colonia.',
-      },
-      life: {
-        q: 'La Estación Espacial Internacional recicla casi toda su agua. ¿Cuánta, aproximadamente?',
-        options: ['Cerca del 98%', 'La mitad', 'Solo el 10%'],
-        answer: 0,
-        explain: 'En 2023 la NASA logró recuperar cerca del 98% del agua: el sudor, la respiración y hasta la orina se purifican.',
-      },
-      bio: {
-        q: 'En el ciclo del agua, cuando el vapor se enfría y forma gotitas, se llama…',
-        options: ['Condensación', 'Evaporación', 'Fotosíntesis'],
-        answer: 0,
-        explain: 'Es la condensación. Las recicladoras de las bases espaciales condensan el vapor del aire para volver a usarlo.',
-      },
-      habitat: {
-        q: '¿Dónde se ha encontrado agua congelada en Marte?',
-        options: ['En los polos y enterrada bajo el suelo', 'En ríos que fluyen hoy', 'En nubes de lluvia'],
-        answer: 0,
-        explain: 'Marte tiene casquetes polares de hielo y hielo enterrado. Hoy no hay ríos líquidos en su superficie.',
-      },
-    },
-    bonus: {
-      q: '¿Qué sales tóxicas hay en el suelo marciano y obligan a filtrar el agua?',
-      options: ['Percloratos', 'Azúcares', 'Bicarbonatos'],
-      answer: 0,
-      explain: 'La sonda Phoenix encontró percloratos en 2008. Hay que quitarlos antes de beber el agua o regar con ella.',
-    },
     event: {
       title: 'LA RED PIERDE PRESIÓN',
       narrative:
@@ -455,10 +354,10 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       shareLabel: 'Donar agua a la red de la colonia',
       shareUnit: '💧',
       actions: {
-        power: { verb: 'Enciende las bombas', emoji: '⚙️', hint: 'Toca para dar potencia' },
-        life: { verb: 'Cierra las válvulas', emoji: '🚰', hint: 'Toca para frenar la fuga' },
-        bio: { verb: 'Ajusta el goteo', emoji: '🌾', hint: 'Toca para regar solo lo necesario' },
-        habitat: { verb: 'Parcha la tubería', emoji: '🩹', hint: 'Toca para sellar cada grieta' },
+        power: { verb: 'Reparte energía a las bombas', emoji: '⚙️', hint: 'Mantén cada bomba en su zona verde' },
+        life: { verb: 'Recolecta hielo', emoji: '🧊', hint: 'Atrapa el hielo y esquiva las sales' },
+        bio: { verb: 'Filtra el agua', emoji: '🧪', hint: 'Separa el agua limpia de la contaminada' },
+        habitat: { verb: 'Parcha la tubería', emoji: '🩹', hint: 'Gira los tubos para cerrar el circuito' },
       },
       savedText: '¡La red recuperó la presión y ningún sector se quedó sin agua!',
       failText: 'La presión no se recuperó a tiempo y varios sectores tuvieron que racionar agua.',
@@ -498,38 +397,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: la tormenta durará más de lo previsto.',
       'Descubrimiento: un remolino de polvo limpió algunos paneles…',
     ],
-    quiz: {
-      power: {
-        q: '¿Por qué una tormenta de polvo reduce la energía de la colonia?',
-        options: ['El polvo bloquea la luz del Sol y cubre los paneles', 'El polvo es magnético', 'El viento descarga las baterías'],
-        answer: 0,
-        explain: 'Los paneles solares necesitan luz. El polvo en el aire y sobre los paneles reduce la energía que producen.',
-      },
-      life: {
-        q: '¿Qué sistema NUNCA debemos apagar en una base espacial?',
-        options: ['El soporte vital: oxígeno y aire', 'La música', 'Las pantallas'],
-        answer: 0,
-        explain: 'Sin soporte vital no hay aire que respirar. Siempre es la primera prioridad.',
-      },
-      bio: {
-        q: 'Marte recibe menos luz solar que la Tierra porque…',
-        options: ['Está más lejos del Sol', 'Es más pequeño', 'Es de color rojo'],
-        answer: 0,
-        explain: 'Al estar más lejos, Marte recibe menos de la mitad de la luz solar que llega a la Tierra.',
-      },
-      habitat: {
-        q: '¿Para qué sirve una batería en la colonia?',
-        options: ['Para guardar energía y usarla después', 'Para producir luz solar', 'Para enfriar el hábitat'],
-        answer: 0,
-        explain: 'Las baterías guardan la energía del día para usarla de noche o durante una tormenta.',
-      },
-    },
-    bonus: {
-      q: '¿Qué fuente de energía usan los rovers Curiosity y Perseverance que no depende del Sol?',
-      options: ['Un generador nuclear de radioisótopos', 'Paneles solares gigantes', 'Pedales'],
-      answer: 0,
-      explain: 'Usan un generador que convierte en electricidad el calor del plutonio. Funciona de día, de noche y con tormentas.',
-    },
     event: {
       title: 'LA TORMENTA SE EXTIENDE',
       narrative:
@@ -537,10 +404,10 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       shareLabel: 'Compartir batería con la red',
       shareUnit: '🔋',
       actions: {
-        power: { verb: 'Orienta los paneles', emoji: '☀️', hint: 'Toca para atrapar cada rayo de luz' },
-        life: { verb: 'Recicla el aire', emoji: '🫧', hint: 'Toca para mantener el oxígeno' },
-        bio: { verb: 'Luces de emergencia', emoji: '💡', hint: 'Toca para encender los LED' },
-        habitat: { verb: 'Aísla los muros', emoji: '🧱', hint: 'Toca para guardar el calor' },
+        power: { verb: 'Reparte la energía', emoji: '🔋', hint: 'Mantén cada sistema en su zona verde' },
+        life: { verb: 'Recicla el aire', emoji: '🫧', hint: 'Toca al ritmo del generador' },
+        bio: { verb: 'Enciende las luces LED', emoji: '💡', hint: 'Dale a cada bandeja lo que pide' },
+        habitat: { verb: 'Aísla los muros', emoji: '🧱', hint: 'Apila los bloques bien alineados' },
       },
       savedText: '¡La colonia sobrevivió a la oscuridad compartiendo sus baterías!',
       failText: 'Las reservas se agotaron y algunos sistemas tuvieron que apagarse.',
@@ -580,38 +447,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: la señal cambia de frecuencia y la comunicación se corta.',
       'Descubrimiento: ¡la señal venía de una vieja sonda perdida!',
     ],
-    quiz: {
-      power: {
-        q: 'Las señales de radio viajan a la velocidad de…',
-        options: ['La luz', 'El sonido', 'Un cohete'],
-        answer: 0,
-        explain: 'Las ondas de radio son ondas electromagnéticas, igual que la luz: viajan a unos 300 000 km por segundo.',
-      },
-      life: {
-        q: '¿Cuánto tarda un mensaje de radio en llegar de la Tierra a Marte?',
-        options: ['Entre 3 y 22 minutos', '1 segundo', '3 días'],
-        answer: 0,
-        explain: 'Depende de dónde estén los planetas en su órbita: entre unos 3 y 22 minutos, solo de ida.',
-      },
-      bio: {
-        q: '¿Por qué un rover avanza despacio y planea cada movimiento?',
-        options: ['Porque nadie puede ir a repararlo si se daña', 'Porque se cansa', 'Porque Marte no tiene gravedad'],
-        answer: 0,
-        explain: 'Un rover está solo a millones de kilómetros. Cada paso se planea para no atascarse ni romperse.',
-      },
-      habitat: {
-        q: 'Si una onda vibra más rápido (tiene más frecuencia), su longitud de onda es…',
-        options: ['Más corta', 'Más larga', 'Igual'],
-        answer: 0,
-        explain: 'A mayor frecuencia, menor longitud de onda. Las antenas se diseñan según la frecuencia que quieren captar.',
-      },
-    },
-    bonus: {
-      q: '¿Cómo envían los rovers de Marte la mayor parte de sus datos a la Tierra?',
-      options: ['A través de orbitadores que funcionan como relevo', 'Por un cable muy largo', 'Con espejos'],
-      answer: 0,
-      explain: 'Orbitadores como el Mars Reconnaissance Orbiter reciben los datos del rover y los reenvían a la Tierra.',
-    },
     event: {
       title: 'SEÑAL INTERMITENTE',
       narrative:
@@ -619,10 +454,10 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       shareLabel: 'Prestar energía a la antena principal',
       shareUnit: '📡',
       actions: {
-        power: { verb: 'Carga la antena', emoji: '🔋', hint: 'Toca para mandar energía' },
-        life: { verb: 'Enfría el sistema', emoji: '🌡️', hint: 'Toca para evitar el sobrecalentamiento' },
-        bio: { verb: 'Analiza la señal', emoji: '🔬', hint: 'Toca para descifrar el patrón' },
-        habitat: { verb: 'Orienta el plato', emoji: '📡', hint: 'Toca para apuntar la antena' },
+        power: { verb: 'Atrapa los paquetes de datos', emoji: '📶', hint: 'Atrapa los datos y esquiva el ruido' },
+        life: { verb: 'Enfría el transmisor', emoji: '🌡️', hint: 'Toca al ritmo del radiador' },
+        bio: { verb: 'Separa la señal del ruido', emoji: '🔬', hint: 'Manda cada pulso a su lado' },
+        habitat: { verb: 'Orienta el plato', emoji: '📡', hint: 'Iguala tu onda con la señal' },
       },
       savedText: '¡Sintonizamos la frecuencia y recuperamos el contacto con todos los rovers!',
       failText: 'La señal se perdió un tiempo y algunos rovers quedaron incomunicados.',
@@ -663,38 +498,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: no hay espacio protegido para todos los módulos.',
       'Descubrimiento: el radar encontró un tubo de lava gigante…',
     ],
-    quiz: {
-      power: {
-        q: '¿Qué formas resisten mejor la presión del aire dentro de un hábitat?',
-        options: ['Domos y cilindros redondeados', 'Cubos con esquinas', 'Pirámides de papel'],
-        answer: 0,
-        explain: 'Las formas redondeadas reparten la presión de manera uniforme; las esquinas concentran el esfuerzo.',
-      },
-      life: {
-        q: '¿Para qué sirve una esclusa (airlock) en un hábitat?',
-        options: ['Para entrar y salir sin perder el aire', 'Para guardar comida', 'Para hacer ejercicio'],
-        answer: 0,
-        explain: 'La esclusa tiene dos puertas: así se puede salir a la superficie sin que escape el aire de la base.',
-      },
-      bio: {
-        q: '¿Por qué en Marte se necesita protección extra contra la radiación?',
-        options: ['Marte no tiene un campo magnético global ni una atmósfera gruesa', 'Porque Marte es muy caliente', 'Por las tormentas de lluvia'],
-        answer: 0,
-        explain: 'La Tierra nos protege con su campo magnético y su atmósfera. En Marte hay que blindar los hábitats.',
-      },
-      habitat: {
-        q: '¿Qué material local podría usarse para construir con impresoras 3D en Marte?',
-        options: ['Regolito, el suelo marciano', 'Madera de árboles marcianos', 'Hielo de Júpiter'],
-        answer: 0,
-        explain: 'Usar materiales del lugar ahorra muchísimos viajes desde la Tierra. La NASA ha probado hábitats impresos en 3D.',
-      },
-    },
-    bonus: {
-      q: '¿Cómo se llama la misión de la NASA donde cuatro voluntarios vivieron un año en un hábitat de Marte impreso en 3D?',
-      options: ['CHAPEA', 'Apollo 11', 'Hubble'],
-      answer: 0,
-      explain: 'En CHAPEA vivieron 378 días en Mars Dune Alpha, un hábitat impreso en 3D en Houston.',
-    },
     event: {
       title: 'ESPACIO LIMITADO',
       narrative:
@@ -745,38 +548,6 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       'Emergencia global: tormenta solar y fuga de aire al mismo tiempo.',
       'Descubrimiento: la colonia es autosuficiente… ¡y la Luna nos llama!',
     ],
-    quiz: {
-      power: {
-        q: 'Si la energía de la colonia falla, ¿qué sistemas se afectan?',
-        options: ['Todos: agua, oxígeno, calefacción y cultivos', 'Ninguno', 'Solo las luces'],
-        answer: 0,
-        explain: 'Todo en una base espacial necesita energía: bombas, recicladoras, calefacción y luces de cultivo.',
-      },
-      life: {
-        q: 'Un sistema de soporte vital "cerrado" es aquel que…',
-        options: ['Recicla el aire y el agua una y otra vez', 'Nunca se abre', 'No necesita energía'],
-        answer: 0,
-        explain: 'En un sistema cerrado casi nada se tira: el agua y el aire se limpian y se vuelven a usar.',
-      },
-      bio: {
-        q: 'En un ecosistema, las plantas son…',
-        options: ['Productores: fabrican su propio alimento', 'Consumidores', 'Descomponedores'],
-        answer: 0,
-        explain: 'Las plantas producen alimento con la luz del Sol; de ellas dependen los demás seres vivos del ecosistema.',
-      },
-      habitat: {
-        q: '¿Qué pasa si un sistema de la colonia gasta más de lo que produce?',
-        options: ['Sus reservas bajan hasta agotarse', 'Produce más por sí solo', 'No pasa nada'],
-        answer: 0,
-        explain: 'Un balance negativo vacía las reservas poco a poco. Por eso cada plan debe cuidar el equilibrio.',
-      },
-    },
-    bonus: {
-      q: '¿Cómo se llama el experimento del rover Perseverance que produjo oxígeno en Marte?',
-      options: ['MOXIE', 'VEGGIE', 'ROVER-O2'],
-      answer: 0,
-      explain: 'En 2021 MOXIE convirtió dióxido de carbono marciano en oxígeno por primera vez.',
-    },
     event: {
       title: 'EMERGENCIA CONJUNTA',
       narrative:
@@ -784,10 +555,10 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
       shareLabel: 'Compartir reservas con toda la colonia',
       shareUnit: '⭐',
       actions: {
-        power: { verb: 'Reparte la energía', emoji: '⚡', hint: 'Toca para mandar energía a la red' },
-        life: { verb: 'Sella la fuga de aire', emoji: '🫧', hint: 'Toca para tapar la fuga' },
-        bio: { verb: 'Protege los cultivos', emoji: '🌿', hint: 'Toca para cubrirlos' },
-        habitat: { verb: 'Refuerza el escudo', emoji: '🛡️', hint: 'Toca para blindar los refugios' },
+        power: { verb: 'Reparte la energía', emoji: '⚡', hint: 'Mantén cada sector en su zona verde' },
+        life: { verb: 'Sella la fuga de aire', emoji: '🫧', hint: 'Recorre la grieta con el dedo' },
+        bio: { verb: 'Protege los cultivos', emoji: '🌿', hint: 'Dale a cada cultivo lo que pide' },
+        habitat: { verb: 'Refuerza el escudo', emoji: '🛡️', hint: 'Apila el regolito bien alineado' },
       },
       savedText: '¡La colonia resistió la emergencia conjunta! Somos autosuficientes.',
       failText: 'La colonia resistió con daños: habrá que reconstruir algunos sectores.',
@@ -840,10 +611,6 @@ export const BOT_LOGS = [
   'Cada quien dijo su número y así encontramos la respuesta.',
   'Pensamos en toda la colonia y no solo en nuestro sector.',
 ];
-
-export function missionForCategory(category: CategoryId): MissionId {
-  return CATEGORIES[category]?.missionId ?? 'greenhouse';
-}
 
 export function levelFromXp(xp: number): { level: number; title: string; progress: number; next: number } {
   const per = 400;

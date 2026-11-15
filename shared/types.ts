@@ -64,13 +64,6 @@ export interface AvatarConfig {
   accessory: number;
 }
 
-export interface Quiz {
-  q: string;
-  options: string[];
-  answer: number;
-  explain: string;
-}
-
 /* ---------- Rompecabezas cooperativo (información secreta por rol) ---------- */
 
 export interface IntelLine {
@@ -165,6 +158,7 @@ export interface CrewOutcome {
 export interface CrewStatus {
   members: number;
   connected: number;
+  /** Tripulantes que ya recuperaron su transmisión en el mundo 3D. */
   decoded: number;
   voted: number;
   locked: boolean;
@@ -182,7 +176,8 @@ export interface CrewStatus {
   logStars: number | null;
   logComment: string | null;
   logHidden: boolean;
-  bonusCorrect: number;
+  /** Incidentes reparados por la tripulación en la emergencia. */
+  repaired: number;
 }
 
 export interface HostCrew extends CrewSummary {
@@ -191,40 +186,48 @@ export interface HostCrew extends CrewSummary {
   health: CrewHealthStatus | null;
 }
 
-export interface ScanResult {
-  category: CategoryId;
-  label: string;
-  confidence: number;
-  discovery: string;
-  funFact: string;
-  source: 'ai' | 'local' | 'manual' | 'vote' | 'teacher';
-}
-
 export interface MissionPublic {
   id: MissionId;
-  category: CategoryId;
-  objectLabel: string;
-  discovery: string;
-  funFact: string;
   briefing: string;
   crewLines: Record<string, string>;
   twists: string[];
   twistsRevealed: number;
   aiNarrative: boolean;
-  source: ScanResult['source'];
   puzzleTitle: string;
   puzzleQuestion: string;
 }
 
 export interface PlayerProgress {
+  /** Recuperó su transmisión secreta en el mundo 3D. */
   decoded: boolean;
-  correct: boolean | null;
   voted: boolean;
   share: number | null;
   taps: number;
-  bonus: boolean | null;
+  /** Incidentes que ayudó a reparar. */
+  repairs: number;
   sessionXp: number;
   badges: BadgeId[];
+}
+
+/* ---------- Problemas en el mundo 3D (emergencia global) ---------- */
+
+/** Tipo de problema que aparece en la colonia; cada uno lo repara una especialidad. */
+export type IncidentKind = 'dust' | 'leak' | 'crack' | 'wilt' | 'overload' | 'cold' | 'static';
+
+export interface Incident {
+  id: string;
+  kind: IncidentKind;
+  /** Especialidad que sabe repararlo. */
+  role: RoleId;
+  /** Sector donde apareció y lugar alrededor de él (0–3). */
+  sectorId: SectorId;
+  slot: number;
+  /** Avance de la reparación (0–1). */
+  progress: number;
+  /** Ya quedó reparado. */
+  fixed: boolean;
+  /** Quiénes están trabajando en él ahora mismo (ids de jugadores). */
+  workers: string[];
 }
 
 export interface EventPublic {
@@ -233,6 +236,8 @@ export interface EventPublic {
   progress: number;
   goal: number;
   saved: boolean | null;
+  /** Problemas que hay que reparar en el mundo 3D durante la acción. */
+  incidents: Incident[];
 }
 
 export interface ResultsPublic {
@@ -265,31 +270,14 @@ export interface IxMessage {
   crewId?: string;
 }
 
-export interface ObjectVoteState {
-  options: CategoryId[];
-  counts: Partial<Record<CategoryId, number>>;
-  total: number;
-  open: boolean;
-}
-
-export interface QuizView {
-  q: string;
-  options: string[];
-  answered: boolean;
-  correct: boolean | null;
-  choice: number | null;
-  explain: string | null;
-  answer: number | null;
-}
-
 export interface ClassStats {
   players: number;
   connected: number;
-  quizAnswered: number;
-  quizCorrect: number;
+  /** Transmisiones recuperadas en el mundo 3D. */
+  decoded: number;
   votes: number;
-  bonusAnswered: number;
-  bonusCorrect: number;
+  /** Incidentes reparados en la emergencia. */
+  repaired: number;
 }
 
 export interface HostView {
@@ -311,11 +299,9 @@ export interface HostView {
   event: EventPublic | null;
   results: ResultsPublic | null;
   debrief: DebriefPublic | null;
-  objectVote: ObjectVoteState | null;
   ix: IxMessage[];
   ai: { enabled: boolean; model: string };
   stats: ClassStats;
-  bonusActive: boolean;
   finalUnlocked: boolean;
   missionsPlayed: MissionId[];
   nasa: MissionNasa | null;
@@ -344,6 +330,8 @@ export interface PlayerEventView extends EventPublic {
   shareVotes: Record<string, number>;
   crewShare: number | null;
   myTaps: number;
+  /** Mis reparaciones terminadas. */
+  myRepairs: number;
   crewTaps: Record<RoleId, number>;
   rolesPresent: RoleId[];
   target: number;
@@ -371,14 +359,13 @@ export interface PlayerView {
   me: PlayerPublic & { sessionXp: number; badges: BadgeId[] };
   crew: (CrewSummary & { members: PlayerPublic[] }) | null;
   mission: MissionPublic | null;
-  quiz: QuizView | null;
+  /** Transmisión secreta: hay que encontrarla en el mundo 3D (baliza de su especialidad). */
+  transmission: { found: boolean } | null;
   intel: IntelCard[] | null;
   challenge: PlayerChallengeView | null;
-  bonus: QuizView | null;
   event: PlayerEventView | null;
   outcome: PlayerOutcomeView | null;
   debrief: DebriefPublic | null;
-  objectVote: { options: CategoryId[]; myVote: CategoryId | null; open: boolean } | null;
   hint: IxMessage | null;
   nasa: {
     science: ScienceHighlight | null;
@@ -396,9 +383,6 @@ export type HostAction =
   | { type: 'formCrews' }
   | { type: 'shuffleCrews' }
   | { type: 'toScan' }
-  | { type: 'objectVoteStart'; options: CategoryId[] }
-  | { type: 'objectVoteClose' }
-  | { type: 'chooseScan'; scan: ScanResult }
   | { type: 'chooseMission'; missionId: MissionId }
   | { type: 'next' }
   | { type: 'pause' }
@@ -411,13 +395,16 @@ export type HostAction =
   | { type: 'setDifficulty'; difficulty: Difficulty };
 
 export type PlayerAction =
-  | { type: 'quiz'; choice: number }
+  /** Recuperó su transmisión en la baliza del mundo 3D (o con el radar si no hay 3D). */
+  | { type: 'decode' }
   | { type: 'vote'; optionId: string }
   | { type: 'log'; text: string }
   | { type: 'share'; amount: number }
   | { type: 'taps'; count: number }
-  | { type: 'objectVote'; category: CategoryId }
-  | { type: 'bonus'; choice: number }
+  /** Avance en la reparación de un problema del mundo 3D (puntos del minijuego). */
+  | { type: 'repair'; incidentId: string; points: number }
+  /** Empieza (o deja) de trabajar en un problema: los demás lo ven en el mundo. */
+  | { type: 'work'; incidentId: string | null }
   | { type: 'avatar'; avatar: AvatarConfig };
 
 export interface Ack<T = unknown> {
