@@ -33,6 +33,8 @@ import { WorldCanvas } from '../../world/react/WorldCanvas';
 import { WorldPlay } from '../../world/react/WorldPlay';
 import type { InteractEvent, WorldEngine } from '../../world/WorldEngine';
 import { AvatarBuilder } from '../play/AvatarBuilder';
+import { Trainer } from '../trainer/Trainer';
+import type { BaseBrief } from '../../engine/trainer';
 
 /* ---------------- partida guardada ---------------- */
 
@@ -161,6 +163,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
   const [placing, setPlacing] = useState<PlacingState | null>(null);
   const [modules, setModules] = useState<ModuleKind[]>([]);
   const [inspect, setInspect] = useState<ModuleEdit | null>(null);
+  const [training, setTraining] = useState(false);
 
   const gameRef = useRef(game);
   const profileRef = useRef(profile);
@@ -600,11 +603,20 @@ export function FreePlay({ initialRoom, mode }: Props) {
     </div>
   );
 
+  // Lo que le falta a la base: IX lo usa para elegir el siguiente reto del entrenador.
+  const brief: BaseBrief = (() => {
+    const b = baseBalance(modules);
+    const names: Record<string, string> = { energy: 'energía', water: 'agua', air: 'aire', food: 'comida', beds: 'camas' };
+    const missing = SUPPLY_ORDER.filter((s) => b[s].made < b[s].used || (b[s].made === 0 && s !== 'beds')).map((s) => names[s]);
+    if (!modules.includes('habitat')) missing.push('blindaje contra la radiación');
+    return { modules: modules.length, missing };
+  })();
+
   return (
     <div className="world-overlay free-world">
       <WorldCanvas
         snapshot={snapshot}
-        keyboard
+        keyboard={!training}
         onEngine={(e) => {
           // Acceso al motor desde la consola del navegador, para depurar.
           (window as unknown as { __world?: unknown }).__world = e;
@@ -638,6 +650,17 @@ export function FreePlay({ initialRoom, mode }: Props) {
           }
           actions={
             <>
+              <button
+                className="wp-btn solid"
+                onClick={() => {
+                  outpostRef.current?.cancel();
+                  setPanel(null);
+                  setTraining(true);
+                }}
+                aria-label="Entrenador de misión"
+              >
+                🎓 <span>Entrenar</span>
+              </button>
               <button className={`wp-btn ${room ? 'live' : ''}`} onClick={() => setPanel(panel === 'invite' ? null : 'invite')} aria-label="Amigos">
                 👥 <span>{room ? peers.length + 1 : 'Invitar'}</span>
                 {room && <i className={`wp-dot ${netState}`} />}
@@ -873,6 +896,19 @@ export function FreePlay({ initialRoom, mode }: Props) {
             </section>
           )}
         </WorldPlay>
+        {training && (
+          <Trainer
+            embedded
+            base={brief}
+            onClose={() => setTraining(false)}
+            onReward={({ ok, stars, xp }) => {
+              // Cada misión cumplida trae materiales para seguir construyendo la base.
+              if (ok) update((g) => ({ ...g, inv: { regolith: g.inv.regolith + 1 + stars * 2, ice: g.inv.ice + stars, metal: g.inv.metal + stars } }));
+              setProfile(loadProfile());
+              say(ok ? `🎓 +${xp} XP y materiales para tu base` : `🎓 +${xp} XP por intentarlo`);
+            }}
+          />
+        )}
         {failed && (
           <div className="free-fail">
             <p>Este dispositivo no puede mostrar el mundo 3D (necesita WebGL 2).</p>
