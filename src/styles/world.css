@@ -624,6 +624,13 @@
 .wp.is-touch .wp-build {
   bottom: max(10px, env(safe-area-inset-bottom));
 }
+/* Con la barra de bloques, la ayuda y los gestos suben para no taparla. */
+@media (max-width: 1240px) {
+  .wp.is-build .wp-keys,
+  .wp.is-build .wp-emote-bar {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 76px);
+  }
+}
 .wp.is-touch.is-build .wp-stick,
 .wp.is-touch.is-build .wp-actions {
   bottom: calc(max(10px, env(safe-area-inset-bottom)) + 76px);
@@ -1022,6 +1029,40 @@
 }
 .free-card {
   text-align: center;
+}
+.free-head h1 {
+  margin: 0 0 6px;
+}
+.free-head .muted {
+  margin: 0;
+}
+.free-form {
+  display: grid;
+  gap: 12px;
+}
+@media (min-width: 900px) {
+  .intro-card.free-card {
+    width: min(920px, 100%);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      'avatar head'
+      'avatar form';
+    grid-template-rows: auto 1fr;
+    column-gap: 28px;
+    padding: 26px;
+    align-items: start;
+  }
+  .free-head {
+    grid-area: head;
+    text-align: left;
+  }
+  .free-avatar {
+    grid-area: avatar;
+  }
+  .free-form {
+    grid-area: form;
+  }
 }
 .free-kicker {
   display: inline-block;

@@ -14,7 +14,8 @@ import type { RealtimeChannel, RealtimeClient } from '@supabase/realtime-js';
 import type { AvatarConfig } from '../../shared/types';
 import type { BlockEdit } from '../world/blocks/BlockWorld';
 import type { PresencePose } from '../world/colony/snapshot';
-import { ICE_SERVERS, PEER_PREFIX, isPose } from './protocol';
+import type { Signaling } from '../engine/settings';
+import { PEER_PREFIX, isPose, peerOptions } from './protocol';
 import { relayConfig } from './relay';
 
 export interface FreePeer {
@@ -57,6 +58,16 @@ export function newRoomCode(): string {
 /** Enlace para invitar a la sala. */
 export function roomLink(room: string): string {
   return `${location.origin}${location.pathname}#/libre?sala=${room}`;
+}
+
+/** Servidor de señalización propio (el mismo ajuste que usa la clase), si lo hay. */
+function savedSignaling(): Signaling | null {
+  try {
+    const s = JSON.parse(localStorage.getItem('ixchel.sig') || 'null') as Signaling | null;
+    return s && typeof s.host === 'string' ? s : null;
+  } catch {
+    return null;
+  }
 }
 
 const validAvatar = (a: unknown): a is AvatarConfig => {
@@ -312,7 +323,7 @@ export class FreeNet {
   /** Intenta ser el centro de la sala; si ya hay uno, se conecta a él. */
   private openPeer(): void {
     const hubId = `${PEER_PREFIX}libre-${this.room}`;
-    const opts = { debug: 0, config: { iceServers: ICE_SERVERS } };
+    const opts = peerOptions(savedSignaling());
     let peer: Peer;
     try {
       peer = new Peer(hubId, opts);
@@ -353,17 +364,21 @@ export class FreeNet {
     });
     peer.on('disconnected', () => {
       if (this.peer !== peer || this.stopped) return;
-      try {
-        peer.reconnect();
-      } catch {
-        this.again(3000);
-      }
+      // Se cayó la señalización: se reintenta con calma (las conexiones abiertas siguen vivas).
+      setTimeout(() => {
+        if (this.peer !== peer || this.stopped || peer.destroyed || !peer.disconnected) return;
+        try {
+          peer.reconnect();
+        } catch {
+          this.again(3000);
+        }
+      }, 3500 + Math.random() * 2500);
     });
   }
 
   private joinHub(hubId: string): void {
     if (this.stopped) return;
-    const peer = new Peer({ debug: 0, config: { iceServers: ICE_SERVERS } });
+    const peer = new Peer(peerOptions(savedSignaling()));
     this.peer = peer;
     this.hub = false;
     let opened = false;

@@ -414,17 +414,22 @@ export function FreePlay({ initialRoom, mode }: Props) {
           </a>
         </header>
         <main className="intro-card card profile-card free-card">
-          <p className="free-kicker">{invited ? `Sala ${room}` : 'Modo libre'}</p>
-          <h1>{invited ? 'Tus amigos te esperan en Marte' : 'Explora Marte a tu manera'}</h1>
-          <p className="muted">Mina el planeta, fabrica bloques y construye tu base. Juega solo o comparte un enlace con tus amigos.</p>
-          <AvatarBuilder
-            value={profile.avatar}
-            onChange={(avatar) => {
-              const next = { ...profile, avatar };
-              saveProfile(next);
-              setProfile(next);
-            }}
-          />
+          <div className="free-head">
+            <p className="free-kicker">{invited ? `Sala ${room}` : 'Modo libre'}</p>
+            <h1>{invited ? 'Tus amigos te esperan en Marte' : 'Explora Marte a tu manera'}</h1>
+            <p className="muted">Mina el planeta, fabrica bloques y construye tu base. Juega solo o comparte un enlace con tus amigos.</p>
+          </div>
+          <div className="free-avatar">
+            <AvatarBuilder
+              value={profile.avatar}
+              onChange={(avatar) => {
+                const next = { ...profile, avatar };
+                saveProfile(next);
+                setProfile(next);
+              }}
+            />
+          </div>
+          <div className="free-form">
           <div className="field">
             <label htmlFor="fname">Tu nombre de astronauta</label>
             <input
@@ -470,6 +475,7 @@ export function FreePlay({ initialRoom, mode }: Props) {
             <li>🔗 Invita con un enlace</li>
           </ul>
           <p className="fine center">Sin cuentas: tu astronauta y tu mundo se guardan en este dispositivo.</p>
+          </div>
         </main>
       </div>
     );

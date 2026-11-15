@@ -43,6 +43,7 @@ import { terrainRadius } from './planet/heightfield';
 import { LANDING_PAD, colonySpot } from './planet/layout';
 import { PLAYER, PlayerController, type Sphere as CharSphere } from './player/PlayerController';
 import { PlayerInput } from './player/PlayerInput';
+import { SurfaceDetail } from './planet/detail';
 import { Sky } from './planet/sky';
 import { PlanetTerrain } from './planet/terrain';
 import { createTerrainMaterial, type TerrainUniforms } from './planet/terrainMaterial';
@@ -235,6 +236,7 @@ export class WorldEngine {
   private readonly terrain: PlanetTerrain;
   private readonly terrainUniforms: TerrainUniforms;
   private readonly sky = new Sky();
+  private readonly detail: SurfaceDetail;
   private readonly sun = new DirectionalLight(0xffffff, 2);
   private readonly hemi = new HemisphereLight(0xffffff, 0x444444, 1);
   private readonly fog = new Fog(0xffffff, 10, 300);
@@ -317,6 +319,8 @@ export class WorldEngine {
     this.terrainUniforms = uniforms;
     this.terrain = new PlanetTerrain(material, this.tier === 'low' ? 28 : 56);
     this.scene.add(this.terrain.group);
+    this.detail = new SurfaceDetail(Math.round(6500 * QUALITY[this.tier].scatter));
+    this.scene.add(this.detail.mesh);
 
     this.sun.castShadow = true;
     this.sun.shadow.bias = -0.0005;
@@ -913,6 +917,7 @@ export class WorldEngine {
     this.blocks?.dispose();
     this.entities.dispose();
     this.terrain.dispose();
+    this.detail.dispose();
     this.sky.dispose();
     this.kit.dispose();
     this.post?.dispose();

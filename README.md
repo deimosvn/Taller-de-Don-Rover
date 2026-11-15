@@ -10,6 +10,7 @@ Es una **PWA que corre 100% en el navegador**: no hay servidor que instalar. El 
 
 - **Presentación** (`#/`): la propuesta completa del proyecto, con el planeta y los personajes en 3D.
 - **Consola del profesor** (`#/profe`): abordaje con QR, formación automática de tripulaciones, escáner del mundo, briefing, transmisiones cifradas, reto de tripulación, evento global, resultados y debrief. Incluye estado global del planeta, bitácora de IX, pistas, pausa y reporte descargable en CSV.
+- **Modo libre** (`#/libre`): sin código de clase. Cada quien explora Marte con su astronauta, **mina** el planeta, **fabrica** bloques en la impresora 3D y **construye** su base, al estilo de un juego de bloques. Se puede jugar solo o crear una sala y **compartir un enlace o un QR** para que los amigos entren al mismo mundo (ver [Modo libre](#modo-libre)).
 - **App del alumno** (`#/jugar`): astronauta personalizable, descifrado de transmisiones con retos científicos, votación interna, bitácora de la tripulación, minijuego de emergencia, XP e insignias guardados en el dispositivo.
 - **6 misiones**: Greenhouse Rescue, The Water Crisis, Darkness Protocol, The Unknown Signal, Habitat Zero y The Final Colony. Cada tripulación recibe números distintos y cada rol tiene un dato imprescindible para encontrar la mejor decisión.
 - **Colonia persistente**: el mapa de MARS-01 cambia con los resultados, se desbloquean edificios y la colonia del grupo se guarda entre clases (con exportar e importar).
@@ -69,6 +70,17 @@ Sin conexión o sin la función, el juego sigue con su contenido propio. Las res
 ## Minijuegos de la emergencia
 
 En la etapa de acción, cada especialidad hace una tarea realista de su sistema: limpiar paneles solares, regular presión/CO₂/temperatura con su zona segura en unidades reales, sellar fugas o puntos de calor, orientar paneles o la antena, dosificar agua o luz a las plantas, conectar cables y repetir el patrón de una señal. Cada minijuego muestra un dato real de la NASA. Se pueden probar todos en `#/minijuegos`.
+
+## Modo libre
+
+Quien no tiene un código de clase puede jugar desde la portada (**Jugar ahora**) o desde la pantalla de **Únete a la misión** (**¿No tienes código?**).
+
+- **Jugar solo**: el mundo, el inventario y las misiones del explorador se guardan en el dispositivo.
+- **Con amigos**: se crea una sala de 5 caracteres y se comparte el enlace `#/libre?sala=XXXXX` (o el QR). Todos ven el mismo planeta, a los demás astronautas en tiempo real y los bloques que cada quien pone o quita. No hay anfitrión fijo: si quien creó la sala se va, otro dispositivo toma el relevo.
+- **Bloques**: regolito, basalto, hielo, hematita y cristal se minan del suelo y de los depósitos repartidos por el planeta; ladrillo, vidrio, panel, lámpara y cultivo se fabrican en la impresora 3D (así funcionaría una colonia real: con los recursos del lugar).
+- **Controles**: `WASD` caminar · `Espacio` saltar · clic izquierdo minar · clic derecho construir · `1`–`0` elegir bloque · `C` fabricar · `V` primera/tercera persona. En el celular: joystick, botón de salto y un botón para alternar entre minar y construir.
+
+Los bloques viven en una rejilla "esfera-cubo" (`src/world/blocks/`) y la sala usa PeerJS con el canal de respaldo de Supabase Realtime (`src/net/freeNet.ts`).
 
 ## Inteligencia artificial
 
