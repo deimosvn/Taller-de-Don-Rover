@@ -65,6 +65,7 @@ import { saveColony } from './store';
 import { logMission } from '../lib/cloud';
 import { nasaStudies, spaceWeather } from '../lib/nasa';
 import { HEALTH, MISSION_TOPICS, buildHealth, doseFor, healthFactor, healthKindFor, plainHighlight, protectionFor } from '../../shared/nasa';
+import { FIX_GOAL, MISSION_PROBLEMS } from '../../shared/minigames';
 
 /* ------------------------------------------------------------------ */
 /* Utilidades                                                           */
@@ -92,6 +93,11 @@ export function makeRoomCode() {
 
 const TIER_SCORE: Record<Tier, number> = { best: 100, ok: 60, bad: 25, critical: 0 };
 const TIER_HEALTH: Record<Tier, number> = { best: 12, ok: 4, bad: -10, critical: -16 };
+
+/** Fases en las que se trabaja en el problema de la historia (minijuego de la tripulación). */
+const FIX_PHASES: Phase[] = ['briefing', 'discovery', 'challenge'];
+/** Lo que suma al sistema de la misión una tripulación que resolvió su problema. */
+const FIX_METER = 10;
 
 const BAD_WORDS = ['idiota', 'estupid', 'pendej', 'mierda', 'puta', 'puto', 'verga', 'chinga', 'cabron', 'culero', 'pinche', 'imbecil', 'tarad', 'mamon'];
 const normalize = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -161,6 +167,10 @@ interface Player {
   newBadges: BadgeId[];
   tapAllowance: number;
   tapStamp: number;
+  /** Puntos del minijuego del problema de la misión. */
+  fix: number;
+  fixAllowance: number;
+  fixStamp: number;
 }
 
 interface Crew {
@@ -202,6 +212,8 @@ interface MissionRun {
   hints: IxMessage[];
   /** Estudios, clima espacial y salud de la tripulación con datos reales de la NASA. */
   nasa?: MissionNasa;
+  /** Tripulaciones que ya resolvieron el problema de la historia. */
+  fixed?: string[];
 }
 
 export interface RoomSnapshot {
@@ -443,6 +455,9 @@ export class HostEngine {
       newBadges: [],
       tapAllowance: 40,
       tapStamp: t,
+      fix: 0,
+      fixAllowance: 30,
+      fixStamp: t,
     };
   }
 
@@ -789,6 +804,9 @@ export class HostEngine {
       p.newBadges = [];
       p.tapAllowance = 40;
       p.tapStamp = now();
+      p.fix = 0;
+      p.fixAllowance = 30;
+      p.fixStamp = now();
     }
     const stamp = now();
     for (const c of this.crews) {
@@ -1067,6 +1085,27 @@ export class HostEngine {
     return a;
   }
 
+  /** Cuánto resolvió la tripulación del problema de la historia (0–1). */
+  private crewFix(c: Crew): number {
+    const ms = this.activeMembers(c);
+    if (!ms.length) return 0;
+    // Cada quien aporta hasta el doble de su parte: quien juega más ayuda a quien no pudo.
+    const sum = ms.reduce((s, p) => s + Math.min(FIX_GOAL * 2, p.fix ?? 0), 0);
+    return Math.min(1, sum / (FIX_GOAL * ms.length));
+  }
+
+  /** IX avisa la primera vez que una tripulación resuelve el problema. */
+  private announceFix(c: Crew): boolean {
+    const m = this.mission;
+    if (!m || this.crewFix(c) < 1) return false;
+    m.fixed ??= [];
+    if (m.fixed.includes(c.id)) return false;
+    m.fixed.push(c.id);
+    const def = MISSIONS[m.id];
+    this.pushIx('info', `🔧 ${c.name} resolvió «${MISSION_PROBLEMS[m.id].title}». ${SYSTEMS[def.focus].emoji} ${SYSTEMS[def.focus].short} mejorará en los resultados.`);
+    return true;
+  }
+
   private updateProgress() {
     const m = this.mission;
     if (!m) return;
@@ -1094,9 +1133,9 @@ export class HostEngine {
     const ms = this.members(c);
     // La calidad de la decisión pesa más: una buena decisión nunca debe quedar por debajo
     // de una mala solo por la bitácora o por la velocidad en la emergencia.
-    const efficiency = Math.round(TIER_SCORE[tier] * 0.8 + this.crewAction(c) * 20);
+    const efficiency = Math.round(TIER_SCORE[tier] * 0.7 + this.crewAction(c) * 15 + this.crewFix(c) * 15);
     const participation = ms.length
-      ? ms.reduce((s, p) => s + ((p.quizChoice !== null ? 1 : 0) + (p.vote ? 1 : 0) + (p.taps >= 5 ? 1 : 0)) / 3, 0) / ms.length
+      ? ms.reduce((s, p) => s + ((p.quizChoice !== null ? 1 : 0) + (p.vote ? 1 : 0) + (p.taps >= 5 ? 1 : 0) + ((p.fix ?? 0) > 0 ? 1 : 0)) / 4, 0) / ms.length
       : 0;
     const votes = ms.map((p) => p.vote).filter(Boolean);
     const agree = votes.filter((v) => v === c.decision).length;
@@ -1134,12 +1173,18 @@ export class HostEngine {
     const before = { ...this.colony.meters };
     const n = Math.max(1, this.crews.length);
     const agg: Meters = { energy: 0, water: 0, food: 0, habitat: 0 };
+    let fixTotal = 0;
 
     for (const c of this.crews) {
       const res = c.decision && c.puzzle ? c.puzzle.results[c.decision] : null;
       const opt = c.decision && c.puzzle ? c.puzzle.options.find((o) => o.id === c.decision) : null;
       const tier: Tier = res?.tier ?? 'critical';
-      const effects: Partial<Meters> = res?.effects ?? { [def.focus]: -8 };
+      const effects: Partial<Meters> = { ...(res?.effects ?? { [def.focus]: -8 }) };
+      // Resolver el problema de la historia repara el sistema de la misión.
+      const fix = this.crewFix(c);
+      const repair = Math.round(FIX_METER * fix);
+      if (repair) effects[def.focus] = (effects[def.focus] ?? 0) + repair;
+      fixTotal += repair;
       for (const k of SYSTEM_ORDER) agg[k] += effects[k] ?? 0;
       c.outcome = {
         tier,
@@ -1150,6 +1195,7 @@ export class HostEngine {
         solution: c.puzzle?.solution ?? '',
         scores: this.scoreCrew(c, tier),
         effects,
+        fix: Math.round(fix * 100) / 100,
       };
     }
 
@@ -1190,6 +1236,8 @@ export class HostEngine {
       after.food += 2;
       chain.push('⚡→🌱 Energía de sobra: las luces de cultivo trabajaron al máximo.');
     }
+    const fixAvg = Math.round(fixTotal / n);
+    if (fixAvg > 0) chain.push(`🔧 Al resolver «${MISSION_PROBLEMS[m.id].title.toLowerCase()}», las tripulaciones sumaron +${fixAvg} a ${SYSTEMS[def.focus].emoji} ${SYSTEMS[def.focus].short.toLowerCase()}.`);
     chain.push(saved ? `🤝 ${def.event.savedText}` : `⚠️ ${def.event.failText}`);
     for (const k of SYSTEM_ORDER) after[k] = clamp(Math.round(after[k]), 0, 100);
 
@@ -1198,7 +1246,7 @@ export class HostEngine {
     for (const c of this.crews) {
       const tier = c.outcome!.tier;
       this.colony.sectors[c.sectorId] = clamp(
-        (this.colony.sectors[c.sectorId] ?? 65) + TIER_HEALTH[tier] + (saved ? 6 : -6) - (c.share ?? 0) * 3,
+        (this.colony.sectors[c.sectorId] ?? 65) + TIER_HEALTH[tier] + (saved ? 6 : -6) - (c.share ?? 0) * 3 + Math.round(8 * (c.outcome!.fix ?? 0)),
         5,
         100,
       );
@@ -1228,6 +1276,7 @@ export class HostEngine {
           earned.push('brain');
         } else if (c.outcome!.tier === 'ok') xp += 30;
         xp += Math.min(40, p.taps);
+        xp += Math.round(30 * Math.min(1, (p.fix ?? 0) / FIX_GOAL));
         if (p.taps > 0 && p.taps === topTaps) earned.push('hands');
         if (saved) {
           xp += 40;
@@ -1505,6 +1554,11 @@ export class HostEngine {
           acted = true;
         }
       }
+      if (crew && FIX_PHASES.includes(this.phase) && (p.fix ?? 0) < FIX_GOAL * 1.2 && R() < 0.1) {
+        p.fix = (p.fix ?? 0) + 2 + Math.floor(R() * 4);
+        this.announceFix(crew);
+        acted = true;
+      }
       if (this.phase === 'challenge' && crew?.puzzle) {
         if (!crew.locked) {
           if (!p.vote && R() < 0.09) {
@@ -1613,6 +1667,22 @@ export class HostEngine {
         p.shareVote = a.amount;
         this.updateProgress();
         break;
+      case 'fix': {
+        if (!m || !crew || !FIX_PHASES.includes(this.phase)) return OK;
+        const t = now();
+        p.fixAllowance = Math.min(30, (p.fixAllowance ?? 30) + ((t - (p.fixStamp ?? t)) / 1000) * 8);
+        p.fixStamp = t;
+        const n = Math.max(0, Math.min(Math.floor(Number(a.count) || 0), Math.floor(p.fixAllowance)));
+        if (!n) return OK;
+        p.fixAllowance -= n;
+        p.fix = (p.fix ?? 0) + n;
+        if (this.announceFix(crew)) {
+          this.changed();
+          return OK;
+        }
+        this.changed(false);
+        return OK;
+      }
       case 'taps': {
         if (this.phase !== 'event' || m?.event.stage !== 'action') return OK;
         const t = now();
@@ -1654,6 +1724,7 @@ export class HostEngine {
       taps: this.tapsByRole(c),
       rolesPresent: this.rolesPresent(c),
       action: Math.round(this.crewAction(c) * 100) / 100,
+      fix: Math.round(this.crewFix(c) * 100) / 100,
       protocol: c.protocol,
       log: c.log ? (c.logHidden ? 'Bitácora oculta por IX' : c.log.text) : null,
       logBy: c.log?.by ?? null,
@@ -1712,6 +1783,7 @@ export class HostEngine {
             voted: Boolean(p.vote),
             share: p.shareVote,
             taps: p.taps,
+            fix: p.fix ?? 0,
             bonus: p.bonusCorrect,
             sessionXp: p.sessionXp,
             badges: p.badges,
@@ -1855,6 +1927,10 @@ export class HostEngine {
       challenge,
       bonus,
       event,
+      problem:
+        inMission && crew && m && FIX_PHASES.concat(['event', 'results']).includes(this.phase)
+          ? { mine: p.fix ?? 0, goal: FIX_GOAL, crew: Math.round(this.crewFix(crew) * 100) / 100, open: FIX_PHASES.includes(this.phase) }
+          : null,
       outcome,
       debrief: inMission && this.phase === 'debrief' ? (m?.debrief ?? null) : null,
       objectVote: this.objectVote ? { options: this.objectVote.options, myVote: p.objectVote, open: this.objectVote.open } : null,

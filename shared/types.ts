@@ -160,6 +160,8 @@ export interface CrewOutcome {
   solution: string;
   scores: CrewScores;
   effects: Partial<Meters>;
+  /** Cuánto resolvió la tripulación del problema de la misión (0–1). */
+  fix?: number;
 }
 
 export interface CrewStatus {
@@ -176,6 +178,8 @@ export interface CrewStatus {
   taps: Record<RoleId, number>;
   rolesPresent: RoleId[];
   action: number;
+  /** Cuánto resolvió la tripulación del problema de la misión (0–1). */
+  fix: number;
   protocol: boolean;
   log: string | null;
   logBy: string | null;
@@ -222,6 +226,8 @@ export interface PlayerProgress {
   voted: boolean;
   share: number | null;
   taps: number;
+  /** Puntos del problema de la misión. */
+  fix: number;
   bonus: boolean | null;
   sessionXp: number;
   badges: BadgeId[];
@@ -376,6 +382,8 @@ export interface PlayerView {
   challenge: PlayerChallengeView | null;
   bonus: QuizView | null;
   event: PlayerEventView | null;
+  /** Problema de la historia de la misión (se resuelve con un minijuego). */
+  problem: { mine: number; goal: number; crew: number; open: boolean } | null;
   outcome: PlayerOutcomeView | null;
   debrief: DebriefPublic | null;
   objectVote: { options: CategoryId[]; myVote: CategoryId | null; open: boolean } | null;
@@ -416,6 +424,7 @@ export type PlayerAction =
   | { type: 'log'; text: string }
   | { type: 'share'; amount: number }
   | { type: 'taps'; count: number }
+  | { type: 'fix'; count: number }
   | { type: 'objectVote'; category: CategoryId }
   | { type: 'bonus'; choice: number }
   | { type: 'avatar'; avatar: AvatarConfig };

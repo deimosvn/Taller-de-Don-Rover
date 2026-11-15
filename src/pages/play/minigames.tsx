@@ -1,5 +1,6 @@
-// Minijuegos realistas de la emergencia global. Cada especialidad hace una tarea concreta de
-// su sistema; lo bien que la haga se convierte en "acciones" para el motor del juego.
+// Minijuegos realistas de las misiones: los problemas de la historia y la emergencia global.
+// Cada tarea es concreta (repartir energía, sellar fugas, sintonizar una señal…); lo bien que
+// se haga se convierte en "acciones" o "reparaciones" para el motor del juego.
 //
 //   scrub ..... frotar el polvo de los paneles solares
 //   gauge ..... mantener un indicador (presión, CO₂, temperatura…) en la zona segura
@@ -8,9 +9,12 @@
 //   dose ...... dar a cada planta la cantidad justa de agua o de luz
 //   wires ..... conectar cada pieza con su pareja
 //   pattern ... repetir el patrón de una señal o el orden de encendido
+//   budget .... repartir energía, agua o recursos entre lo que los necesita
+//   switches .. decidir qué sistemas quedan encendidos con poca energía
+//   tune ...... igualar la frecuencia de una señal que cambia
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type ReactElement } from 'react';
-import type { AimTheme, DoseTheme, GaugeSpec, MinigameSpec, PatternTheme, TargetTheme, WiresTheme } from '../../../shared/minigames';
+import type { AimTheme, BudgetTheme, DoseTheme, GaugeSpec, MinigameSpec, PatternTheme, TargetTheme, WiresTheme } from '../../../shared/minigames';
 import { vibrate } from '../../lib/pwa';
 import { sfx } from '../../lib/sound';
 
@@ -91,6 +95,15 @@ export function Minigame({ spec, color, dark, onPoints }: { spec: MinigameSpec; 
       break;
     case 'pattern':
       game = <Pattern theme={spec.pattern ?? 'signal'} award={award} />;
+      break;
+    case 'budget':
+      game = <Budget theme={spec.budget ?? 'crops'} award={award} />;
+      break;
+    case 'switches':
+      game = <Switches award={award} />;
+      break;
+    case 'tune':
+      game = <Tune award={award} />;
       break;
     default:
       game = <Scrub award={award} />;
@@ -796,6 +809,324 @@ function Pattern({ theme, award }: { theme: PatternTheme; award: Award }) {
       <div className="mg-hud">
         <span>{mode === 'show' ? (theme === 'signal' ? '📡 Escucha la señal…' : '👀 Mira el orden…') : `👉 Tu turno: ${pos + 1} de ${seq.length}`}</span>
         <span>✅ {theme === 'signal' ? plural(rounds, 'señal descifrada', 'señales descifradas') : plural(rounds, 'arranque correcto', 'arranques correctos')}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Repartir energía, agua o recursos                                    */
+/* ------------------------------------------------------------------ */
+
+const BUDGET: Record<BudgetTheme, { unit: string; unitName: string; pool: string; items: { emoji: string; name: string }[]; done: string; rounds: [string, string] }> = {
+  crops: {
+    unit: '⚡',
+    unitName: 'energía',
+    pool: 'Energía de los paneles',
+    items: [
+      { emoji: '🥬', name: 'Lechuga' },
+      { emoji: '🥔', name: 'Papa' },
+      { emoji: '🫘', name: 'Frijol' },
+      { emoji: '🍓', name: 'Fresa' },
+    ],
+    done: '✅ ¡Todos los cultivos tienen luz!',
+    rounds: ['invernadero salvado', 'invernaderos salvados'],
+  },
+  water: {
+    unit: '💧',
+    unitName: 'agua',
+    pool: 'Agua en la reserva',
+    items: [
+      { emoji: '🧑‍🚀', name: 'Tripulación' },
+      { emoji: '🌱', name: 'Cultivos' },
+      { emoji: '🫧', name: 'Oxígeno' },
+      { emoji: '🧼', name: 'Limpieza' },
+    ],
+    done: '✅ ¡A nadie le falta agua!',
+    rounds: ['ración repartida', 'raciones repartidas'],
+  },
+  systems: {
+    unit: '📦',
+    unitName: 'recursos',
+    pool: 'Recursos de la colonia',
+    items: [
+      { emoji: '⚡', name: 'Energía' },
+      { emoji: '💧', name: 'Agua' },
+      { emoji: '🌱', name: 'Alimentos' },
+      { emoji: '🛡️', name: 'Hábitat' },
+    ],
+    done: '✅ ¡Los cuatro sistemas en equilibrio!',
+    rounds: ['plan en equilibrio', 'planes en equilibrio'],
+  },
+};
+
+const BUDGET_MAX = 7;
+
+/** Ronda nueva: cada cosa necesita una franja de dos valores y el total alcanza justo. */
+function newBudget(theme: BudgetTheme, round: number) {
+  const n = theme === 'systems' || round >= 2 ? 4 : 3;
+  const needs = Array.from({ length: n }, () => {
+    const lo = 1 + Math.floor(Math.random() * (BUDGET_MAX - 2));
+    return { lo, hi: lo + 1 };
+  });
+  const total = needs.reduce((s, x) => s + (Math.random() < 0.5 ? x.lo : x.hi), 0);
+  return { needs, total, values: needs.map(() => 0) };
+}
+
+function Budget({ theme, award }: { theme: BudgetTheme; award: Award }) {
+  const look = BUDGET[theme];
+  const [round, setRound] = useState(0);
+  const [b, setB] = useState(() => newBudget(theme, 0));
+  const [solved, setSolved] = useState(false);
+  const used = b.values.reduce((s, v) => s + v, 0);
+  const left = b.total - used;
+  const okAt = (i: number) => b.values[i] >= b.needs[i].lo && b.values[i] <= b.needs[i].hi;
+
+  const change = (i: number, d: number) => {
+    if (solved) return;
+    const v = b.values[i] + d;
+    if (v < 0 || v > BUDGET_MAX || (d > 0 && left <= 0)) {
+      vibrate(30);
+      return;
+    }
+    sfx.tick();
+    const values = b.values.map((x, k) => (k === i ? v : x));
+    const next = { ...b, values };
+    setB(next);
+    const allOk = values.every((x, k) => x >= next.needs[k].lo && x <= next.needs[k].hi);
+    if (allOk && values.reduce((s, x) => s + x, 0) === next.total) {
+      setSolved(true);
+      award(5, { x: 50, y: 30 });
+      sfx.success();
+      vibrate([15, 25, 15]);
+      setTimeout(() => {
+        const r = round + 1;
+        setRound(r);
+        setB(newBudget(theme, r));
+        setSolved(false);
+      }, 900);
+    }
+  };
+
+  return (
+    <div className={`budget theme-${theme} ${solved ? 'solved' : ''}`}>
+      <div className="budget-pool">
+        <span>{look.pool}</span>
+        <b>{left > 0 ? `${look.unit} ${left} por repartir` : `${look.unit} todo repartido`}</b>
+      </div>
+      <div className="budget-row">
+        {b.needs.map((need, i) => (
+          <div key={`${round}:${i}`} className={`budget-item ${okAt(i) ? 'ok' : b.values[i] > need.hi ? 'over' : ''}`}>
+            <span className="budget-emoji">{look.items[i].emoji}</span>
+            <small>{look.items[i].name}</small>
+            <div className="budget-meter" role="img" aria-label={`${look.items[i].name}: ${b.values[i]}, necesita de ${need.lo} a ${need.hi}`}>
+              <i className="budget-band" style={{ bottom: `${((need.lo - 1) / BUDGET_MAX) * 100}%`, height: `${(2 / BUDGET_MAX) * 100}%` }} />
+              {Array.from({ length: BUDGET_MAX }, (_, k) => (
+                <em key={k} className={k < b.values[i] ? 'on' : ''} />
+              ))}
+            </div>
+            <span className="budget-need mono">
+              {need.lo}–{need.hi}
+            </span>
+            <div className="budget-btns">
+              <button aria-label={`Quitar ${look.unitName} a ${look.items[i].name}`} onPointerDown={() => change(i, -1)}>
+                −
+              </button>
+              <button aria-label={`Dar ${look.unitName} a ${look.items[i].name}`} onPointerDown={() => change(i, 1)}>
+                +
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className={`gauge-status ${solved ? 'ok' : ''}`}>{solved ? look.done : left === 0 ? '⚠️ Ya no queda: quita de donde sobre' : 'Cada uno necesita lo de su franja verde'}</p>
+      <div className="mg-hud">
+        <span>✅ {plural(round, look.rounds[0], look.rounds[1])}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Qué sistemas quedan encendidos                                       */
+/* ------------------------------------------------------------------ */
+
+const SYSTEMS_LIST: { emoji: string; name: string; cost: number; must?: boolean }[] = [
+  { emoji: '🫁', name: 'Soporte vital', cost: 3, must: true },
+  { emoji: '🔥', name: 'Calefacción', cost: 2, must: true },
+  { emoji: '🌱', name: 'Luces de cultivo', cost: 3 },
+  { emoji: '💧', name: 'Recicladora de agua', cost: 2 },
+  { emoji: '🔬', name: 'Laboratorio', cost: 2 },
+  { emoji: '🚙', name: 'Cargar el rover', cost: 3 },
+  { emoji: '📺', name: 'Pantallas', cost: 1 },
+  { emoji: '🎵', name: 'Música', cost: 1 },
+];
+
+const isPlan = (power: number, used: number) => used <= power && used >= power - 1;
+
+function newSwitchboard() {
+  const optional = shuffled(SYSTEMS_LIST.length - 2)
+    .slice(0, 4)
+    .map((i) => i + 2);
+  const items = [0, 1, ...optional];
+  // La energía alcanza para lo esencial y una parte (no todo) de lo demás.
+  const keep = optional.filter(() => Math.random() < 0.5);
+  if (!keep.length) keep.push(optional[0]);
+  if (keep.length === optional.length) keep.pop();
+  const power = [0, 1, ...keep].reduce((s, i) => s + SYSTEMS_LIST[i].cost, 0);
+  // Empieza con todo encendido: hay que decidir qué apagar.
+  return { items, power, on: items.map(() => true) };
+}
+
+function Switches({ award }: { award: Award }) {
+  const [board, setBoard] = useState(newSwitchboard);
+  const [solved, setSolved] = useState(false);
+  const [plans, setPlans] = useState(0);
+  const usedBy = (on: boolean[]) => board.items.reduce((s, i, k) => s + (on[k] ? SYSTEMS_LIST[i].cost : 0), 0);
+  const used = usedBy(board.on);
+  const over = used > board.power;
+  const waste = board.power - used;
+
+  const toggle = (k: number) => {
+    if (solved) return;
+    if (SYSTEMS_LIST[board.items[k]].must) {
+      vibrate(40);
+      sfx.fail();
+      return;
+    }
+    sfx.select();
+    const on = board.on.map((x, j) => (j === k ? !x : x));
+    setBoard({ ...board, on });
+    if (isPlan(board.power, usedBy(on))) {
+      setSolved(true);
+      award(5, { x: 50, y: 25 });
+      sfx.success();
+      vibrate([15, 25, 15]);
+      setPlans((p) => p + 1);
+      setTimeout(() => {
+        setBoard(newSwitchboard());
+        setSolved(false);
+      }, 1000);
+    }
+  };
+
+  return (
+    <div className={`switches ${solved ? 'solved' : ''}`}>
+      <div className="switch-power">
+        <div className="switch-bar">
+          <i className={over ? 'bad' : ''} style={{ width: `${Math.min(100, (used / Math.max(1, board.power)) * 100)}%` }} />
+        </div>
+        <span>
+          ☀️ Los paneles dan <b>{board.power} ⚡</b> · Usas <b className={over ? 'bad' : ''}>{used} ⚡</b>
+        </span>
+      </div>
+      <div className="switch-grid">
+        {board.items.map((i, k) => {
+          const sys = SYSTEMS_LIST[i];
+          return (
+            <button key={`${i}:${k}`} className={`switch ${board.on[k] ? 'on' : ''} ${sys.must ? 'must' : ''}`} aria-pressed={board.on[k]} onPointerDown={() => toggle(k)}>
+              <span className="switch-emoji">{sys.emoji}</span>
+              <span className="switch-name">
+                {sys.name}
+                <small>{sys.must ? `🔒 ${sys.cost} ⚡ · siempre` : `${sys.cost} ⚡`}</small>
+              </span>
+              <i className="switch-led" aria-hidden />
+            </button>
+          );
+        })}
+      </div>
+      <p className={`gauge-status ${solved ? 'ok' : over ? 'bad' : ''}`}>
+        {solved ? '✅ ¡La colonia aguanta la oscuridad!' : over ? '⚠️ Gastas más de lo que entra: apaga algo' : waste > 1 ? `Sobran ${waste} ⚡: enciende algo útil` : 'Casi…'}
+      </p>
+      <div className="mg-hud">
+        <span>✅ {plural(plans, 'plan de ahorro', 'planes de ahorro')}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Sintonizar la señal                                                  */
+/* ------------------------------------------------------------------ */
+
+const TUNE_MIN = 1;
+const TUNE_MAX = 6;
+
+function newTarget(old?: number): number {
+  let f = TUNE_MIN + 0.5 + Math.random() * (TUNE_MAX - TUNE_MIN - 1);
+  if (old !== undefined && Math.abs(f - old) < 1.2) f = f > (TUNE_MIN + TUNE_MAX) / 2 ? f - 1.6 : f + 1.6;
+  return Math.round(f * 10) / 10;
+}
+
+function wavePath(freq: number, phase: number, amp: number): string {
+  let d = '';
+  for (let x = 0; x <= 300; x += 5) {
+    const y = 60 + Math.sin((x / 300) * freq * Math.PI * 2 + phase) * amp;
+    d += `${x === 0 ? 'M' : 'L'} ${x} ${y.toFixed(1)} `;
+  }
+  return d;
+}
+
+function Tune({ award }: { award: Award }) {
+  const [target, setTarget] = useState(() => newTarget());
+  const [freq, setFreq] = useState(TUNE_MIN + 0.4);
+  const [msgs, setMsgs] = useState(0);
+  const [shifted, setShifted] = useState(false);
+  const [done, setDone] = useState(false);
+  const lock = useRef(0);
+  const phase = useRef(0);
+  const [, render] = useState(0);
+  const close = Math.abs(freq - target) <= 0.2;
+
+  useLoop((dt) => {
+    phase.current += dt * 2.4;
+    if (!done) {
+      lock.current = close ? Math.min(1, lock.current + dt / 1.3) : Math.max(0, lock.current - dt * 1.5);
+      if (lock.current >= 1) {
+        setDone(true);
+        award(5, { x: 50, y: 30 });
+        sfx.success();
+        vibrate([15, 25, 15]);
+        setMsgs((m) => m + 1);
+        setTimeout(() => {
+          lock.current = 0;
+          setTarget((t) => newTarget(t));
+          setDone(false);
+          setShifted(true);
+          setTimeout(() => setShifted(false), 1800);
+        }, 700);
+      }
+    }
+    render((n) => (n + 1) % 1000);
+  });
+
+  return (
+    <div className="tune">
+      <svg viewBox="0 0 300 120" className="tune-svg" aria-hidden>
+        <path d={wavePath(target, phase.current, 40)} className="tune-target" />
+        <path d={wavePath(freq, phase.current, 40)} className={`tune-mine ${close ? 'close' : ''}`} />
+      </svg>
+      <div className="tune-lock" role="progressbar" aria-label="Señal fijada" aria-valuenow={Math.round(lock.current * 100)} aria-valuemin={0} aria-valuemax={100}>
+        <i style={{ width: `${lock.current * 100}%` }} />
+      </div>
+      <input
+        className="tune-slider"
+        type="range"
+        min={TUNE_MIN}
+        max={TUNE_MAX}
+        step={0.05}
+        value={freq}
+        aria-label="Frecuencia de tu antena"
+        onChange={(e) => setFreq(Number(e.target.value))}
+      />
+      <p className={`gauge-status ${done || close ? 'ok' : ''}`}>
+        {done ? '✅ ¡Mensaje recibido!' : shifted ? '📡 La señal cambió de frecuencia: búscala otra vez' : close ? '🔒 Mantén la onda así…' : freq < target ? 'Sube la frecuencia →' : '← Baja la frecuencia'}
+      </p>
+      <div className="mg-hud">
+        <span>
+          📻 Tu antena: <b className="mono">{freq.toFixed(1)}</b>
+        </span>
+        <span>✅ {plural(msgs, 'mensaje recibido', 'mensajes recibidos')}</span>
       </div>
     </div>
   );

@@ -310,6 +310,11 @@ export class PlayerNet {
     if (count > 0) this.send({ t: 'act', rid: 0, action: { type: 'taps', count } });
   }
 
+  /** Puntos del minijuego del problema de la misión (sin esperar respuesta, como los toques). */
+  sendFix(count: number) {
+    if (count > 0) this.send({ t: 'act', rid: 0, action: { type: 'fix', count } });
+  }
+
   /** Reintentar el ingreso con nuevos datos (por ejemplo, después de un nombre rechazado). */
   rejoin() {
     if (this.linked) this.send({ t: 'join', ...this.joinInfo() });

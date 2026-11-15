@@ -256,6 +256,10 @@
   left: max(12px, env(safe-area-inset-left));
   max-width: min(420px, calc(100% - 24px));
 }
+/* Con un aviso arriba, el objetivo baja para que no se tapen. */
+.wp.has-banner .wp-objective {
+  top: calc(max(12px, env(safe-area-inset-top)) + 116px);
+}
 .wp-quest {
   display: flex;
   align-items: center;

@@ -9,6 +9,7 @@ import { Confetti, Icon, RoleChip } from '../../components/ui';
 import { HealthCard, ScienceCard } from '../../components/nasa';
 import { minigameFor } from '../../../shared/minigames';
 import { Minigame } from './minigames';
+import { ProblemCard } from './MissionProblem';
 import { hostNow, useTicker } from '../../lib/clock';
 import { vibrate } from '../../lib/pwa';
 import { sfx } from '../../lib/sound';
@@ -500,7 +501,7 @@ function Vote({ view, act }: { view: PlayerView; act: Act }) {
 
 /* ---------------- evento global ---------------- */
 
-function TapGame({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
+export function TapGame({ view, net }: { view: PlayerView; net: PlayerNet | null }) {
   const ev = view.event!;
   const role = view.me.roles[0] ?? 'power';
   const r = ROLES[role];
@@ -796,11 +797,28 @@ export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act:
     case 'scan':
       return <ScanWait view={view} act={act} />;
     case 'briefing':
-      return view.mission ? <Briefing view={view} /> : <ScanWait view={view} act={act} />;
+      return view.mission ? (
+        <>
+          <Briefing view={view} />
+          <ProblemCard view={view} net={net} open3d={open3d} />
+        </>
+      ) : (
+        <ScanWait view={view} act={act} />
+      );
     case 'discovery':
-      return <Decode view={view} act={act} />;
+      return (
+        <>
+          <Decode view={view} act={act} />
+          <ProblemCard view={view} net={net} open3d={open3d} />
+        </>
+      );
     case 'challenge':
-      return view.quiz && !view.quiz.answered ? <Decode view={view} act={act} /> : <Vote view={view} act={act} />;
+      return (
+        <>
+          {view.quiz && !view.quiz.answered ? <Decode view={view} act={act} /> : <Vote view={view} act={act} />}
+          <ProblemCard view={view} net={net} open3d={open3d} />
+        </>
+      );
     case 'event':
       return <Emergency view={view} act={act} net={net} />;
     case 'results':

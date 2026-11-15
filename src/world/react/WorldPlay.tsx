@@ -116,7 +116,7 @@ export function WorldPlay({ engine, snapshot, onExit, exitLabel = 'Salir', banne
   const message = notice ?? toast;
 
   return (
-    <div className={`wp ${first ? 'is-first' : 'is-third'} ${touch ? 'is-touch' : 'is-mouse'} ${hotbar ? 'is-build' : ''}`}>
+    <div className={`wp ${first ? 'is-first' : 'is-third'} ${touch ? 'is-touch' : 'is-mouse'} ${hotbar ? 'is-build' : ''} ${banner ? 'has-banner' : ''}`}>
       {first && <div className="wp-visor" aria-hidden />}
       {first && <div className="wp-crosshair" aria-hidden />}
 

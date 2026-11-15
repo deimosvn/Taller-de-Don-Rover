@@ -1368,3 +1368,97 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------- problema de la misión (minijuego de la tripulación) ---------------- */
+.problem {
+  display: grid;
+  gap: 10px;
+}
+.problem-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.problem-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+.problem-emoji {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid var(--ink);
+  background: var(--pc, var(--mars-400));
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 1.55rem;
+}
+.problem-kicker {
+  margin: 0;
+  font: 700 0.72rem var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.problem-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.problem-progress {
+  display: grid;
+  gap: 4px;
+}
+.problem-progress small {
+  font-size: 0.82rem;
+}
+.problem-bar {
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+.problem-bar i {
+  display: block;
+  height: 100%;
+  background: var(--pc, var(--mars-400));
+  transition: width 0.4s ease;
+}
+.problem-closed {
+  margin: 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.9rem;
+}
+.problem-card {
+  display: grid;
+  gap: 12px;
+  width: min(440px, calc(100% - 32px));
+  margin: 18px auto 8px;
+  padding: 14px 16px 16px;
+}
+.problem-card .problem-text {
+  color: var(--ink-soft);
+}
+.problem-card.is-open {
+  width: min(480px, calc(100% - 16px));
+  padding: 12px;
+}
+.problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.problem-actions .btn {
+  flex: 1 1 auto;
+}
+.wp-problem .problem-bar {
+  border-color: var(--txt);
+}

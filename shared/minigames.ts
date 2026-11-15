@@ -8,7 +8,7 @@
 
 import type { MissionId, RoleId } from './types';
 
-export type MinigameKind = 'scrub' | 'gauge' | 'targets' | 'aim' | 'dose' | 'wires' | 'pattern';
+export type MinigameKind = 'scrub' | 'gauge' | 'targets' | 'aim' | 'dose' | 'wires' | 'pattern' | 'budget' | 'switches' | 'tune';
 
 /** Indicador con zona segura, en unidades reales. Mantener presionado lo mueve hacia `push`. */
 export interface GaugeSpec {
@@ -35,6 +35,8 @@ export type AimTheme = 'sun' | 'earth';
 export type DoseTheme = 'drip' | 'led';
 export type WiresTheme = 'power' | 'assembly' | 'grid';
 export type PatternTheme = 'signal' | 'pumps';
+/** Qué se reparte en el minijuego de repartir: energía entre cultivos, agua o recursos. */
+export type BudgetTheme = 'crops' | 'water' | 'systems';
 
 export interface MinigameSpec {
   kind: MinigameKind;
@@ -50,6 +52,7 @@ export interface MinigameSpec {
   dose?: DoseTheme;
   wires?: WiresTheme;
   pattern?: PatternTheme;
+  budget?: BudgetTheme;
 }
 
 const SCRUB_PANELS: MinigameSpec = {
@@ -240,3 +243,115 @@ export function minigameFor(mission: MissionId | null | undefined, role: RoleId 
   if (!mission || !role) return SCRUB_PANELS;
   return MINIGAMES[mission]?.[role] ?? SCRUB_PANELS;
 }
+
+/* ------------------------------------------------------------------ */
+/* Problemas de la historia                                             */
+/* ------------------------------------------------------------------ */
+//
+// Cada misión plantea un problema en su historia (el invernadero sin energía, la reserva de
+// agua vacía, la colonia a oscuras…). Toda la tripulación lo resuelve con un minijuego en una
+// estación del mundo 3D (o desde su pantalla) mientras investiga y decide. Lo que logra se
+// manda al motor como "reparaciones" y mejora el sistema de la misión en los resultados.
+// El acontecimiento inesperado (la emergencia) se resuelve con los minijuegos de cada
+// especialidad (`MINIGAMES`).
+
+/** Puntos de minijuego que vale una reparación completa por tripulante. */
+export const FIX_GOAL = 15;
+
+export interface MissionProblem {
+  emoji: string;
+  /** Lo que hay que hacer, en pocas palabras. */
+  title: string;
+  /** Qué pasó en la historia y por qué hay que resolverlo. */
+  text: string;
+  /** Dónde está la estación del problema: `sector:<id>`, `building:<id>` o `hub`. */
+  station: string;
+  /** Nombre del lugar, para orientar al jugador. */
+  place: string;
+  spec: MinigameSpec;
+}
+
+export const MISSION_PROBLEMS: Record<MissionId, MissionProblem> = {
+  greenhouse: {
+    emoji: '🌱',
+    title: 'Reparte la energía del invernadero',
+    text: 'La tormenta de polvo bajó la energía solar. Reparte la que queda entre los cultivos para que ninguno se quede sin luz.',
+    station: 'sector:greenhouse',
+    place: 'Invernaderos',
+    spec: {
+      kind: 'budget',
+      budget: 'crops',
+      how: 'Usa + y − para repartir la energía. Cada cultivo necesita la cantidad de su franja verde y no debe sobrar nada.',
+      science: 'El experimento Veggie de la NASA cultiva lechugas en la Estación Espacial con luces LED que gastan muy poca energía.',
+      source: 'NASA · Experimento Veggie',
+    },
+  },
+  water: {
+    emoji: '💧',
+    title: 'Raciona el agua de la reserva',
+    text: 'La fuga vació parte de la reserva. Reparte el agua que queda entre la tripulación, los cultivos y el generador de oxígeno.',
+    station: 'sector:waterplant',
+    place: 'Planta de agua',
+    spec: {
+      kind: 'budget',
+      budget: 'water',
+      how: 'Usa + y − para repartir el agua del tanque. Cada uso necesita la cantidad de su franja verde y no debe sobrar nada.',
+      science: 'En la Estación Espacial Internacional se recupera cerca del 98 % del agua: cada litro se planea con cuidado.',
+      source: 'NASA · Sistema de soporte vital de la EEI',
+    },
+  },
+  darkness: {
+    emoji: '🌑',
+    title: 'Restablece la energía',
+    text: 'Los paneles casi no producen. Decide qué sistemas se quedan encendidos sin gastar más energía de la que entra.',
+    station: 'sector:solar',
+    place: 'Granja solar',
+    spec: {
+      kind: 'switches',
+      how: 'Enciende y apaga sistemas. El soporte vital y la calefacción no se pueden apagar; usa la energía de los paneles sin pasarte ni desperdiciarla.',
+      science: 'En 2018 una tormenta de polvo cubrió Marte y dejó sin energía al rover Opportunity: sus paneles casi no recibían luz.',
+      source: 'NASA · Mars Exploration Rovers',
+    },
+  },
+  signal: {
+    emoji: '📡',
+    title: 'Sintoniza la señal del rover',
+    text: 'La señal cambia de frecuencia y la comunicación con el rover se corta. Iguala su frecuencia para recibir cada mensaje.',
+    station: 'building:antenna',
+    place: 'Antena de la colonia',
+    spec: {
+      kind: 'tune',
+      how: 'Desliza para que tu onda quede encima de la señal del rover y mantenla así hasta fijarla. ¡La frecuencia cambia!',
+      science: 'Los rovers en Marte mandan casi todos sus datos a orbitadores como el Mars Reconnaissance Orbiter, que los reenvían a la Tierra.',
+      source: 'NASA · Red de comunicaciones de Marte',
+    },
+  },
+  habitat: {
+    emoji: '🏗️',
+    title: 'Arma el módulo nuevo',
+    text: 'La colonia necesita crecer. Ensambla las piezas del módulo para que toda la tripulación tenga un lugar protegido.',
+    station: 'sector:habitat',
+    place: 'Hábitats',
+    spec: {
+      kind: 'wires',
+      wires: 'assembly',
+      how: 'Toca una pieza y luego la que encaja con ella para armar el módulo.',
+      science: 'La NASA ha probado hábitats impresos en 3D, como Mars Dune Alpha en Houston, donde voluntarios vivieron un año.',
+      source: 'NASA · CHAPEA / Mars Dune Alpha',
+    },
+  },
+  final: {
+    emoji: '⚖️',
+    title: 'Equilibra los cuatro sistemas',
+    text: 'Cada plan ayuda a un sistema y puede dañar a otro. Reparte los recursos para que energía, agua, alimentos y protección queden en equilibrio.',
+    station: 'hub',
+    place: 'Centro de mando',
+    spec: {
+      kind: 'budget',
+      budget: 'systems',
+      how: 'Usa + y − para repartir los recursos. Cada sistema necesita la cantidad de su franja verde y no debe sobrar nada.',
+      science: 'Una base en Marte tendría que fabricar su propia agua, aire y comida con lo que hay en el planeta: la NASA lo llama ISRU.',
+      source: 'NASA · Uso de recursos del lugar (ISRU)',
+    },
+  },
+};

@@ -1,19 +1,26 @@
-// Laboratorio de minijuegos (#/minijuegos): prueba cualquier tarea de la emergencia sin
-// jugar una misión completa. Útil para el equipo y para mostrar el juego.
+// Laboratorio de minijuegos (#/minijuegos): prueba el problema de la historia de cada misión
+// y cada tarea de la emergencia sin jugar una misión completa. Útil para el equipo y para
+// mostrar el juego.
 
 import { useState } from 'react';
 import { MISSIONS, MISSION_ORDER, ROLES, ROLE_ORDER } from '../../../shared/content';
-import { MINIGAMES } from '../../../shared/minigames';
+import { FIX_GOAL, MINIGAMES, MISSION_PROBLEMS } from '../../../shared/minigames';
 import type { MissionId, RoleId } from '../../../shared/types';
 import { Minigame } from './minigames';
 
+type Pick = RoleId | 'story';
+
 export function MinigameLab() {
   const [mission, setMission] = useState<MissionId>('greenhouse');
-  const [role, setRole] = useState<RoleId>('power');
+  const [pick, setPick] = useState<Pick>('story');
   const [points, setPoints] = useState(0);
-  const spec = MINIGAMES[mission][role];
-  const action = MISSIONS[mission].event.actions[role];
-  const r = ROLES[role];
+  const def = MISSIONS[mission];
+  const prob = MISSION_PROBLEMS[mission];
+  const story = pick === 'story';
+  const spec = story ? prob.spec : MINIGAMES[mission][pick];
+  const action = story ? null : def.event.actions[pick];
+  const color = story ? def.color : ROLES[pick].color;
+  const dark = story ? def.deep : ROLES[pick].dark;
   return (
     <div className="play play-game mg-lab">
       <div className="starfield" />
@@ -22,7 +29,7 @@ export function MinigameLab() {
           ← Inicio
         </a>
         <b>Laboratorio de minijuegos</b>
-        <span className="mono">{points} acciones</span>
+        <span className="mono">{story ? `${Math.min(100, Math.round((points / FIX_GOAL) * 100))}% reparado` : `${points} acciones`}</span>
       </header>
       <main className="play-main">
         <div className="mg-lab-pick">
@@ -34,18 +41,19 @@ export function MinigameLab() {
             ))}
           </select>
           <div className="mg-lab-roles">
+            <button className={`chip ${story ? 'on' : ''}`} onClick={() => (setPick('story'), setPoints(0))}>
+              {prob.emoji} Problema de la historia
+            </button>
             {ROLE_ORDER.map((x) => (
-              <button key={x} className={`chip ${x === role ? 'on' : ''}`} onClick={() => (setRole(x), setPoints(0))}>
+              <button key={x} className={`chip ${x === pick ? 'on' : ''}`} onClick={() => (setPick(x), setPoints(0))}>
                 {ROLES[x].emoji} {ROLES[x].specialty}
               </button>
             ))}
           </div>
         </div>
         <div className="tapgame">
-          <p className="eyebrow center">
-            ¡ACCIÓN! · {action.emoji} {action.verb}
-          </p>
-          <Minigame key={`${mission}:${role}`} spec={spec} color={r.color} dark={r.dark} onPoints={(n) => setPoints((p) => p + n)} />
+          <p className="eyebrow center">{story ? `${prob.emoji} ${prob.title}` : `¡EMERGENCIA! · ${action!.emoji} ${action!.verb}`}</p>
+          <Minigame key={`${mission}:${pick}`} spec={spec} color={color} dark={dark} onPoints={(n) => setPoints((p) => p + n)} />
         </div>
       </main>
     </div>
