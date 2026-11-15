@@ -614,7 +614,7 @@ export class WorldEngine {
     const need = aim.kind === 'block' ? BLOCKS[aim.block].hardness : 0.5;
     this.mining = { key: aim.key, kind: aim.kind, t: 0, need };
     p.controller.faceTowards(aim.point);
-    p.controller.playEmote('scan', need + 0.4);
+    p.controller.playEmote('work', need + 0.4);
   }
 
   private placeBlock(): void {

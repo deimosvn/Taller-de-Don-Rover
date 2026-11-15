@@ -592,3 +592,59 @@
     display: none;
   }
 }
+
+/* ---------------- acceso al modo libre ---------------- */
+.hero-free {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 248, 236, 0.28);
+  background: rgba(23, 8, 6, 0.5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: var(--cream);
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+.hero-free:hover {
+  transform: translateY(-2px);
+  background: rgba(23, 8, 6, 0.68);
+}
+.hero-free-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--mars-500);
+  font-size: 1.25rem;
+  flex: none;
+}
+.hero-free span:nth-child(2) {
+  display: grid;
+  line-height: 1.25;
+  min-width: 0;
+}
+.hero-free b {
+  font: 700 1rem var(--font-display);
+}
+.hero-free small {
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+.hero-free-go {
+  margin-left: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink);
+  font: 700 0.85rem var(--font-display);
+  white-space: nowrap;
+}

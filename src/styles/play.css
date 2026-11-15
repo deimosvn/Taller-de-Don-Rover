@@ -1335,3 +1335,36 @@
 .world-btn {
   white-space: nowrap;
 }
+
+/* ---------------- sin código: modo libre ---------------- */
+.nocode {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 2px dashed rgba(42, 18, 13, 0.16);
+  display: grid;
+  gap: 6px;
+}
+.nocode-title {
+  margin: 0;
+  font: 700 1.15rem var(--font-display);
+  color: var(--ink);
+}
+.nocode .muted {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+.nocode-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.nocode-actions .btn {
+  text-decoration: none;
+  justify-content: center;
+}
+@media (max-width: 360px) {
+  .nocode-actions {
+    grid-template-columns: 1fr;
+  }
+}

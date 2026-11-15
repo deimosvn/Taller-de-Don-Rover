@@ -253,11 +253,11 @@ export function Landing() {
                 <Icon name="install" size={16} /> Instalar app
               </button>
             )}
-            <a className="btn small cream" href="#/mundo">
-              🌍 Explorar Marte
+            <a className="btn small cream" href="#/libre">
+              🎮 Jugar ahora
             </a>
             <a className="btn small cream" href="#/jugar">
-              Unirme
+              Tengo código
             </a>
             <a className="btn small mars" href="#/profe">
               Crear misión
@@ -282,6 +282,14 @@ export function Landing() {
               🧑‍🚀 Soy alumno: unirme
             </a>
           </div>
+          <a className="hero-free" href="#/libre">
+            <span className="hero-free-icon">⛏️</span>
+            <span>
+              <b>¿Sin código? Juega ahora</b>
+              <small>Mina, fabrica y construye en Marte · solo o con amigos por enlace</small>
+            </span>
+            <span className="hero-free-go">Jugar →</span>
+          </a>
           <p className="hero-hint">
             <Icon name="map" size={16} /> Arrastra el planeta para girarlo · rueda o pellizco para acercarte
           </p>
@@ -327,8 +335,8 @@ export function Landing() {
             <a className="btn huge cream" href="#/jugar">
               🧑‍🚀 Unirme
             </a>
-            <a className="btn huge ghost" href="#/mundo">
-              🌍 Explorar Marte en 3D
+            <a className="btn huge ghost" href="#/libre">
+              🎮 Jugar solo o con amigos
             </a>
           </div>
         </div>
