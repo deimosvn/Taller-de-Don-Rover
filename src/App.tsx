@@ -7,6 +7,7 @@ const HostApp = lazy(() => import('./pages/host/HostApp').then((m) => ({ default
 const PlayApp = lazy(() => import('./pages/play/PlayApp').then((m) => ({ default: m.PlayApp })));
 const WorldExplorer = lazy(() => import('./world/react/WorldExplorer').then((m) => ({ default: m.WorldExplorer })));
 const MinigameLab = lazy(() => import('./pages/play/MinigameLab').then((m) => ({ default: m.MinigameLab })));
+const RoverSetup = lazy(() => import('./pages/rover/RoverSetup').then((m) => ({ default: m.RoverSetup })));
 const Trainer = lazy(() => import('./pages/trainer/Trainer').then((m) => ({ default: m.Trainer })));
 const FreePlay = lazy(() => import('./pages/free/FreePlay').then((m) => ({ default: m.FreePlay })));
 
@@ -28,6 +29,8 @@ export function App() {
         <HostApp />
       ) : route.path === '/jugar' ? (
         <PlayApp initialCode={(route.params.get('c') ?? '').toUpperCase()} sig={route.params.get('s')} />
+      ) : route.path === '/donrover' ? (
+        <RoverSetup />
       ) : route.path === '/entrenador' ? (
         <Trainer />
       ) : route.path === '/libre' ? (

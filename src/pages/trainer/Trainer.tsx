@@ -17,6 +17,7 @@ import { nasaCheck, type NasaSource } from '../../lib/nasa';
 import { loadProfile, saveProfile } from '../../lib/profile';
 import { primeAudio, sfx } from '../../lib/sound';
 import { SimPlay } from './SimPlay';
+import { RoverCaptions, RoverPanel } from '../../rover/RoverPanel';
 
 interface Props {
   /** Dentro del mundo 3D (modo libre): se dibuja como panel y se puede cerrar. */
@@ -232,6 +233,14 @@ export function Trainer({ embedded = false, role = null, base = null, onClose, o
             );
           })}
         </ul>
+
+        {!embedded && (
+          <div className="tr-rover">
+            <p className="tr-h">¿Tienes dudas? Pregúntale a Don Rover</p>
+            <RoverPanel compact />
+            <RoverCaptions />
+          </div>
+        )}
 
         <footer className="tr-status">
           <span className={ai.enabled ? 'ok' : ''}>

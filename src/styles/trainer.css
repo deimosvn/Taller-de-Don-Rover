@@ -796,3 +796,13 @@
     flex: 1 1 100%;
   }
 }
+.tr-rover {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+}
+.tr-rover .rp {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 248, 236, 0.05);
+}

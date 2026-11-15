@@ -11,6 +11,7 @@ import './styles/world.css';
 import './styles/nasa.css';
 import './styles/minigames.css';
 import './styles/trainer.css';
+import './styles/rover.css';
 import { App } from './App';
 import { probeServer } from './lib/cloud';
 import { registerServiceWorker } from './lib/pwa';

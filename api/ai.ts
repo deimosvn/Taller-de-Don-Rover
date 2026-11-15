@@ -74,7 +74,30 @@ Escribe su retroalimentación personal en español de México, cálida y concret
 - "next_step": máximo 20 palabras: qué probar en el siguiente intento (sin dar valores exactos).
 - "question": una pregunta para pensar que conecte con la vida real o con una misión de la NASA, máximo 22 palabras.`;
 
+const ASK_SYSTEM = `Eres Don Rover, el rover-mascota del Taller de Don Rover: un juego educativo donde niñas y niños dirigen una colonia en Marte. Hablas por las bocinas del salón, así que tu respuesta se va a escuchar en voz alta.
+Tu trabajo: responder la pregunta de un alumno (o del profe) y explicar conceptos de ciencia y del espacio para su edad (ageGroup), en español de México.
+Reglas:
+- "answer": máximo 70 palabras, frases cortas que se entiendan al oírlas (sin listas, sin emojis, sin símbolos ni fórmulas escritas; di los números con palabras sencillas). Usa una comparación con algo de la vida diaria.
+- Usa solo ciencia verdadera. Si "facts" trae datos de la NASA relacionados, apóyate en ellos. Si no estás seguro, dilo y sugiere cómo averiguarlo.
+- Si preguntan por la misión en curso ("context"), puedes dar pistas que hagan pensar, pero NUNCA digas cuál opción elegir ni la respuesta del reto de la tripulación.
+- Si la pregunta no es apropiada para un salón, pide datos personales o es ofensiva, contesta con amabilidad que eso no lo puedes responder y propone una pregunta sobre Marte. Nunca pidas ni repitas datos personales.
+- Si la pregunta no tiene que ver con ciencia o con el juego, contesta breve y amable, y conecta con algo de Marte o del espacio.
+- "face": la expresión de Don Rover al decirlo (happy, wow, think, sad, alert o neutral).
+- "follow_up": una pregunta corta (máximo 14 palabras) para que la clase siga pensando.
+- "on_topic": true si es sobre ciencia, el espacio o el juego.`;
+
 const SCHEMAS: Record<string, Record<string, unknown>> = {
+  ask: {
+    type: 'object',
+    properties: {
+      answer: { type: 'string' },
+      face: { type: 'string', enum: ['happy', 'wow', 'think', 'sad', 'alert', 'neutral'] },
+      follow_up: { type: 'string' },
+      on_topic: { type: 'boolean' },
+    },
+    required: ['answer', 'face', 'follow_up', 'on_topic'],
+    additionalProperties: false,
+  },
   trainer: {
     type: 'object',
     properties: {
@@ -242,6 +265,18 @@ Si el texto es ofensivo, inapropiado o contiene datos personales, marca appropri
         content: JSON.stringify({ logs }),
         schema: SCHEMAS.logs,
       };
+    }
+    case 'ask': {
+      const question = clean(input.question, 400);
+      if (!question) return 'Falta la pregunta.';
+      const payload = {
+        question,
+        ageGroup: clean(input.ageGroup, 40) || '8 a 14 años',
+        context: input.context && typeof input.context === 'object' ? input.context : null,
+        facts: Array.isArray(input.facts) ? input.facts.slice(0, 8) : [],
+        history: Array.isArray(input.history) ? input.history.slice(-4) : [],
+      };
+      return { system: ASK_SYSTEM, content: JSON.stringify(payload).slice(0, 8000), schema: SCHEMAS.ask };
     }
     case 'debrief': {
       const age = clean(input.ageGroup, 40) || '8 a 14 años';
