@@ -61,6 +61,8 @@ export interface UpdateContext {
   time: number;
   /** Brillo ambiental de luces (0 = día, 1 = oscuridad). */
   night: number;
+  /** Posición de la cámara (para ajustar etiquetas según la distancia). */
+  eye?: Vector3;
 }
 
 /** Resultado de construir un modelo. */

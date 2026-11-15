@@ -271,13 +271,16 @@ export class ColonyDirector {
       this.tubes.push({ sector: s, points: pts, length, inward, color: new Color(sys.color) });
     }
 
-    // Faroles del perímetro, entre sectores y lejos del camino del rover.
+    // Faroles del perímetro, entre sectores y lejos del camino del rover (sin tapar la
+    // avenida sur que va de la plataforma de abordaje a la puerta del hub).
     for (const s of SECTOR_ORDER) {
       for (const [radius, offset] of [
         [31.2, 22.5],
         [12.2, 22.5],
       ] as const) {
-        const { east, north } = colonyPoint(radius, SECTOR_ANGLE[s] + offset);
+        const angle = SECTOR_ANGLE[s] + offset;
+        if (Math.abs(((angle % 360) + 360) % 360 - 90) < 1) continue;
+        const { east, north } = colonyPoint(radius, angle);
         const d = colonyDir(east, north);
         const base = surfacePoint(d, 0);
         const rot = uprightRot(d);

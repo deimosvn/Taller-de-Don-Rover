@@ -405,6 +405,12 @@ export class WorldEngine {
     return this.player?.view ?? null;
   }
 
+  /** Estado actual del HUD (para la interfaz que se monta después de entrar). */
+  get hud(): PlayerHud | null {
+    const p = this.player;
+    return p ? { view: p.view, prompt: p.prompt, grounded: p.controller.grounded, running: p.controller.anim === 'run' } : null;
+  }
+
   /** Controles táctiles de la interfaz (joystick y botón de correr). */
   get controls(): { stick: { x: number; y: number }; setRun(on: boolean): void } {
     const input = this.playerInput;
@@ -820,7 +826,7 @@ export class WorldEngine {
     const q = QUALITY[this.tier];
     this.terrain.update(this.camera.position, q.lodBias, q.buildBudgetMs);
 
-    const ctx = { dt, time: this.time, night: clamp((this.light.glow - 0.55) / 1.6, 0, 1) };
+    const ctx = { dt, time: this.time, night: clamp((this.light.glow - 0.55) / 1.6, 0, 1), eye: this.camera.position };
     this.director.update(ctx);
     this.entities.update(ctx);
     this.updateMarker();

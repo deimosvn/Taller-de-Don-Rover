@@ -81,6 +81,10 @@ export function WorldCanvas({ snapshot, options, interactive = true, keyboard = 
   return (
     <div className={`world-view ${ready ? 'is-ready' : 'is-loading'} ${className}`}>
       <div className="world-host" ref={hostRef} />
+      <div className="world-loading" aria-hidden={ready}>
+        <div className="spinner" />
+        Preparando Marte…
+      </div>
       {children}
     </div>
   );

@@ -41,6 +41,7 @@ export interface AstronautParams {
 const GLOVE = '#EEF0F8';
 const BOOT = '#E3E6F2';
 const SCREEN = '#1B1640';
+const _lp = new Vector3();
 
 /* ------------------------------------------------------------------ */
 /* Piezas                                                               */
@@ -370,11 +371,14 @@ export function buildAstronaut(ctx: BuildContext, params: Record<string, unknown
   head.add(eyes);
 
   let label: ReturnType<typeof labelSprite> | null = null;
+  let labelOn = true;
   if (p.label) {
     label = labelSprite(p.label, { bg: p.labelColor ?? '#FFF8EC', height: 0.3 });
     label.position.copy(anchors.label);
     root.add(label);
   }
+  const labelW = label?.scale.x ?? 1;
+  const labelH = label?.scale.y ?? 1;
 
   /* ---------------- animación ---------------- */
 
@@ -522,6 +526,13 @@ export function buildAstronaut(ctx: BuildContext, params: Record<string, unknown
     }
     if (blink > 0) blink -= dt;
     eyes.scale.y = blink > 0 ? 0.12 : 1;
+    // El nombre se oculta si la cámara está encima o muy lejos, y se achica al acercarse.
+    if (label && uc.eye && labelOn) {
+      const d = root.getWorldPosition(_lp).distanceTo(uc.eye);
+      label.visible = d > 2.3 && d < 46;
+      const k = Math.min(1, Math.max(0.55, d / 7));
+      label.scale.set(labelW * k, labelH * k, 1);
+    }
   }
 
   // En primera persona el propio astronauta no se dibuja (la cámara está dentro del casco),
@@ -544,7 +555,8 @@ export function buildAstronaut(ctx: BuildContext, params: Record<string, unknown
 
   function applyState(state: EntityState): void {
     setFirstPerson(Boolean(state.firstPerson));
-    if (label) label.visible = !state.hideLabel && !state.firstPerson;
+    labelOn = !state.hideLabel && !state.firstPerson;
+    if (label) label.visible = labelOn;
   }
 
   apply();

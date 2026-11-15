@@ -760,7 +760,21 @@ function Debrief({ view }: { view: PlayerView }) {
 
 /* ---------------- enrutador por fase ---------------- */
 
-export function PhaseScreen({ view, act, net }: { view: PlayerView; act: Act; net: PlayerNet | null }) {
+/** Invitación a recorrer la colonia en 3D mientras se espera. */
+function Explore3D({ open3d, text }: { open3d?: () => void; text: string }) {
+  if (!open3d) return null;
+  return (
+    <button className="explore-3d card" onClick={open3d}>
+      <span className="explore-3d-emoji">🌍</span>
+      <span>
+        <b>Explorar la colonia en 3D</b>
+        <small>{text}</small>
+      </span>
+    </button>
+  );
+}
+
+export function PhaseScreen({ view, act, net, open3d }: { view: PlayerView; act: Act; net: PlayerNet | null; open3d?: () => void }) {
   if (view.phase !== 'lobby' && !view.crew) {
     return (
       <Center>
@@ -772,9 +786,19 @@ export function PhaseScreen({ view, act, net }: { view: PlayerView; act: Act; ne
   }
   switch (view.phase) {
     case 'lobby':
-      return <Waiting view={view} act={act} />;
+      return (
+        <>
+          <Waiting view={view} act={act} />
+          <Explore3D open3d={open3d} text="Camina con tu astronauta, salta con la gravedad de Marte y saluda a tus compañeros." />
+        </>
+      );
     case 'crews':
-      return <RoleReveal view={view} />;
+      return (
+        <>
+          <RoleReveal view={view} />
+          <Explore3D open3d={open3d} text="Ve a conocer tu sector y a tu tripulación en la colonia." />
+        </>
+      );
     case 'scan':
       return <ScanWait view={view} act={act} />;
     case 'briefing':

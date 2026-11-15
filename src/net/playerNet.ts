@@ -4,7 +4,8 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { Signaling } from '../engine/settings';
 import type { Ack, AvatarConfig, PlayerAction, PlayerView } from '../../shared/types';
-import { PEER_PREFIX, peerOptions, type ToHost, type ToPlayer } from './protocol';
+import type { PresenceMap, PresencePose, WorldSnapshot } from '../world/colony/snapshot';
+import { PEER_PREFIX, isPose, peerOptions, type ToHost, type ToPlayer } from './protocol';
 
 export type PlayerNetState = 'connecting' | 'connected' | 'reconnecting' | 'notfound' | 'error' | 'kicked';
 
@@ -23,6 +24,12 @@ interface Handlers {
 }
 
 export class PlayerNet {
+  /** Último estado de la colonia para el mundo 3D. */
+  world: WorldSnapshot | null = null;
+  /** Se llama cuando cambia el estado de la colonia. */
+  onWorld: ((w: WorldSnapshot) => void) | null = null;
+  /** Se llama con las poses de los compañeros que juegan en 3D. */
+  onPeers: ((p: PresenceMap) => void) | null = null;
   private peer: Peer | null = null;
   private conn: DataConnection | null = null;
   private pending = new Map<number, (a: Ack) => void>();
@@ -179,7 +186,25 @@ export class PlayerNet {
         this.setState('kicked');
         this.stop();
         break;
+      case 'world':
+        if (msg.world && typeof msg.world === 'object') {
+          this.world = msg.world;
+          this.onWorld?.(msg.world);
+        }
+        break;
+      case 'peers': {
+        if (!msg.peers || typeof msg.peers !== 'object') break;
+        const clean: PresenceMap = {};
+        for (const [id, p] of Object.entries(msg.peers)) if (isPose(p)) clean[id] = p;
+        this.onPeers?.(clean);
+        break;
+      }
     }
+  }
+
+  /** Pose del astronauta en el mundo 3D (null al salir). Sin confirmación. */
+  sendPose(p: PresencePose | null) {
+    this.send({ t: 'pos', p });
   }
 
   act(action: PlayerAction): Promise<Ack> {

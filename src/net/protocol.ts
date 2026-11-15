@@ -5,20 +5,32 @@
 import type { PeerJSOption } from 'peerjs';
 import type { Signaling } from '../engine/settings';
 import type { AvatarConfig, PlayerAction, PlayerView } from '../../shared/types';
+import type { PresenceMap, PresencePose, WorldSnapshot } from '../world/colony/snapshot';
 
 export const PEER_PREFIX = 'ixchel-mars-v1-';
 
 export type ToHost =
   | { t: 'join'; name: string; avatar: AvatarConfig; xp: number; token?: string }
   | { t: 'act'; rid: number; action: PlayerAction }
-  | { t: 'hb' };
+  | { t: 'hb' }
+  /** Pose del astronauta en el mundo 3D (null = salió del mundo). */
+  | { t: 'pos'; p: PresencePose | null };
 
 export type ToPlayer =
   | { t: 'joined'; playerId: string; token: string; name: string }
   | { t: 'error'; error: string }
   | { t: 'ack'; rid: number; ok: boolean; error?: string }
   | { t: 'view'; view: PlayerView }
-  | { t: 'kicked' };
+  | { t: 'kicked' }
+  /** Estado de la colonia para el mundo 3D (salud, edificios, tripulaciones…). */
+  | { t: 'world'; world: WorldSnapshot }
+  /** Poses de los compañeros que están jugando en 3D. */
+  | { t: 'peers'; peers: PresenceMap };
+
+/** ¿Es una pose válida? (los datos de la red no son de fiar). */
+export function isPose(p: unknown): p is PresencePose {
+  return Array.isArray(p) && p.length === 6 && p.every((n) => typeof n === 'number' && Number.isFinite(n)) && Math.abs(Math.hypot(p[0], p[1], p[2]) - 1) < 0.05;
+}
 
 export function peerOptions(sig: Signaling | null | undefined): PeerJSOption {
   const base: PeerJSOption = { debug: 0 };

@@ -39,3 +39,507 @@
   background: #0b0f38;
   overscroll-behavior: none;
 }
+
+/* Lienzo 3D a pantalla completa (celular del alumno y proyector) */
+.world-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #0b0f38;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.world-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: var(--cream);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.world-view.is-ready .world-loading {
+  opacity: 0;
+}
+.world-loading .spinner {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 248, 236, 0.25);
+  border-top-color: var(--ix);
+  animation: wl-spin 0.9s linear infinite;
+}
+@keyframes wl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Botones de la vista del explorador */
+.world-cta {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  z-index: 5;
+}
+
+/* ==========================================================================
+   Modo jugador (primera y tercera persona)
+   ========================================================================== */
+
+.wp {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  font-family: var(--font-display);
+  color: var(--ink);
+}
+.wp > * {
+  pointer-events: auto;
+}
+.wp kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  padding: 0 0.35em;
+  height: 1.6em;
+  border-radius: 7px;
+  border: 2px solid var(--ink);
+  border-bottom-width: 3px;
+  background: #fff;
+  font-family: var(--font-display);
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.wp-top {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.wp-top > * {
+  pointer-events: auto;
+}
+.wp-spacer {
+  flex: 1;
+  pointer-events: none !important;
+}
+.wp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: rgba(255, 248, 236, 0.94);
+  color: var(--ink);
+  font: 700 0.95rem var(--font-display);
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wp-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+.wp-btn.solid {
+  background: var(--ix);
+}
+.wp-chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(33, 26, 74, 0.72);
+  color: var(--cream);
+  font-weight: 600;
+  font-size: 0.9rem;
+  pointer-events: none !important;
+}
+@media (max-width: 560px) {
+  .wp-btn span {
+    display: none;
+  }
+  .wp-top .wp-btn:last-child {
+    font-size: 0.85rem;
+    padding: 0 10px;
+  }
+}
+
+.wp-banner {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 54px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-radius: var(--radius-md);
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  box-shadow: 0 4px 0 var(--ink);
+  font-weight: 600;
+}
+.wp-banner span {
+  flex: 1;
+}
+.wp-banner.alert {
+  background: #ffe1dd;
+  animation: wp-pulse 1.4s ease-in-out infinite;
+}
+@keyframes wp-pulse {
+  50% {
+    transform: translateX(-50%) scale(1.025);
+  }
+}
+
+.wp-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 150px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 9px 16px 9px 10px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  box-shadow: 0 4px 0 var(--ink);
+  font: 700 1rem var(--font-display);
+  color: var(--ink);
+  cursor: pointer;
+  animation: wp-pop 0.25s ease-out;
+}
+@media (pointer: fine) {
+  .wp-prompt {
+    bottom: 34px;
+  }
+}
+@keyframes wp-pop {
+  from {
+    transform: translateX(-50%) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* Joystick y botones táctiles */
+.wp-stick {
+  position: absolute;
+  left: max(22px, env(safe-area-inset-left));
+  bottom: max(26px, env(safe-area-inset-bottom));
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 248, 236, 0.18) 0 45%, rgba(255, 248, 236, 0.32) 46% 100%);
+  border: 3px solid rgba(255, 248, 236, 0.85);
+  box-shadow: 0 0 0 3px rgba(33, 26, 74, 0.35);
+  touch-action: none;
+}
+.wp-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
+}
+.wp-actions {
+  position: absolute;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.wp-emotes {
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
+  gap: 8px;
+}
+.wp-round {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: rgba(255, 248, 236, 0.94);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.wp-round.jump {
+  width: 88px;
+  height: 88px;
+  font-size: 2rem;
+  line-height: 1;
+  background: var(--ix);
+  align-content: center;
+}
+.wp-round.jump small {
+  font: 700 0.72rem var(--font-display);
+}
+.wp-round:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.wp-keys {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 248, 236, 0.92);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 0.86rem;
+  cursor: pointer;
+  max-width: calc(100% - 32px);
+}
+.wp-keys span {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+/* Primera persona: visor del casco */
+.wp-visor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+  background:
+    radial-gradient(ellipse 78% 72% at 50% 50%, transparent 70%, rgba(20, 16, 50, 0.32) 88%, rgba(20, 16, 50, 0.86) 100%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 22%, transparent 30%);
+  box-shadow: inset 0 0 0 2px rgba(182, 156, 255, 0.25);
+}
+.wp-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: rgba(255, 248, 236, 0.9);
+  box-shadow: 0 0 0 2px rgba(33, 26, 74, 0.6);
+  pointer-events: none !important;
+}
+
+/* Tarjetas de lo que el jugador descubre */
+.wp-card {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  max-height: 60%;
+  overflow: auto;
+  padding: 14px 16px 16px;
+  border-radius: var(--radius-lg);
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  box-shadow: 0 5px 0 var(--ink), 0 0 0 6px color-mix(in srgb, var(--wc) 45%, transparent);
+  font-family: var(--font-body);
+  animation: wp-card-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+  z-index: 3;
+}
+@keyframes wp-card-in {
+  from {
+    transform: translate(-50%, 30px) scale(0.92);
+    opacity: 0;
+  }
+}
+.wp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.wp-card-head h3 {
+  flex: 1;
+  margin: 0;
+  font: 700 1.25rem var(--font-display);
+}
+.wp-card-emoji {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--wc) 40%, white);
+  border: 3px solid var(--ink);
+  font-size: 1.4rem;
+}
+.wp-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: #fff;
+  color: var(--ink);
+  font: 800 1rem/1 var(--font-display);
+  cursor: pointer;
+}
+.wp-card p {
+  margin: 4px 0 10px;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.wp-card.ix p {
+  min-height: 3em;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.wp-meter {
+  display: grid;
+  grid-template-columns: 9.5em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 0.9rem;
+}
+.wp-meter-bar {
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: #fff;
+  overflow: hidden;
+}
+.wp-meter-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.wp-meter b {
+  text-align: right;
+  font-family: var(--font-display);
+}
+.wp-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 2px dashed rgba(33, 26, 74, 0.18);
+  font-size: 0.9rem;
+}
+.wp-line b {
+  text-align: right;
+  font-family: var(--font-display);
+}
+
+.wp-toast {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  box-shadow: 0 4px 0 var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+  animation: wp-pop 0.25s ease-out;
+  pointer-events: none !important;
+}
+
+/* ==========================================================================
+   Colonia 3D en el proyector
+   ========================================================================== */
+
+.hw-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  pointer-events: none;
+}
+.hw-top > * {
+  pointer-events: auto;
+}
+.hw-people {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: none;
+}
+.hw-person {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 3px solid var(--ink);
+  background: rgba(255, 248, 236, 0.92);
+  color: var(--ink);
+  font: 700 0.92rem var(--font-display);
+  cursor: pointer;
+}
+.hw-person.on {
+  background: var(--ix);
+}
+.hw-person.live {
+  box-shadow: 0 0 0 3px rgba(85, 219, 122, 0.55);
+}
+.hw-live {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #55db7a;
+  box-shadow: 0 0 8px #55db7a;
+}

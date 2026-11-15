@@ -1287,3 +1287,51 @@
       0 0 44px rgba(255, 107, 91, 0.85);
   }
 }
+
+/* Invitación al mundo 3D */
+.explore-3d {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(440px, calc(100% - 32px));
+  margin: 18px auto 8px;
+  padding: 14px 16px;
+  border: 3px solid var(--ink);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #fff8ec 0%, #ffe3c8 100%);
+  box-shadow: 0 5px 0 var(--ink);
+  color: var(--ink);
+  text-align: left;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+.explore-3d:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 var(--ink);
+}
+.explore-3d-emoji {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  border: 3px solid var(--ink);
+  background: var(--mars-400);
+  font-size: 1.8rem;
+}
+.explore-3d b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+.explore-3d small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.world-btn {
+  white-space: nowrap;
+}

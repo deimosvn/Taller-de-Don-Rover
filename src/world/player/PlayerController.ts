@@ -56,6 +56,8 @@ export class PlayerController {
   readonly face = new Vector3();
   /** Pies del jugador en el mundo. */
   readonly feet = new Vector3();
+  /** Dirección en la que el jugador quiere moverse (tangente unitaria o cero). */
+  private readonly wish = new Vector3();
   /** Altura sobre el terreno y velocidad vertical. */
   alt = 0;
   vy = 0;
@@ -117,6 +119,7 @@ export class PlayerController {
     let amount = Math.min(1, wish.length());
     if (amount < 0.08) amount = 0;
     if (amount > 0) wish.normalize();
+    this.wish.copy(wish);
     const top = input.run ? PLAYER.run : PLAYER.walk;
     const target = _b.copy(wish).multiplyScalar(top * amount);
     const k = 1 - Math.exp(-(this.grounded ? PLAYER.accel : PLAYER.accel * PLAYER.airControl) * dt);
@@ -177,10 +180,11 @@ export class PlayerController {
     if (firstPerson) {
       _a.copy(camForward).addScaledVector(this.dir, -camForward.dot(this.dir));
       if (_a.lengthSq() > 1e-6) this.face.copy(_a.normalize());
-    } else if (speed > 0.4 && amount > 0) {
+    } else if (amount > 0) {
+      // El cuerpo gira hacia donde el jugador quiere ir (aunque una pared lo frene).
       const now = this.heading;
       tangentFrame(this.dir, _east, _north);
-      const want = Math.atan2(this.vel.dot(_east), this.vel.dot(_north));
+      const want = Math.atan2(this.wish.dot(_east), this.wish.dot(_north));
       const h = now + angleDelta(now, want) * (1 - Math.exp(-PLAYER.turn * dt));
       this.face.copy(_north).multiplyScalar(Math.cos(h)).addScaledVector(_east, Math.sin(h)).normalize();
     }

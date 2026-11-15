@@ -3,7 +3,9 @@
 import Peer, { type DataConnection } from 'peerjs';
 import type { HostEngine } from '../engine/room';
 import type { Signaling } from '../engine/settings';
-import { PEER_PREFIX, peerOptions, type ToHost, type ToPlayer } from './protocol';
+import { snapshotFromHost } from '../world/colony/fromGame';
+import type { PresenceMap, PresencePose } from '../world/colony/snapshot';
+import { PEER_PREFIX, isPose, peerOptions, type ToHost, type ToPlayer } from './protocol';
 
 export interface NetStatus {
   state: 'starting' | 'online' | 'reconnecting' | 'offline';
@@ -16,17 +18,34 @@ interface Entry {
   playerId: string | null;
   lastSeen: number;
   lastSent: string;
+  lastWorld: string;
+  lastPeers: string;
 }
+
+/** Cada cuánto se reenvían las poses de los astronautas (ms). */
+const PRESENCE_MS = 200;
+/** Una pose sin noticias durante este tiempo se descarta (ms). */
+const PRESENCE_TTL = 8000;
 
 export class HostNet {
   private peer: Peer | null = null;
   private conns = new Map<string, Entry>();
   private unsub: (() => void) | null = null;
   private hb: ReturnType<typeof setInterval> | null = null;
+  private presenceTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly presence = new Map<string, { pose: PresencePose; at: number }>();
+  private presenceDirty = false;
   private beat = 0;
   private destroyed = false;
   private retries = 0;
   status: NetStatus = { state: 'starting', detail: 'Abriendo la colonia…', peers: 0 };
+
+  /** Poses de los alumnos que juegan en 3D (para la vista 3D del proyector). */
+  presenceMap(): PresenceMap {
+    const out: PresenceMap = {};
+    for (const [id, p] of this.presence) out[id] = p.pose;
+    return out;
+  }
 
   constructor(
     private engine: HostEngine,
@@ -39,12 +58,14 @@ export class HostNet {
     this.open();
     this.unsub = this.engine.subscribe(() => this.pushViews(false));
     this.hb = setInterval(() => this.heartbeat(), 4000);
+    this.presenceTimer = setInterval(() => this.broadcastPresence(), PRESENCE_MS);
   }
 
   stop() {
     this.destroyed = true;
     this.unsub?.();
     if (this.hb) clearInterval(this.hb);
+    if (this.presenceTimer) clearInterval(this.presenceTimer);
     for (const e of this.conns.values()) e.conn.close();
     this.conns.clear();
     this.peer?.destroy();
@@ -100,7 +121,7 @@ export class HostNet {
   }
 
   private accept(conn: DataConnection) {
-    const entry: Entry = { conn, playerId: null, lastSeen: Date.now(), lastSent: '' };
+    const entry: Entry = { conn, playerId: null, lastSeen: Date.now(), lastSent: '', lastWorld: '', lastPeers: '' };
     conn.on('open', () => {
       this.conns.set(conn.connectionId, entry);
     });
@@ -110,6 +131,7 @@ export class HostNet {
       this.conns.delete(conn.connectionId);
       if (entry.playerId && ![...this.conns.values()].some((e) => e.playerId === entry.playerId)) {
         this.engine.setConnected(entry.playerId, false);
+        if (this.presence.delete(entry.playerId)) this.presenceDirty = true;
       }
       this.setStatus(this.status.state, this.status.detail);
     };
@@ -144,10 +166,23 @@ export class HostNet {
         }
         entry.playerId = res.data.playerId;
         entry.lastSent = '';
+        entry.lastWorld = '';
+        entry.lastPeers = '';
         this.send(entry.conn, { t: 'joined', ...res.data });
         this.engine.setConnected(res.data.playerId, true);
         this.sendView(entry, true);
+        this.sendWorld(entry, this.worldJson());
         this.setStatus(this.status.state, this.status.detail);
+        break;
+      }
+      case 'pos': {
+        if (!entry.playerId) return;
+        if (msg.p === null) {
+          if (this.presence.delete(entry.playerId)) this.presenceDirty = true;
+        } else if (isPose(msg.p)) {
+          this.presence.set(entry.playerId, { pose: msg.p, at: Date.now() });
+          this.presenceDirty = true;
+        }
         break;
       }
       case 'act': {
@@ -179,7 +214,48 @@ export class HostNet {
   }
 
   private pushViews(force: boolean) {
-    for (const e of this.conns.values()) this.sendView(e, force);
+    const world = this.conns.size ? this.worldJson() : '';
+    for (const e of this.conns.values()) {
+      this.sendView(e, force);
+      if (world) this.sendWorld(e, world);
+    }
+  }
+
+  /** Estado de la colonia para el mundo 3D de los celulares (se manda solo si cambió). */
+  private worldJson(): string {
+    try {
+      return JSON.stringify(snapshotFromHost(this.engine.hostView()));
+    } catch {
+      return '';
+    }
+  }
+
+  private sendWorld(entry: Entry, json: string) {
+    if (!entry.playerId || !json || json === entry.lastWorld) return;
+    entry.lastWorld = json;
+    this.send(entry.conn, { t: 'world', world: JSON.parse(json) });
+  }
+
+  /** Reenvía las poses a quienes están en 3D (a cada uno, las de los demás). */
+  private broadcastPresence() {
+    const now = Date.now();
+    for (const [id, p] of this.presence) {
+      if (now - p.at > PRESENCE_TTL) {
+        this.presence.delete(id);
+        this.presenceDirty = true;
+      }
+    }
+    if (!this.presenceDirty) return;
+    this.presenceDirty = false;
+    for (const e of this.conns.values()) {
+      if (!e.playerId || !this.presence.has(e.playerId)) continue;
+      const peers: PresenceMap = {};
+      for (const [id, p] of this.presence) if (id !== e.playerId) peers[id] = p.pose;
+      const key = JSON.stringify(peers);
+      if (key === e.lastPeers) continue;
+      e.lastPeers = key;
+      this.send(e.conn, { t: 'peers', peers });
+    }
   }
 
   private heartbeat() {
@@ -189,7 +265,10 @@ export class HostNet {
       if (t - e.lastSeen > 16000) {
         e.conn.close();
         this.conns.delete(id);
-        if (e.playerId) this.engine.setConnected(e.playerId, false);
+        if (e.playerId) {
+          this.engine.setConnected(e.playerId, false);
+          if (this.presence.delete(e.playerId)) this.presenceDirty = true;
+        }
       }
     }
     // Cada 8 s reenviamos la vista: sincroniza relojes y confirma que el canal sigue vivo.

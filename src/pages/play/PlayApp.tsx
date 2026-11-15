@@ -1,7 +1,7 @@
 // App del alumno (celular, tableta o computadora). Sin cuentas: la identidad del astronauta
 // vive en este dispositivo y la partida llega por WebRTC desde el navegador del profesor.
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ROLES } from '../../../shared/content';
 import type { PlayerAction, PlayerView } from '../../../shared/types';
 import { Astronaut, IXOrb } from '../../components/art';
@@ -17,6 +17,9 @@ import { AvatarBuilder } from './AvatarBuilder';
 import { PhaseScreen } from './screens';
 
 const CODE_RE = /^[A-Z]{4}$/;
+
+/** Mundo 3D del alumno (three.js se descarga solo si lo abre). */
+const PlayWorld = lazy(() => import('./PlayWorld'));
 
 function loadSig(raw: string | null) {
   const fromUrl = decodeSignaling(raw);
@@ -43,6 +46,7 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
   const [netState, setNetState] = useState<PlayerNetState>('connecting');
   const [joinError, setJoinError] = useState('');
   const [toast, setToast] = useState<{ text: string; kind: 'hint' | 'error' } | null>(null);
+  const [show3d, setShow3d] = useState(false);
   const netRef = useRef<PlayerNet | null>(null);
   const profileRef = useRef(profile);
   profileRef.current = profile;
@@ -276,6 +280,11 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
         </div>
         <div className="play-top-right">
           {timed && view && <Countdown deadline={view.deadline} paused={view.paused} pausedRemaining={view.pausedRemaining} total={total} size={46} />}
+          {view && (
+            <button className="btn small cream world-btn" onClick={() => setShow3d(true)} aria-label="Explorar la colonia en 3D">
+              🌍 3D
+            </button>
+          )}
           <span className={`net-dot ${netState}`} title={netState} />
         </div>
       </header>
@@ -301,7 +310,7 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
 
       <main className="play-main" key={view?.phase ?? 'none'}>
         {view ? (
-          <PhaseScreen view={view} act={act} net={netRef.current} />
+          <PhaseScreen view={view} act={act} net={netRef.current} open3d={() => setShow3d(true)} />
         ) : (
           <div className="play-center">
             <IXOrb size={110} mood="talk" />
@@ -316,6 +325,21 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
           <IXOrb size={34} mood={toast.kind === 'hint' ? 'talk' : 'alert'} />
           <span>{toast.text}</span>
         </div>
+      )}
+
+      {show3d && view && (
+        <Suspense
+          fallback={
+            <div className="world-overlay">
+              <div className="world-loading">
+                <div className="spinner" />
+                Preparando Marte…
+              </div>
+            </div>
+          }
+        >
+          <PlayWorld view={view} net={netRef.current} onClose={() => setShow3d(false)} />
+        </Suspense>
       )}
     </div>
   );

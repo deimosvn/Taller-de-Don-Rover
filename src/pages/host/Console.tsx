@@ -1,7 +1,7 @@
 // Pantalla del proyector: barra superior, escenario de la etapa, estado global del planeta,
 // bitácora de IX, tripulaciones y el panel de control del profesor.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { MISSIONS, PACES, ROLES, ROLE_ORDER, SECTORS, SYSTEM_ORDER } from '../../../shared/content';
 import type { Ack, HostAction, HostView } from '../../../shared/types';
 import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
@@ -12,6 +12,9 @@ import type { NetStatus } from '../../net/hostNet';
 import { Report } from './Report';
 import { Scanner } from './Scanner';
 import { SettingsModal } from './SettingsModal';
+
+/** La colonia en 3D en el proyector (three.js se descarga solo al abrirla). */
+const HostWorld = lazy(() => import('./HostWorld'));
 import { BriefingStage, ChallengeStage, CrewsStage, DebriefStage, DiscoveryStage, EventStage, LobbyStage, ResultsStage } from './stages';
 
 export type Run = (a: HostAction) => Ack;
@@ -163,6 +166,7 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [worldOpen, setWorldOpen] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useWakeLock(true);
@@ -341,6 +345,9 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
           )}
         </div>
         <div className="dock-right">
+          <button className="btn small cream world-open" onClick={() => setWorldOpen(true)} title="Ver la colonia en 3D con toda la clase">
+            🌍 Colonia 3D
+          </button>
           {(view.phase === 'results' || view.phase === 'debrief' || view.crews.length > 0) && (
             <button className="icon-btn" onClick={() => setReportOpen(true)} aria-label="Reporte del profesor" title="Reporte del profesor">
               <Icon name="chart" />
@@ -387,6 +394,11 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
       )}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <Report open={reportOpen} onClose={() => setReportOpen(false)} view={view} />
+      {worldOpen && (
+        <Suspense fallback={null}>
+          <HostWorld view={view} onClose={() => setWorldOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }
