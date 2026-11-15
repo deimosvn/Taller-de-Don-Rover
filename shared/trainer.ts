@@ -48,7 +48,7 @@ export interface SimResult {
   failedSol: number | null;
   metrics: Metric[];
   /** Una serie por sol para la gráfica (reserva de energía, aire, agua…). */
-  series: { label: string; unit: string; values: number[]; floor: number };
+  series: { label: string; unit: string; values: number[]; floor: number; limit?: number };
   /** Qué pasó, en una frase. */
   verdict: string;
   /** Qué aprender de esta corrida. */
@@ -130,8 +130,9 @@ const solar: SimDef = {
   topics: { ntrs: 'Mars dust storm solar array power', osdr: '' },
   objective: (s) => `Mantén encendida la base de ${s.p.crew} astronautas durante ${s.p.sols} soles, con una tormenta de polvo de ${s.p.stormSols} soles (τ = ${s.p.tauStorm}).`,
   controls: (s) => [
-    { id: 'area', label: 'Paneles solares', unit: 'm²', min: 0, max: 2000, step: 20, value: r0((s.p.load / (dailyInsolation(s.p.lat, s.p.ls, s.p.tauClear) * PANEL.eff)) / 20) * 20, help: 'Más área = más energía, pero más masa que traer de la Tierra.' },
-    { id: 'battery', label: 'Baterías', unit: 'kWh', min: 0, max: 2000, step: 20, value: r0(s.p.load / 2 / 20) * 20, help: 'Guardan energía para la noche y para los días oscuros.' },
+    // De inicio: lo justo para un día claro. Alcanza hasta que llega la tormenta.
+    { id: 'area', label: 'Paneles solares', unit: 'm²', min: 0, max: 2000, step: 20, value: Math.ceil((s.p.load * 1.1) / (dailyInsolation(s.p.lat, s.p.ls, s.p.tauClear) * PANEL.eff) / 20) * 20, help: 'Más área = más energía, pero más masa que traer de la Tierra.' },
+    { id: 'battery', label: 'Baterías', unit: 'kWh', min: 0, max: 2000, step: 20, value: Math.ceil(s.p.load / 2 / 20) * 20 + 20, help: 'Guardan energía para la noche y para los días oscuros.' },
     { id: 'saving', label: 'Modo ahorro en la tormenta', unit: '%', min: 0, max: 40, step: 5, value: 0, help: 'Apagar lo que no es vital durante la tormenta.' },
   ],
   run(s, i) {
@@ -565,7 +566,7 @@ const shield: SimDef = {
         { label: 'Exploración', value: i.eva, unit: 'h/sol', need: evaNeed, ok: science },
         { label: 'Excavación del escudo', value: r1(digSols), unit: 'soles', need: digMax, lowerIsBetter: true, ok: built },
       ],
-      series: { label: 'Dosis acumulada', unit: 'mSv', values, floor: 0 },
+      series: { label: 'Dosis acumulada', unit: 'mSv', values, floor: 0, limit },
       verdict: ok
         ? 'La tripulación exploró Marte y volvió dentro del límite de radiación.'
         : failed !== null
@@ -784,6 +785,15 @@ const TITLES: Record<SimId, string[]> = {
   landing: ['Siete minutos de terror', 'Llegan los suministros', 'Retrocohetes listos'],
 };
 
+const STORIES: Record<SimId, string[]> = {
+  solar: ['Los satélites ven una tormenta de polvo que viene hacia la base. Cuando llegue, el cielo se pondrá café y casi no habrá luz para los paneles.', 'El pronóstico marca polvo en el aire por varios soles. La base tiene que seguir encendida: calefacción, aire y comunicaciones dependen de ti.'],
+  oxygen: ['El cohete de suministros se retrasó y el oxígeno de reserva solo alcanza para un par de soles. Hay que fabricarlo aquí, con el aire y el agua de Marte.', 'La tripulación creció y el tanque de oxígeno baja más rápido de lo planeado. Te toca decidir cómo producir más sin apagar la base.'],
+  water: ['El radar encontró hielo enterrado cerca de la base. Derretirlo cuesta energía, y cada gota que se pierde hay que volver a sacarla del suelo.', 'El tanque de agua está a la mitad y falta mucho para el siguiente cargamento. Entre el hielo y el reciclador tiene que alcanzar.'],
+  greenhouse: ['La comida empacada se está terminando. El invernadero tiene luz, agua y espacio limitados: hay que elegir bien qué sembrar.', 'La tripulación quiere comer algo fresco y la despensa baja cada sol. Es momento de convertir el invernadero en la cocina de la colonia.'],
+  shield: ['En Marte no hay campo magnético ni aire grueso que detengan la radiación. Hay que proteger el hábitat sin dejar de explorar.', 'El Sol está inquieto y la misión es larga. Cada sol suma radiación: decide cuánto escudo construir y cuánto tiempo salir.'],
+  landing: ['La nave de suministros ya entró a la atmósfera y soltó el paracaídas. Los últimos metros son tuyos: frénala con los retrocohetes.', 'Llega la carga que la colonia espera desde hace meses. El aire de Marte es muy delgado: solo el motor puede frenar la nave.'],
+};
+
 /** Reto de plantilla (sin IA): mismo motor, narración escrita a mano. */
 export function localChallenge(skills: Skills, opts: { name?: string; role?: RoleId | null; solarActivity?: number; avoid?: SimId | null; sim?: SimId; seed?: number } = {}): Challenge {
   const sim = opts.sim ?? recommend(skills, opts);
@@ -798,7 +808,7 @@ export function localChallenge(skills: Skills, opts: { name?: string; role?: Rol
     id: `${sim}-${seed.toString(36)}`,
     scenario,
     title: pick(rng, TITLES[sim]),
-    briefing: `${who}la colonia te necesita. ${def.objective(scenario)}`,
+    briefing: `${who}la colonia te necesita. ${pick(rng, STORIES[sim])}`,
     why: !k
       ? `Todavía no entrenas ${def.need.toLowerCase()}: toda la base depende de ello.`
       : k.last < 70

@@ -266,6 +266,29 @@ export default async function handler(req: Req, res: Res) {
       res.status(200).json({ ok: true, key: KEY !== 'DEMO_KEY', sources: ['DONKI', 'NTRS', 'OSDR'] });
       return;
     }
+    if (op === 'check') {
+      // Diagnóstico en vivo: una petición pequeña a cada fuente, con su tiempo de respuesta.
+      const today = new Date();
+      const iso = (d: Date) => d.toISOString().slice(0, 10);
+      const from = new Date(today.getTime() - 5 * 86400_000);
+      const probe = async (name: string, url: string) => {
+        const t0 = Date.now();
+        try {
+          await getJson(url, 8000);
+          return { name, ok: true, ms: Date.now() - t0 };
+        } catch (err) {
+          return { name, ok: false, ms: Date.now() - t0, error: String((err as Error).message).slice(0, 80) };
+        }
+      };
+      const sources = await Promise.all([
+        probe('DONKI', `https://api.nasa.gov/DONKI/FLR?startDate=${iso(from)}&endDate=${iso(today)}&api_key=${KEY}`),
+        probe('NTRS', 'https://ntrs.nasa.gov/api/citations/search?q=Mars&page.size=1'),
+        probe('OSDR', 'https://osdr.nasa.gov/osdr/data/search?term=plant&from=0&size=1&type=cgene'),
+      ]);
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).json({ ok: true, key: KEY !== 'DEMO_KEY', sources });
+      return;
+    }
     if (op === 'studies') {
       const q = param(req, 'q').trim();
       const oq = param(req, 'osdr').trim() || q;

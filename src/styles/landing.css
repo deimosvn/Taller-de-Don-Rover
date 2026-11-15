@@ -676,3 +676,9 @@
   font: 700 0.85rem var(--font-display);
   white-space: nowrap;
 }
+.hero-free + .hero-free {
+  margin-top: 0;
+}
+.hero-free-icon.ix {
+  background: var(--ix);
+}
