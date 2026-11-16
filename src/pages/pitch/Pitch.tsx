@@ -1,21 +1,25 @@
-// Presentación del hackatón (#/pitch): 14 diapositivas hechas con código, pensadas para durar
-// 10 minutos en un proyector. Al iniciar, Don Rover da su primer diálogo y un dato real de la
-// NASA de ese día (DONKI o NeoWs); su cara se mueve en pantalla y, si la placa está conectada,
-// también en el Don Rover físico. Flechas, espacio o el control remoto cambian de diapositiva.
-//
-// Basada en el guion "Don Rover — Pitch". Los tiempos de cada diapositiva suman 600 s.
+// Presentación del hackatón (#/pitch): 14 diapositivas visuales que duran 10 minutos.
+// Un Marte 3D real (el mismo motor del juego) acompaña toda la presentación y viaja por la
+// colonia; las pantallas son capturas reales de la plataforma y los astronautas, la cara de Don
+// Rover y los medidores son los componentes vivos del juego. Al iniciar, Don Rover da su primer
+// diálogo y un dato real de la NASA de ese día; si la placa está conectada, también habla ahí.
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { ROLES, ROLE_ORDER } from '../../../shared/content';
 import { RADIATION } from '../../../shared/marsSim';
 import type { SpaceWeather } from '../../../shared/nasa';
-import { DonRover } from '../../components/art';
-import { QR } from '../../components/ui';
+import type { RoleId, SystemId } from '../../../shared/types';
+import { Astronaut } from '../../components/art';
+import { QR, SystemMeter, useCountUp } from '../../components/ui';
 import { nasaApod, nasaNeo, spaceWeather, type Apod, type NeoToday } from '../../lib/nasa';
 import { ask, type Answer } from '../../rover/assistant';
 import { rover } from '../../rover/link';
 import { RoverFace } from '../../rover/RoverFace';
 import { useVoice } from '../../rover/RoverPanel';
 import { say, stop } from '../../rover/voice';
+import { DEMO_SNAPSHOT } from '../../world/colony/snapshot';
+import { ROLE_AVATARS } from '../../world/react/missionZones';
+import { PlanetView } from '../../world/react/PlanetView';
 import '../../styles/pitch.css';
 
 const REPO = 'https://github.com/deimosvn/Taller-de-Don-Rover';
@@ -25,7 +29,7 @@ const TOTAL = 600;
 
 const OPENING =
   'Saludos, tripulación. Soy Don Rover, el asistente de la colonia. Tengo una mala noticia: una tormenta solar se acerca a nuestra base en Marte. Y una buena: ustedes pueden salvarla. Pero primero, déjenme contarles por qué existo.';
-const CLOSING = 'Los descubrimientos de la NASA pueden cambiar el futuro. Pero deben llegar a las aulas y a los hogares. La ciencia deja de leerse y empieza a vivirse. ¡Gracias, tripulación!';
+const CLOSING = 'Los descubrimientos de la NASA deben llegar a las aulas y a los hogares. La ciencia deja de leerse y empieza a vivirse. ¡Gracias, tripulación!';
 
 const fmt = (n: number) => n.toLocaleString('es-MX');
 const mmss = (s: number) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
@@ -39,7 +43,8 @@ interface Live {
 
 interface Fact {
   spoken: string;
-  title: string;
+  big: string;
+  unit: string;
   detail: string;
   source: string;
 }
@@ -49,26 +54,29 @@ function nasaFact(live: Live): Fact {
   const w = live.weather;
   if (w && w.cmes > 0) {
     return {
-      spoken: `Y un dato real de la NASA, de hoy: en las últimas dos semanas el Sol lanzó ${w.cmes} eyecciones de masa coronal, y la más rápida viajaba a ${fmt(w.fastestCme)} kilómetros por segundo. Por eso, en Marte, el clima espacial puede decidir si una colonia sobrevive.`,
-      title: `${w.cmes} eyecciones de masa coronal`,
-      detail: `La más rápida: ${fmt(w.fastestCme)} km/s${w.maxKp > 0 ? ` · índice Kp máximo ${w.maxKp}` : ''} · clima espacial ${w.label.toLowerCase()} (${w.from} a ${w.to})`,
-      source: 'NASA DONKI · en vivo',
+      spoken: `Y un dato real de la NASA, de hoy: en las últimas dos semanas el Sol lanzó ${w.cmes} eyecciones de masa coronal, y la más rápida viajaba a ${fmt(w.fastestCme)} kilómetros por segundo. En Marte, el clima espacial puede decidir si una colonia sobrevive.`,
+      big: String(w.cmes),
+      unit: 'eyecciones de masa coronal',
+      detail: `en 14 días · la más rápida a ${fmt(w.fastestCme)} km/s`,
+      source: 'NASA DONKI · hoy',
     };
   }
   const n = live.neo;
   const c = n?.closest[0];
   if (n && c) {
     return {
-      spoken: `Y un dato real de la NASA, de hoy: ${n.count === 1 ? 'un asteroide pasa' : `${n.count} asteroides pasan`} cerca de la Tierra. El más cercano, ${c.name}, mide unos ${fmt(c.diameterM ?? 0)} metros y pasa a ${c.lunar} veces la distancia a la Luna. Tranquilos: ninguno va a chocar.`,
-      title: n.count === 1 ? 'Un asteroide cerca de la Tierra hoy' : `${n.count} asteroides cerca de la Tierra hoy`,
-      detail: `El más cercano: ${c.name}, ~${fmt(c.diameterM ?? 0)} m, a ${fmt(c.missKm ?? 0)} km`,
-      source: 'NASA NeoWs · en vivo',
+      spoken: `Y un dato real de la NASA, de hoy: ${n.count === 1 ? 'un asteroide pasa' : `${n.count} asteroides pasan`} cerca de la Tierra. El más cercano mide unos ${fmt(c.diameterM ?? 0)} metros. Tranquilos: ninguno va a chocar.`,
+      big: String(n.count),
+      unit: n.count === 1 ? 'asteroide cerca de la Tierra' : 'asteroides cerca de la Tierra',
+      detail: `el más cercano: ${c.name}`,
+      source: 'NASA NeoWs · hoy',
     };
   }
   return {
-    spoken: `Y un dato real de la NASA: el rover Curiosity midió en Marte ${String(RADIATION.surface).replace('.', ' punto ')} milisieverts de radiación al día, cientos de veces más que aquí en la Tierra. Por eso nuestra colonia necesita escudos.`,
-    title: `${RADIATION.surface} mSv de radiación al día`,
-    detail: 'Medido por el instrumento RAD del rover Curiosity en la superficie de Marte',
+    spoken: `Y un dato real de la NASA: el rover Curiosity midió en Marte ${String(RADIATION.surface).replace('.', ' punto ')} milisieverts de radiación al día. Por eso nuestra colonia necesita escudos.`,
+    big: String(RADIATION.surface),
+    unit: 'mSv de radiación al día',
+    detail: 'medidos por Curiosity en Marte',
     source: 'NASA · Curiosity RAD',
   };
 }
@@ -77,25 +85,90 @@ function nasaFact(live: Live): Fact {
 /* Piezas visuales                                                      */
 /* ------------------------------------------------------------------ */
 
-function In({ d = 0, children, className = '', as: Tag = 'div' }: { d?: number; children: ReactNode; className?: string; as?: 'div' | 'li' | 'p' | 'h1' | 'h2' | 'figure' }) {
+function In({ d = 0, children, className = '', style }: { d?: number; children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
-    <Tag className={`pt-in ${className}`} style={{ '--d': `${d}s` } as CSSProperties}>
+    <div className={`pt-in ${className}`} style={{ '--d': `${d}s`, ...style } as CSSProperties}>
       {children}
-    </Tag>
+    </div>
   );
 }
 
-function Photo({ src, alt, caption, d = 0, tilt = 0, className = '' }: { src: string; alt: string; caption?: string; d?: number; tilt?: number; className?: string }) {
+function Kicker({ children, d = 0 }: { children: ReactNode; d?: number }) {
   return (
-    <figure className={`pt-photo pt-in ${className}`} style={{ '--d': `${d}s`, '--tilt': `${tilt}deg` } as CSSProperties}>
-      <img src={`pitch/${src}`} alt={alt} loading="eager" />
-      {caption && <figcaption>{caption}</figcaption>}
-    </figure>
+    <In d={d} className="pt-kicker">
+      {children}
+    </In>
   );
 }
 
-function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="pt-eyebrow pt-in">{children}</p>;
+/** Captura real de la consola dentro de un monitor. */
+function Screen({ src, alt, d = 0, className = '', label }: { src: string; alt: string; d?: number; className?: string; label?: string }) {
+  return (
+    <In d={d} className={`pt-screen ${className}`}>
+      <div className="pt-screen-bar">
+        <i />
+        <i />
+        <i />
+        {label && <span>{label}</span>}
+      </div>
+      <img src={`pitch/${src}`} alt={alt} />
+    </In>
+  );
+}
+
+/** Captura real del celular del alumno dentro de un teléfono. */
+function Phone({ src, alt, d = 0, tilt = 0, className = '' }: { src: string; alt: string; d?: number; tilt?: number; className?: string }) {
+  return (
+    <In d={d} className={`pt-phone ${className}`} style={{ '--tilt': `${tilt}deg` } as CSSProperties}>
+      <img src={`pitch/${src}`} alt={alt} />
+    </In>
+  );
+}
+
+function Polaroid({ src, alt, caption, d = 0, tilt = 0 }: { src: string; alt: string; caption: string; d?: number; tilt?: number }) {
+  return (
+    <In d={d} className="pt-polaroid" style={{ '--tilt': `${tilt}deg` } as CSSProperties}>
+      <img src={`pitch/${src}`} alt={alt} />
+      <span>{caption}</span>
+    </In>
+  );
+}
+
+function Crew({ size = 150, d = 0, pose = 'idle' as 'idle' | 'cheer' | 'wave' }) {
+  return (
+    <div className="pt-crew">
+      {ROLE_ORDER.map((r: RoleId, i) => (
+        <In key={r} d={d + i * 0.1} className="pt-crew-member">
+          <Astronaut avatar={ROLE_AVATARS[r]} role={r} size={size} pose={i % 2 ? pose : 'idle'} />
+          <span style={{ '--c': ROLES[r].color } as CSSProperties}>
+            {ROLES[r].emoji} {ROLES[r].specialty}
+          </span>
+        </In>
+      ))}
+    </div>
+  );
+}
+
+function Count({ value }: { value: number }) {
+  return <>{fmt(useCountUp(value, 1400))}</>;
+}
+
+/** Medidores de la colonia que van bajando: el problema, en vivo. */
+function FallingMeters() {
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setT((x) => x + 1), 1600);
+    return () => clearInterval(id);
+  }, []);
+  const base: Record<SystemId, number> = { energy: 78, water: 70, food: 66, habitat: 74 };
+  const drop: Record<SystemId, number> = { energy: 9, water: 6, food: 7, habitat: 11 };
+  return (
+    <div className="pt-meters">
+      {(Object.keys(base) as SystemId[]).map((s) => (
+        <SystemMeter key={s} system={s} value={Math.max(12, base[s] - drop[s] * Math.min(t, 6))} size="lg" />
+      ))}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,12 +176,14 @@ function Eyebrow({ children }: { children: ReactNode }) {
 /* ------------------------------------------------------------------ */
 
 type Who = 'Don Rover' | 'Diego' | 'Daniel' | 'Los tres' | 'Equipo';
+type PlanetPos = 'hero' | 'right' | 'center' | 'corner' | 'off';
 
 interface Slide {
   id: string;
   title: string;
   who: Who;
   seconds: number;
+  planet: { pos: PlanetPos; focus?: string | null };
   render: (ctx: Ctx) => ReactNode;
 }
 
@@ -126,37 +201,40 @@ const SLIDES: Slide[] = [
     title: 'Don Rover',
     who: 'Don Rover',
     seconds: 40,
+    planet: { pos: 'hero', focus: null },
     render: ({ started, start, fact, voice }) => (
       <div className="pt-cover">
-        <div className="pt-cover-face pt-in">
-          <RoverFace expr={voice.face} mouth={voice.mouth} size={360} linked={rover.status.state === 'on'} pulse={voice.speaking ? null : started ? null : '#FFC93C'} />
-        </div>
+        <In className="pt-cover-face">
+          <RoverFace expr={voice.face} mouth={voice.mouth} size={330} linked={rover.status.state === 'on'} pulse={!started && !voice.speaking ? '#F59A63' : null} />
+        </In>
         <div className={`pt-cover-copy ${started ? 'started' : ''}`}>
-          {!started && <Eyebrow>NASA Space Apps Challenge 2026 · Build a Junior Astronaut Mission Trainer</Eyebrow>}
-          <In d={0.1} as="h1">
-            Don Rover
+          <Kicker>NASA Space Apps Challenge 2026</Kicker>
+          <In d={0.1}>
+            <h1>Don Rover</h1>
           </In>
-          {!started && (
-            <In d={0.2} as="p" className="pt-lead">
-              La ciencia deja de leerse <b>y empieza a vivirse.</b>
-            </In>
-          )}
           {!started ? (
-            <In d={0.35}>
-              <button className="pt-start" onClick={start}>
-                ▶ Iniciar · Don Rover toma la palabra
-              </button>
-              <p className="pt-hint">Al presionar, Don Rover habla y dice un dato real de la NASA de hoy.</p>
-            </In>
+            <>
+              <In d={0.2}>
+                <p className="pt-tag">La ciencia deja de leerse y empieza a vivirse.</p>
+              </In>
+              <In d={0.35}>
+                <button className="pt-start" onClick={start}>
+                  ▶ Iniciar
+                </button>
+              </In>
+            </>
           ) : (
-            <In d={0} className="pt-caption-box">
-              <p className="pt-caption">{voice.caption || OPENING}</p>
-              <div className="pt-fact">
-                <span className="pt-badge live">● {fact.source}</span>
-                <b>{fact.title}</b>
-                <small>{fact.detail}</small>
-              </div>
-            </In>
+            <>
+              <In className="pt-bubble">{!voice.caption || voice.caption.startsWith(OPENING) ? OPENING : voice.caption}</In>
+              <In d={0.3} className="pt-fact">
+                <span className="pt-live-dot">● {fact.source}</span>
+                <b>{fact.big}</b>
+                <span>
+                  {fact.unit}
+                  <small>{fact.detail}</small>
+                </span>
+              </In>
+            </>
           )}
         </div>
       </div>
@@ -164,47 +242,38 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'reto',
-    title: 'Nuestro reto',
+    title: 'El reto',
     who: 'Equipo',
-    seconds: 50,
+    seconds: 45,
+    planet: { pos: 'corner', focus: 'colony.mars01' },
     render: () => (
-      <div className="pt-two">
-        <div>
-          <Eyebrow>El reto del hackatón</Eyebrow>
-          <In d={0.05} as="h2">
-            NASA Space Apps Challenge 2026
-          </In>
-          <In d={0.15} className="pt-challenge">
-            <span className="pt-badge">Reto oficial · Intermedio · Principiantes/Jóvenes</span>
-            <b>“Build a Junior Astronaut Mission Trainer”</b>
-            <p>
-              Diseñar un juego o app interactiva donde <b>niñas y niños de 7 a 12 años</b> dirijan una base en la Luna o en Marte y tomen decisiones reales sobre <b>soporte vital</b>,{' '}
-              <b>blindaje contra la radiación</b>, <b>energía</b>, <b>producción de comida</b> y <b>retraso en las comunicaciones</b>, viendo cómo cada decisión hace que la misión triunfe o
-              fracase. Con <b>datos abiertos reales de la NASA</b> como DONKI y OSDR.
-            </p>
-            <a href={CHALLENGE_URL} target="_blank" rel="noreferrer">
-              spaceappschallenge.org/2026/challenges/junior-astronaut-mission-trainer
-            </a>
-          </In>
-        </div>
-        <ul className="pt-checks">
+      <div className="pt-col center">
+        <Kicker>Nuestro reto · NASA Space Apps Challenge 2026</Kicker>
+        <In d={0.1} className="pt-challenge">
+          <span>Reto oficial</span>
+          <b>Build a Junior Astronaut Mission Trainer</b>
+          <a href={CHALLENGE_URL} target="_blank" rel="noreferrer">
+            spaceappschallenge.org
+          </a>
+        </In>
+        <div className="pt-tiles">
           {[
-            ['7 a 12 años', 'Tres niveles: explorador (7–9), cadete (10–12) y comandante (12–15).'],
-            ['Soporte vital, blindaje, energía y comida', 'Son las 4 especialidades de cada tripulación y los 6 simuladores del Entrenador de Misión.'],
-            ['Retraso en las comunicaciones', 'La misión de la señal y Don Rover lo explican: de 3 a 22 minutos entre Marte y la Tierra.'],
-            ['Ninguna decisión es gratis', 'Un motor determinista cobra cada elección: energía hoy contra oxígeno o escudo mañana.'],
-            ['Datos reales de la NASA', 'DONKI, OSDR y NTRS en vivo, con la fuente citada en pantalla.'],
-            ['Sin descargas ni cuentas', 'Corre en el navegador: el alumno solo escanea un QR.'],
-          ].map(([a, b], i) => (
-            <In key={a} as="li" d={0.25 + i * 0.08}>
-              <span className="pt-check">✓</span>
-              <span>
-                <b>{a}</b>
-                <small>{b}</small>
-              </span>
+            ['🧒', '7 a 12 años'],
+            ['🫁', 'Soporte vital'],
+            ['🛡️', 'Blindaje'],
+            ['⚡', 'Energía'],
+            ['🥔', 'Comida'],
+            ['📡', 'Retraso de señal'],
+            ['🛰️', 'Datos reales NASA'],
+            ['🌐', 'Sin cuentas'],
+          ].map(([e, t], i) => (
+            <In key={t} d={0.3 + i * 0.07} className="pt-tile">
+              <span>{e}</span>
+              {t}
+              <i>✓</i>
             </In>
           ))}
-        </ul>
+        </div>
       </div>
     ),
   },
@@ -212,34 +281,22 @@ const SLIDES: Slide[] = [
     id: 'problema',
     title: 'El problema',
     who: 'Equipo',
-    seconds: 35,
+    seconds: 30,
+    planet: { pos: 'off' },
     render: () => (
-      <div className="pt-center">
-        <Eyebrow>El problema</Eyebrow>
-        <In d={0.05} as="h2" className="pt-big">
-          Saben qué es la radiación.
-          <br />
-          <span>Casi nunca la usan para decidir.</span>
-        </In>
-        <In d={0.25} as="p" className="pt-lead narrow">
-          Millones de estudiantes en México y en el mundo aprenden ciencia con libros y presentaciones. El problema no es el talento ni la curiosidad: es que casi nadie les da la oportunidad de{' '}
-          <b>experimentar</b> la ciencia.
-        </In>
-        <div className="pt-needs">
-          {[
-            ['⚡', 'Energía', 'var(--energy)'],
-            ['💧', 'Agua y oxígeno', 'var(--water)'],
-            ['🌱', 'Comida', 'var(--food)'],
-            ['🛡️', 'Radiación', 'var(--habitat)'],
-          ].map(([e, t, c], i) => (
-            <In key={t} d={0.4 + i * 0.1} className="pt-need">
-              <span style={{ '--c': c } as CSSProperties}>{e}</span>
-              {t}
-            </In>
-          ))}
+      <div className="pt-split">
+        <div>
+          <Kicker>El problema</Kicker>
+          <In d={0.1}>
+            <h2 className="pt-h-big">
+              Saben qué es la radiación.
+              <em> Casi nunca la usan para decidir.</em>
+            </h2>
+          </In>
         </div>
-        <In d={0.85} as="p" className="pt-q">
-          Cuatro astronautas en Marte. Una mala decisión y paga la colonia entera. <b>¿Y si lo enfrentaran desde su salón?</b>
+        <In d={0.3} className="pt-card">
+          <p className="pt-card-title">Colonia MARS-01 · una mala decisión…</p>
+          <FallingMeters />
         </In>
       </div>
     ),
@@ -249,32 +306,28 @@ const SLIDES: Slide[] = [
     title: 'La solución',
     who: 'Equipo',
     seconds: 35,
+    planet: { pos: 'center', focus: null },
     render: () => (
-      <div className="pt-two">
-        <div>
-          <Eyebrow>La solución</Eyebrow>
-          <In d={0.05} as="h2">
-            Un salón se convierte en <span className="pt-mars">una colonia en Marte</span> que hay que salvar.
-          </In>
-          <In d={0.2} as="p" className="pt-lead">
-            Don Rover es una plataforma educativa <b>multijugador</b> con <b>inteligencia artificial</b> que convierte <b>investigaciones reales de la NASA</b> en misiones espaciales.
-          </In>
-          <div className="pt-pillars">
-            {[
-              ['🛰️', 'Datos NASA', 'Clima espacial y estudios reales'],
-              ['✨', 'IA', 'Claude arma y narra la misión'],
-              ['🎮', 'Simulación', 'Motor, minijuegos y planeta 3D'],
-            ].map(([e, t, s], i) => (
-              <In key={t} d={0.35 + i * 0.12} className="pt-pillar">
-                <span>{e}</span>
-                <b>{t}</b>
-                <small>{s}</small>
-              </In>
-            ))}
-          </div>
+      <div className="pt-solution">
+        <In className="pt-solution-head">
+          <Kicker>La solución</Kicker>
+          <h2>
+            Un salón → <em>una colonia en Marte</em>
+          </h2>
+        </In>
+        <div className="pt-solution-crew">
+          <Crew size={150} d={0.4} pose="wave" />
         </div>
-        <div className="pt-rover-stage pt-in" style={{ '--d': '0.2s' } as CSSProperties}>
-          <DonRover size={420} animate turntable />
+        <div className="pt-pills">
+          {[
+            ['🛰️', 'Datos reales NASA'],
+            ['✨', 'IA que narra'],
+            ['🎮', 'Juego multijugador'],
+          ].map(([e, t], i) => (
+            <In key={t} d={0.8 + i * 0.1} className="pt-pill">
+              {e} {t}
+            </In>
+          ))}
         </div>
       </div>
     ),
@@ -284,26 +337,24 @@ const SLIDES: Slide[] = [
     title: 'Lo probamos con niños',
     who: 'Equipo',
     seconds: 40,
+    planet: { pos: 'off' },
     render: () => (
       <div className="pt-kids">
-        <div className="pt-kids-copy">
-          <Eyebrow>Lo probamos con niños</Eyebrow>
-          <In d={0.05} as="h2">
-            No nos quedamos en la teoría.
+        <div>
+          <Kicker>Probado en la vida real</Kicker>
+          <In d={0.1}>
+            <h2>Lo probamos con niños.</h2>
           </In>
-          <In d={0.15} as="p" className="pt-lead">
-            Nos escapamos del hackatón unas horas para probar Don Rover con niñas y niños de nuestra comunidad. Jugaron <b>desde sus propios celulares</b>: crearon su astronauta, exploraron la
-            colonia en 3D y resolvieron minijuegos en equipo.
+          <In d={0.2}>
+            <p className="pt-tag small">Cada quien desde su celular, en equipo.</p>
           </In>
-          <In d={0.3} as="p" className="pt-note">
-            Fotos reales de la prueba · recortadas para proteger la identidad de los menores
-          </In>
+          <Polaroid src="proyector-4-astronautas.webp" alt="La consola del profesor en una pantalla con 4 astronautas a bordo" caption="La consola en una pantalla real" d={0.35} tilt={-2} />
         </div>
-        <div className="pt-collage">
-          <Photo src="celular-mundo-3d.webp" alt="Un niño juega en su celular el mundo 3D de Don Rover" caption="Su astronauta en la estación 3D" d={0.2} tilt={-4} />
-          <Photo src="celular-minijuego.webp" alt="Minijuego de conectar cables en el celular" caption="Minijuego: conectar cables" d={0.35} tilt={3} />
-          <Photo src="celular-astronauta.webp" alt="Celular con el astronauta en Marte" caption="Explorando Marte" d={0.5} tilt={-2} />
-          <Photo src="celular-prueba.webp" alt="Un niño muestra su astronauta en el celular" caption="¡Listo para la misión!" d={0.65} tilt={4} />
+        <div className="pt-kids-grid">
+          <Polaroid src="celular-mundo-3d.webp" alt="Un niño juega en su celular el mundo 3D" caption="Su astronauta en 3D" d={0.3} tilt={-4} />
+          <Polaroid src="celular-minijuego.webp" alt="Minijuego de conectar cables en el celular" caption="Minijuego en equipo" d={0.45} tilt={3} />
+          <Polaroid src="celular-astronauta.webp" alt="Celular con el astronauta en Marte" caption="Explorando Marte" d={0.6} tilt={-2} />
+          <Polaroid src="celular-prueba.webp" alt="Un niño muestra su astronauta en el celular" caption="¡Listo para la misión!" d={0.75} tilt={4} />
         </div>
       </div>
     ),
@@ -312,93 +363,57 @@ const SLIDES: Slide[] = [
     id: 'como',
     title: 'Cómo funciona',
     who: 'Diego',
-    seconds: 75,
-    render: () => (
-      <div className="pt-how">
-        <div className="pt-how-top">
-          <div>
-            <Eyebrow>Cómo funciona, en vivo</Eyebrow>
-            <In d={0.05} as="h2">
-              Nadie puede salvar la colonia solo.
-            </In>
-          </div>
-          <Photo src="proyector-4-astronautas.webp" alt="Consola del profesor en una pantalla con 4 astronautas a bordo" caption="La consola del profe: 4 astronautas a bordo" d={0.15} className="pt-how-photo" />
-        </div>
-        <ol className="pt-flow">
-          {[
-            ['🖥️', 'El profe crea la sala', 'Código y QR. Sin instalar nada ni cuentas.'],
-            ['📱', 'Entran 4 alumnos', 'Desde su celular. Cada uno recibe una especialidad: energía, soporte vital, astrobiología o hábitat.'],
-            ['🛰️', 'IX arma la misión', 'Consulta el clima espacial real y estudios de la NASA, y Claude escribe la historia con una tarea para cada quien.'],
-            ['🔐', 'Un dato secreto', 'Cada celular ve solo su dato. Los números cambian con cada tripulación: copiar no sirve.'],
-            ['🗳️', 'Deciden juntos', 'Comparan, votan y escriben su bitácora. La emergencia se resuelve con minijuegos.'],
-            ['🪐', 'Consecuencias', 'El planeta 3D cambia y se guarda para la siguiente clase.'],
-          ].map(([e, t, s], i) => (
-            <In key={t} as="li" d={0.25 + i * 0.12}>
-              <span className="pt-step">{i + 1}</span>
-              <span className="pt-step-e">{e}</span>
-              <b>{t}</b>
-              <small>{s}</small>
-            </In>
-          ))}
-        </ol>
-      </div>
-    ),
+    seconds: 85,
+    planet: { pos: 'off' },
+    render: () => <HowItWorks />,
   },
   {
     id: 'nasa',
     title: 'Datos reales de la NASA',
     who: 'Daniel',
     seconds: 60,
+    planet: { pos: 'right', focus: 'sector.solar' },
     render: ({ live }) => {
       const w = live.weather;
       const c = live.neo?.closest[0];
       return (
         <div className="pt-nasa">
-          <div className="pt-nasa-head">
-            <Eyebrow>Datos reales de la NASA</Eyebrow>
-            <In d={0.05} as="h2">
-              Lo que pasa hoy en el Sol, <span className="pt-mars">pasa en la colonia.</span>
-            </In>
-          </div>
-          <div className="pt-apis">
+          <Kicker>Datos reales de la NASA · en vivo</Kicker>
+          <In d={0.1}>
+            <h2>Lo que pasa en el Sol, pasa en la colonia.</h2>
+          </In>
+          <div className="pt-sources">
             {[
-              ['DONKI', 'Clima espacial', 'Llamaradas, eyecciones de masa coronal, tormentas geomagnéticas y partículas solares de los últimos 14 días → nivel de riesgo 0 a 3. Si el Sol está activo, la emergencia es más difícil y el escudo se daña.', '#FFC93C'],
-              ['NTRS', 'Reportes técnicos', 'Estudios de ingeniería de la NASA sobre el tema de cada misión: la base científica de la historia.', '#7FDBFF'],
-              ['OSDR', 'Biología espacial', 'Investigación de ciencias de la vida en el espacio: radiación, hueso, músculo, defensas y sueño afectan a la tripulación.', '#55DB7A'],
-              ['NeoWs · APOD', 'Don Rover en vivo', 'Asteroides que pasan cerca hoy y la foto astronómica del día, para responder preguntas con datos frescos.', '#C3ADFF'],
-            ].map(([k, t, s, col], i) => (
-              <In key={k} d={0.15 + i * 0.1} className="pt-api">
-                <span className="pt-api-k" style={{ '--c': col } as CSSProperties}>
-                  {k}
-                </span>
-                <b>{t}</b>
-                <small>{s}</small>
+              ['☀️', 'DONKI', 'Clima espacial'],
+              ['📄', 'NTRS', 'Reportes técnicos'],
+              ['🧬', 'OSDR', 'Biología espacial'],
+              ['☄️', 'NeoWs', 'Asteroides'],
+              ['📸', 'APOD', 'Foto del día'],
+            ].map(([e, k, t], i) => (
+              <In key={k} d={0.25 + i * 0.08} className="pt-source">
+                <span>{e}</span>
+                <b>{k}</b>
+                <small>{t}</small>
               </In>
             ))}
           </div>
-          <In d={0.6} className="pt-live">
-            <span className="pt-badge live">● En vivo ahora</span>
-            {w ? (
-              <span>
-                ☀️ Clima espacial <b>{w.label}</b> · <b>{w.cmes}</b> eyecciones de masa coronal (la más rápida, {fmt(w.fastestCme)} km/s)
-                {w.maxKp > 0 ? ` · Kp máx. ${w.maxKp}` : ''}
-                {w.flares > 0 ? ` · ${w.flares} llamaradas` : ''}
-              </span>
-            ) : (
-              <span>{live.loaded ? 'Sin conexión con la NASA: el juego sigue con sus datos guardados.' : 'Consultando a la NASA…'}</span>
-            )}
-            {live.neo && c && (
-              <span>
-                ☄️ <b>{live.neo.count}</b> {live.neo.count === 1 ? 'asteroide pasa' : 'asteroides pasan'} cerca hoy · el más cercano: {c.name}
-              </span>
-            )}
-            {live.apod?.title && (
-              <span className="pt-apod">
-                {live.apod.url && /\.(jpe?g|png|gif|webp)$/i.test(live.apod.url) && <img src={live.apod.url} alt="" />}
-                📸 Foto del día: <b>{live.apod.title}</b>
-              </span>
-            )}
-          </In>
+          <div className="pt-stats">
+            <In d={0.7} className="pt-stat sun">
+              <b>{w ? <Count value={w.cmes} /> : '—'}</b>
+              <span>eyecciones de masa coronal</span>
+              <small>{w ? `clima espacial ${w.label.toLowerCase()}` : 'consultando…'}</small>
+            </In>
+            <In d={0.8} className="pt-stat fast">
+              <b>{w ? <Count value={w.fastestCme} /> : '—'}</b>
+              <span>km/s la más rápida</span>
+              <small>NASA DONKI</small>
+            </In>
+            <In d={0.9} className="pt-stat rock">
+              <b>{live.neo ? <Count value={live.neo.count} /> : '—'}</b>
+              <span>{live.neo?.count === 1 ? 'asteroide cerca hoy' : 'asteroides cerca hoy'}</span>
+              <small>{c ? c.name : 'NASA NeoWs'}</small>
+            </In>
+          </div>
         </div>
       );
     },
@@ -408,38 +423,49 @@ const SLIDES: Slide[] = [
     title: 'La IA narra, el motor decide',
     who: 'Daniel',
     seconds: 55,
+    planet: { pos: 'off' },
     render: () => (
       <div className="pt-ai">
-        <Eyebrow>Qué hay debajo</Eyebrow>
-        <In d={0.05} as="h2" className="pt-big">
-          La IA narra. <span>El motor decide.</span>
+        <Kicker>Qué hay debajo</Kicker>
+        <In d={0.1}>
+          <h2 className="pt-h-big center">
+            La IA narra. <em>El motor decide.</em>
+          </h2>
         </In>
-        <div className="pt-pipe">
+        <div className="pt-flow">
           {[
-            ['🛰️', 'NASA', 'DONKI · NTRS · OSDR'],
-            ['✨', 'Claude Opus 5.5', 'Salidas estructuradas (JSON Schema) validadas antes de usarse'],
-            ['⚙️', 'Motor determinista', 'Puntajes y consecuencias con una semilla por tripulación'],
-            ['🪐', 'Planeta 3D', 'Persistente entre clases'],
-          ].map(([e, t, s], i) => (
-            <In key={t} d={0.2 + i * 0.15} className="pt-pipe-step">
+            ['🛰️', 'NASA'],
+            ['✨', 'Claude'],
+            ['✅', 'Validación'],
+            ['⚙️', 'Motor justo'],
+            ['🪐', 'Planeta 3D'],
+          ].map(([e, t], i) => (
+            <In key={t} d={0.25 + i * 0.12} className="pt-flow-node">
               <span>{e}</span>
-              <b>{t}</b>
-              <small>{s}</small>
+              {t}
+            </In>
+          ))}
+          <div className="pt-flow-line" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </div>
+        </div>
+        <div className="pt-acts">
+          {[
+            ['🎯', 'Elige la misión'],
+            ['🧩', 'Reparte las tareas'],
+            ['📖', 'Escribe la historia'],
+            ['⭐', 'Evalúa bitácoras'],
+            ['🤖', 'Mueve a Don Rover'],
+            ['🎓', 'Escribe el debrief'],
+          ].map(([e, t], i) => (
+            <In key={t} d={0.9 + i * 0.08} className="pt-act">
+              <span>{e}</span>
+              {t}
             </In>
           ))}
         </div>
-        <In d={0.8} className="pt-actions">
-          <b>Acciones que la IA ejecuta en la plataforma</b>
-          <ul>
-            <li>🎯 Elige la misión según el clima espacial y reparte una tarea a cada especialidad</li>
-            <li>📖 Escribe la historia a partir de un estudio real y lo resume para niños</li>
-            <li>⭐ Evalúa las bitácoras de cada tripulación (de 1 a 3 estrellas)</li>
-            <li>🧭 Elige el siguiente reto del Entrenador y da retroalimentación</li>
-            <li>🤖 Mueve a Don Rover: su voz, su cara y la pantalla de la placa</li>
-            <li>🎓 Escribe el debrief con lo aprendido</li>
-          </ul>
-          <small>Sin internet o sin IA, la clase no se detiene: el motor y las plantillas siguen funcionando.</small>
-        </In>
       </div>
     ),
   },
@@ -448,6 +474,7 @@ const SLIDES: Slide[] = [
     title: 'Don Rover sale de la pantalla',
     who: 'Los tres',
     seconds: 60,
+    planet: { pos: 'off' },
     render: ({ voice }) => <RoverDemo voice={voice} />,
   },
   {
@@ -455,48 +482,33 @@ const SLIDES: Slide[] = [
     title: 'Se instala desde el navegador',
     who: 'Los tres',
     seconds: 35,
+    planet: { pos: 'off' },
     render: () => (
-      <div className="pt-two">
+      <div className="pt-split">
         <div>
-          <Eyebrow>Hardware abierto</Eyebrow>
-          <In d={0.05} as="h2">
-            El firmware de Don Rover se instala <span className="pt-mars">directo desde el navegador.</span>
+          <Kicker>Hardware abierto</Kicker>
+          <In d={0.1}>
+            <h2>
+              Se instala <em>desde el navegador.</em>
+            </h2>
           </In>
-          <ol className="pt-mini-steps">
+          <div className="pt-steps3">
             {[
-              ['🔌', 'Conecta la placa ESP32 (KNOMI) por USB'],
-              ['🌐', 'Abre Don Rover → Don Rover físico en Chrome o Edge'],
-              ['⬇️', 'Presiona «Instalar en la placa»: Web Serial + esptool-js la programan en menos de un minuto'],
-              ['🤖', 'Don Rover despierta y se conecta por USB, Wi-Fi o la nube'],
+              ['🔌', 'Conecta por USB'],
+              ['⬇️', 'Instalar en la placa'],
+              ['🤖', '¡Don Rover vive!'],
             ].map(([e, t], i) => (
-              <In key={t} as="li" d={0.2 + i * 0.12}>
+              <In key={t} d={0.3 + i * 0.15} className="pt-step3">
                 <span>{e}</span>
                 {t}
               </In>
             ))}
-          </ol>
-          <In d={0.7} as="p" className="pt-note">
-            Código del firmware en <code>firmware/donrover-knomi</code> (PlatformIO + Arduino). También se compila con <code>pio run -t upload</code>.
+          </div>
+          <In d={0.8}>
+            <p className="pt-mono">Web Serial + esptool-js · ESP32 · firmware abierto</p>
           </In>
         </div>
-        <In d={0.25} className="pt-code">
-          <div className="pt-code-bar">
-            <i />
-            <i />
-            <i />
-            <span>protocolo · una línea JSON por mensaje</span>
-          </div>
-          <pre>{`// Plataforma → Don Rover
-{"t":"face","e":"wow","ms":3000}
-{"t":"talk","on":1}   {"t":"m","v":70}
-{"t":"card","title":"EZZX",
-  "sub":"Codigo para unirse"}
-{"t":"ring","p":350,"c":"#FFC93C"}
-
-// Don Rover → plataforma
-{"t":"hi","fw":"1.0.0","board":"knomi1"}
-{"t":"btn","k":"long"}  // ¡pregunta!`}</pre>
-        </In>
+        <Screen src="app-instalador.webp" alt="Instalador del firmware de Don Rover en la plataforma" label="#/donrover" d={0.25} />
       </div>
     ),
   },
@@ -505,72 +517,31 @@ const SLIDES: Slide[] = [
     title: 'Arquitectura',
     who: 'Daniel',
     seconds: 50,
-    render: () => (
-      <div className="pt-arch">
-        <Eyebrow>Por dentro</Eyebrow>
-        <In d={0.05} as="h2">
-          El proyector es el servidor.
-        </In>
-        <div className="pt-arch-grid">
-          <In d={0.15} className="pt-node phones">
-            <b>📱 Celulares</b>
-            <small>PWA · sin cuentas · vista filtrada: cada quien ve solo su dato</small>
-          </In>
-          <In d={0.25} className="pt-link">
-            <span>WebRTC directo (PeerJS)</span>
-            <span className="alt">respaldo: Supabase Realtime</span>
-          </In>
-          <In d={0.35} className="pt-node host">
-            <b>🖥️ Proyector del profe</b>
-            <small>React 19 + TypeScript · motor determinista · Three.js</small>
-          </In>
-          <In d={0.45} className="pt-link">
-            <span>USB (Web Serial) · Wi-Fi · nube</span>
-          </In>
-          <In d={0.55} className="pt-node board">
-            <b>🤖 Don Rover físico</b>
-            <small>ESP32 + pantalla redonda GC9A01</small>
-          </In>
-        </div>
-        <div className="pt-cloud">
-          {[
-            ['/api/ai', 'Claude Opus 5.5 · la clave nunca llega al navegador'],
-            ['/api/nasa', 'DONKI · NTRS · OSDR · NeoWs · APOD con caché'],
-            ['/api/colonies', 'Supabase Postgres con RLS · colonia persistente'],
-            ['/api/realtime', 'Canal de respaldo para redes escolares'],
-          ].map(([k, s], i) => (
-            <In key={k} d={0.65 + i * 0.08} className="pt-fn">
-              <code>{k}</code>
-              <small>{s}</small>
-            </In>
-          ))}
-        </div>
-        <In d={1} as="p" className="pt-note center">
-          Funciones de Vercel opcionales: sin ellas, el juego corre completo en el navegador. Privacidad: sin cuentas ni datos personales.
-        </In>
-      </div>
-    ),
+    planet: { pos: 'off' },
+    render: () => <Architecture />,
   },
   {
     id: 'planeta',
-    title: 'Resultados en el planeta 3D',
+    title: 'Un planeta que recuerda',
     who: 'Diego',
     seconds: 35,
+    planet: { pos: 'right', focus: 'colony.mars01' },
     render: () => (
-      <div className="pt-two">
-        <div>
-          <Eyebrow>Resultado</Eyebrow>
-          <In d={0.05} as="h2">
-            Cada decisión <span className="pt-mars">cambia un planeta</span> que se guarda de una clase a otra.
-          </In>
-          <In d={0.2} as="p" className="pt-lead">
-            Bitácoras evaluadas, puntaje calculado por el motor y una colonia que crece o sufre con lo que decidió el grupo. La siguiente clase continúa donde se quedó.
-          </In>
+      <div className="pt-world">
+        <Kicker>Resultado</Kicker>
+        <In d={0.1}>
+          <h2>
+            Cada decisión <em>cambia el planeta.</em>
+          </h2>
+        </In>
+        <div className="pt-world-row">
+          <Phone src="app-simulador.webp" alt="Simulador del Entrenador de Misión con paneles, baterías y modo ahorro" d={0.3} tilt={-4} />
+          <Screen src="app-colonia-3d.webp" alt="La colonia MARS-01 en 3D" label="Colonia 3D" d={0.45} className="small" />
         </div>
-        <div className="pt-stack">
-          <Photo src="planeta-colonia.webp" alt="Colonia en 3D sobre el planeta Marte" caption="La colonia MARS-01 en 3D" d={0.15} tilt={-3} />
-          <Photo src="colonia-3d.webp" alt="Módulos de la colonia en el planeta 3D" caption="Módulos, rutas y astronautas en vivo" d={0.35} tilt={3} />
-        </div>
+        <In d={0.7} className="pt-pills left">
+          <span className="pt-pill">⚖️ Ninguna decisión es gratis</span>
+          <span className="pt-pill">💾 Se guarda entre clases</span>
+        </In>
       </div>
     ),
   },
@@ -579,35 +550,33 @@ const SLIDES: Slide[] = [
     title: 'Código abierto',
     who: 'Equipo',
     seconds: 15,
+    planet: { pos: 'off' },
     render: () => (
       <div className="pt-open">
         <div>
-          <Eyebrow>Código abierto</Eyebrow>
-          <In d={0.05} as="h2">
-            Todo el código es público.
-          </In>
-          <In d={0.15} as="p" className="pt-lead">
-            Plataforma, IA, motor, mundo 3D y el firmware de Don Rover, listos para que cualquier escuela lo use, lo estudie o lo mejore.
+          <Kicker>Código abierto</Kicker>
+          <In d={0.1}>
+            <h2>Todo el código es público.</h2>
           </In>
           <In d={0.25}>
             <a className="pt-repo" href={REPO} target="_blank" rel="noreferrer">
               github.com/deimosvn/Taller-de-Don-Rover
             </a>
           </In>
-          <In d={0.3}>
-            <a className="pt-repo app" href={APP} target="_blank" rel="noreferrer">
-              tallerdedonrover.vercel.app
+          <In d={0.35}>
+            <a className="pt-repo light" href={APP} target="_blank" rel="noreferrer">
+              🚀 tallerdedonrover.vercel.app
             </a>
           </In>
         </div>
         <div className="pt-qrs">
           <In d={0.2} className="pt-qr">
-            <QR value={REPO} size={230} />
-            <small>Repositorio</small>
+            <QR value={REPO} size={220} />
+            <span>Repositorio</span>
           </In>
           <In d={0.3} className="pt-qr">
-            <QR value={APP} size={230} />
-            <small>Pruébalo</small>
+            <QR value={APP} size={220} />
+            <span>Pruébalo</span>
           </In>
         </div>
       </div>
@@ -618,25 +587,25 @@ const SLIDES: Slide[] = [
     title: 'Gracias',
     who: 'Equipo',
     seconds: 15,
+    planet: { pos: 'hero', focus: null },
     render: ({ voice }) => (
-      <div className="pt-cover end">
-        <div className="pt-cover-face pt-in">
+      <div className="pt-cover">
+        <In className="pt-cover-face">
           <RoverFace expr={voice.speaking ? voice.face : 'star'} mouth={voice.mouth} size={300} linked={rover.status.state === 'on'} />
-        </div>
+        </In>
         <div className="pt-cover-copy">
-          <In d={0.05} as="p" className="pt-lead">
-            Los descubrimientos de la NASA no deberían quedarse en los laboratorios. También deben llegar a <b>las aulas y a los hogares.</b>
+          <In d={0.1}>
+            <h2 className="pt-h-big">
+              La ciencia deja de leerse <em>y empieza a vivirse.</em>
+            </h2>
           </In>
-          <In d={0.2} as="h1">
-            La ciencia deja de leerse <span className="pt-mars">y empieza a vivirse.</span>
-          </In>
-          <In d={0.35}>
+          <In d={0.3}>
             <button className="pt-start small" onClick={() => void say(CLOSING, { face: 'star' })}>
               🤖 Don Rover se despide
             </button>
           </In>
-          <In d={0.45} as="p" className="pt-note">
-            Don Rover · NASA Space Apps Challenge 2026 · {REPO.replace('https://', '')}
+          <In d={0.45}>
+            <p className="pt-mono">¡Gracias, tripulación!</p>
           </In>
         </div>
       </div>
@@ -644,12 +613,117 @@ const SLIDES: Slide[] = [
   },
 ];
 
+/** Cómo funciona: cuatro pantallas reales que se encienden una tras otra. */
+function HowItWorks() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => (s + 1) % 4), 4200);
+    return () => clearInterval(id);
+  }, []);
+  const steps = [
+    { n: '1', t: 'El profe abre la sala', s: 'Código y QR · sin cuentas' },
+    { n: '2', t: '4 alumnos, 4 especialidades', s: 'Cada quien con un dato secreto' },
+    { n: '3', t: 'IX arma la misión', s: 'Con un estudio real de la NASA' },
+    { n: '4', t: 'Juegan en su celular', s: 'Mundo 3D y minijuegos' },
+  ];
+  return (
+    <div className="pt-how">
+      <div className="pt-how-left">
+        <Kicker>Cómo funciona</Kicker>
+        <In d={0.1}>
+          <h2>Nadie puede salvar la colonia solo.</h2>
+        </In>
+        <ol className="pt-how-steps">
+          {steps.map((x, i) => (
+            <li key={x.n} className={i === step ? 'on' : ''} onClick={() => setStep(i)}>
+              <span>{x.n}</span>
+              <b>{x.t}</b>
+              <small>{x.s}</small>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="pt-how-right">
+        <div className={`pt-how-shot ${step === 0 ? 'on' : ''}`}>
+          <Screen src="app-consola-4-astronautas.webp" alt="Consola del profe con el QR y 4 astronautas" label="Consola del profe" />
+        </div>
+        <div className={`pt-how-shot ${step === 1 ? 'on' : ''}`}>
+          <Screen src="app-tripulacion-don-rover.webp" alt="Tripulación formada y Don Rover narrando" label="Tripulación lista" />
+        </div>
+        <div className={`pt-how-shot ${step === 2 ? 'on' : ''}`}>
+          <Screen src="app-mision-nasa.webp" alt="Misión generada por IX con un estudio real de la NASA" label="Misión con datos NASA" />
+        </div>
+        <div className={`pt-how-shot phones ${step === 3 ? 'on' : ''}`}>
+          <Phone src="app-celular-3d.webp" alt="Celular del alumno en el mundo 3D" tilt={-5} />
+          <Phone src="app-minijuego-energia.webp" alt="Minijuego de repartir la energía del invernadero" tilt={4} />
+          <Phone src="app-minijuego-compuertas.webp" alt="Minijuego de sellar compuertas" tilt={-2} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Arquitectura: nodos con conexiones animadas. */
+function Architecture() {
+  return (
+    <div className="pt-arch">
+      <Kicker>Por dentro</Kicker>
+      <In d={0.1}>
+        <h2 className="center">El proyector es el servidor.</h2>
+      </In>
+      <div className="pt-arch-row">
+        <In d={0.25} className="pt-node">
+          <span>📱</span>
+          <b>Celulares</b>
+          <small>PWA · sin cuentas</small>
+        </In>
+        <In d={0.35} className="pt-wire">
+          <i />
+          <small>WebRTC directo</small>
+        </In>
+        <In d={0.45} className="pt-node main">
+          <span>🖥️</span>
+          <b>Proyector</b>
+          <small>Motor + Three.js</small>
+        </In>
+        <In d={0.55} className="pt-wire">
+          <i />
+          <small>USB · Wi-Fi · nube</small>
+        </In>
+        <In d={0.65} className="pt-node">
+          <RoverFace expr="happy" mouth={0} size={70} />
+          <b>Don Rover</b>
+          <small>ESP32</small>
+        </In>
+      </div>
+      <In d={0.75} className="pt-wire down">
+        <i />
+      </In>
+      <div className="pt-cloud">
+        {[
+          ['✨', '/api/ai', 'Claude Opus 5.5'],
+          ['🛰️', '/api/nasa', 'DONKI · NTRS · OSDR'],
+          ['🗄️', '/api/colonies', 'Supabase'],
+          ['📡', '/api/realtime', 'Respaldo'],
+        ].map(([e, k, t], i) => (
+          <In key={k} d={0.85 + i * 0.08} className="pt-fn">
+            <span>{e}</span>
+            <code>{k}</code>
+            <small>{t}</small>
+          </In>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Demo en vivo: el público le pregunta a Don Rover (Claude + datos reales de la NASA). */
 function RoverDemo({ voice }: { voice: ReturnType<typeof useVoice> }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<{ q: string; a: Answer } | null>(null);
   const suggestions = ['¿Por qué la radiación es peligrosa para el hábitat?', '¿Cómo está el clima espacial hoy?', '¿Qué asteroides pasan cerca hoy?'];
+  const linked = rover.status.state === 'on';
   const go = async (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
@@ -666,32 +740,35 @@ function RoverDemo({ voice }: { voice: ReturnType<typeof useVoice> }) {
   return (
     <div className="pt-rover">
       <div className="pt-rover-left">
-        <Eyebrow>Don Rover sale de la pantalla</Eyebrow>
-        <In d={0.05} as="h2">
-          Un asistente de IA <span className="pt-mars">físico</span> que entiende la misión.
+        <Kicker>Don Rover sale de la pantalla</Kicker>
+        <In d={0.1}>
+          <h2>
+            Un asistente de IA <em>físico.</em>
+          </h2>
         </In>
-        <ul className="pt-roles">
-          {[
-            ['🎙️', 'Narra la misión', 'cada fase, emergencia y resultado, en voz alta'],
-            ['💡', 'Da pistas', 'sin regalar la respuesta del reto'],
-            ['🧠', 'Explica conceptos', 'al nivel de explorador, cadete o comandante'],
-            ['🛰️', 'Dice datos reales de la NASA', 'clima espacial, asteroides, foto del día y estudios'],
-          ].map(([e, t, s], i) => (
-            <In key={t} as="li" d={0.15 + i * 0.1}>
-              <span>{e}</span>
-              <b>{t}</b>
-              <small>{s}</small>
-            </In>
-          ))}
-        </ul>
-        <In d={0.6} as="p" className="pt-note">
-          Conoce la historia, la especialidad de cada alumno, el clima espacial del día y en qué punto va la tripulación. Su cara, su boca y su pantalla se mueven en la placa ESP32.
-        </In>
+        <div className="pt-board-wrap">
+          <In d={0.2} className="pt-board">
+            <RoverFace expr={voice.face} mouth={voice.mouth} size={250} linked={linked} pulse={busy ? '#FFC93C' : null} />
+          </In>
+          <div className="pt-rover-roles">
+            {[
+              ['🎙️', 'Narra'],
+              ['💡', 'Da pistas'],
+              ['🧠', 'Explica'],
+              ['🛰️', 'Datos NASA'],
+            ].map(([e, t], i) => (
+              <In key={t} d={0.35 + i * 0.1} className="pt-act">
+                <span>{e}</span>
+                {t}
+              </In>
+            ))}
+          </div>
+        </div>
       </div>
-      <In d={0.2} className="pt-demo">
-        <div className="pt-demo-face">
-          <RoverFace expr={voice.face} mouth={voice.mouth} size={150} linked={rover.status.state === 'on'} pulse={busy ? '#FFC93C' : null} />
-          <span className={`pt-badge ${rover.status.state === 'on' ? 'live' : ''}`}>{rover.status.state === 'on' ? '● Placa conectada' : 'Demo en pantalla'}</span>
+      <In d={0.3} className="pt-demo">
+        <div className="pt-demo-head">
+          <span className={`pt-live-dot ${linked ? '' : 'off'}`}>● {linked ? 'Placa conectada' : 'En vivo'}</span>
+          <b>Pregúntale a Don Rover</b>
         </div>
         <div className="pt-demo-chat">
           {answer ? (
@@ -709,7 +786,7 @@ function RoverDemo({ voice }: { voice: ReturnType<typeof useVoice> }) {
               )}
             </>
           ) : (
-            <p className="pt-demo-empty">{busy ? 'Consultando a la NASA…' : 'Pregúntale algo a Don Rover en vivo 👇'}</p>
+            <p className="pt-demo-empty">{busy ? 'Consultando a la NASA…' : '👇 Elige una pregunta o escribe la tuya'}</p>
           )}
         </div>
         <div className="pt-demo-sugs">
@@ -817,15 +894,25 @@ export function Pitch() {
 
   return (
     <div className={`pitch ${chrome ? '' : 'clean'}`}>
-      <div className="pt-stars" aria-hidden="true" />
-      <div className="pt-glow" aria-hidden="true" />
+      <div className="pt-bg" aria-hidden="true">
+        <i className="b1" />
+        <i className="b2" />
+        <i className="b3" />
+      </div>
       <div className="pt-stage" style={{ width: W, height: H, transform: `translate(-50%, -50%) scale(${scale})` }}>
+        {/* Marte 3D real: acompaña la presentación y viaja por la colonia. */}
+        <div className={`pt-planet pos-${slide.planet.pos}`} aria-hidden="true">
+          <div className="pt-planet-ring" />
+          <div className="pt-planet-globe">
+            <PlanetView snapshot={DEMO_SNAPSHOT} focus={slide.planet.focus ?? null} autoRotate={!slide.planet.focus} interactive={false} distance={175} />
+          </div>
+        </div>
         <section key={slide.id} className={`pt-slide pt-s-${slide.id}`} aria-roledescription="diapositiva" aria-label={`${index + 1} de ${SLIDES.length}: ${slide.title}`}>
           {slide.render({ live, fact, started: startedAt !== null, start: () => void start(), voice })}
         </section>
         <footer className="pt-foot">
           <span className="pt-brand">
-            <RoverFace expr={voice.face} mouth={voice.mouth} size={34} linked={rover.status.state === 'on'} />
+            <RoverFace expr={voice.face} mouth={voice.mouth} size={36} linked={rover.status.state === 'on'} />
             Don Rover
           </span>
           <span className={`pt-who who-${slide.who.replace(' ', '-').toLowerCase()}`}>🎤 {slide.who}</span>

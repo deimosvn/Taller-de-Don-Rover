@@ -693,8 +693,8 @@
   display: flex;
   flex-direction: column;
   border-radius: 20px;
-  background: #1d0b07;
-  color: #fff8ec;
+  background: #fffaf4;
+  color: #2a120d;
   border: 1px solid rgba(240, 138, 87, 0.35);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   overflow: hidden;
@@ -709,23 +709,23 @@
   align-items: center;
   gap: 10px;
   padding: 10px 10px 10px 12px;
-  background: linear-gradient(135deg, #3a1810, #24100a);
-  border-bottom: 1px solid rgba(255, 248, 236, 0.08);
+  background: linear-gradient(135deg, #ffe7d4, #fff3e8);
+  border-bottom: 1px solid rgba(42, 18, 13, 0.08);
 }
 .rdock-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .rdock-title b { font-size: 1rem; }
-.rdock-title small { color: #d9cbbf; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rdock-title small { color: #8a6253; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rdock-icon {
   width: 34px;
   height: 34px;
   border-radius: 10px;
   border: 0;
-  background: rgba(255, 248, 236, 0.08);
-  color: #fff8ec;
+  background: rgba(42, 18, 13, 0.06);
+  color: #2a120d;
   font-size: 1rem;
   cursor: pointer;
 }
-.rdock-icon:hover { background: rgba(255, 248, 236, 0.16); }
+.rdock-icon:hover { background: rgba(42, 18, 13, 0.12); }
 
 .rdock-list {
   flex: 1;
@@ -735,7 +735,7 @@
   flex-direction: column;
   gap: 10px;
 }
-.rdock-hello p { margin: 0; color: #d9cbbf; line-height: 1.45; font-size: 0.92rem; }
+.rdock-hello p { margin: 0; color: #6b3f33; line-height: 1.45; font-size: 0.92rem; }
 .rdock-msg {
   max-width: 88%;
   padding: 9px 12px;
@@ -744,20 +744,20 @@
   line-height: 1.42;
 }
 .rdock-msg p { margin: 0; }
-.rdock-msg.me { align-self: flex-end; background: #f08a57; color: #2a120d; border-bottom-right-radius: 4px; }
-.rdock-msg.rover { align-self: flex-start; background: #2e130c; border: 1px solid rgba(255, 248, 236, 0.08); border-bottom-left-radius: 4px; }
-.rdock-follow { margin-top: 6px !important; color: #ffc93c; font-size: 0.85rem; }
+.rdock-msg.me { align-self: flex-end; background: #f08a57; color: #fff; border-bottom-right-radius: 4px; }
+.rdock-msg.rover { align-self: flex-start; background: #ffffff; border: 1px solid rgba(42, 18, 13, 0.1); box-shadow: 0 2px 8px rgba(42, 18, 13, 0.06); border-bottom-left-radius: 4px; }
+.rdock-follow { margin-top: 6px !important; color: #c06a12; font-size: 0.85rem; }
 .rdock-refs { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .rdock-refs li { display: flex; flex-direction: column; gap: 4px; }
 .rdock-refs img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; }
-.rdock-refs a { color: #7fdbff; font-size: 0.8rem; text-decoration: none; line-height: 1.3; }
+.rdock-refs a { color: #1f6fb2; font-size: 0.8rem; text-decoration: none; line-height: 1.3; }
 .rdock-refs a:hover { text-decoration: underline; }
 .rdock-refs a span {
   display: inline-block;
   margin-right: 4px;
   padding: 1px 6px;
   border-radius: 6px;
-  background: rgba(127, 219, 255, 0.14);
+  background: rgba(31, 111, 178, 0.1);
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -776,9 +776,9 @@
   flex: none;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 201, 60, 0.4);
-  background: rgba(255, 201, 60, 0.08);
-  color: #ffe6a3;
+  border: 1px solid rgba(240, 138, 87, 0.45);
+  background: #fff1e6;
+  color: #8a3b17;
   font-size: 0.78rem;
   cursor: pointer;
   white-space: nowrap;
@@ -791,9 +791,9 @@
   min-width: 0;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #6b3f33;
-  background: #2b100b;
-  color: #fff8ec;
+  border: 1px solid #e6cdbd;
+  background: #ffffff;
+  color: #2a120d;
   font-size: 16px;
 }
 .rdock-mic, .rdock-send {
@@ -804,16 +804,16 @@
   font-size: 1.05rem;
   cursor: pointer;
 }
-.rdock-mic { background: rgba(182, 156, 255, 0.18); color: #fff8ec; }
+.rdock-mic { background: rgba(107, 79, 214, 0.12); color: #2a120d; }
 .rdock-mic.on { background: #b69cff; }
-.rdock-send { background: #f08a57; color: #2a120d; font-weight: 700; }
+.rdock-send { background: #f08a57; color: #fff; font-weight: 700; }
 .rdock-send:disabled { opacity: 0.45; cursor: default; }
 .rdock-clear {
   align-self: center;
   margin: -4px 0 8px;
   border: 0;
   background: none;
-  color: #a8968a;
+  color: #a07a6a;
   font-size: 0.75rem;
   cursor: pointer;
 }
