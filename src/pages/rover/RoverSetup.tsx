@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Logo } from '../../components/ui';
-import { firmwareManifest, flashFirmware, type FirmwareManifest, type FlashProgress } from '../../rover/flasher';
+import { firmwareManifest, flashFirmware, type FirmwareBuild, type FirmwareManifest, type FlashProgress } from '../../rover/flasher';
 import { rover, transportLabel, usbSupported, type RoverExpr } from '../../rover/link';
 import { RoverFace, EXPR_LABEL } from '../../rover/RoverFace';
 import { RoverCaptions, RoverPanel, useRoverStatus, useVoice } from '../../rover/RoverPanel';
@@ -23,22 +23,45 @@ export function RoverSetup() {
   const [target, setTarget] = useState(() => rover.saved.ip || rover.saved.id || '');
   const [bright, setBright] = useState(200);
   const [ring, setRing] = useState(-1);
+  const [boardId, setBoardId] = useState(() => {
+    try {
+      return localStorage.getItem('donrover.placa.modelo') || 'knomi';
+    } catch {
+      return 'knomi';
+    }
+  });
   const info = status.info;
+  const builds = manifest?.builds ?? [];
+  const build: FirmwareBuild | null = builds.find((b) => b.id === boardId) ?? builds[0] ?? null;
+  const chooseBoard = (id: string) => {
+    setBoardId(id);
+    try {
+      localStorage.setItem('donrover.placa.modelo', id);
+    } catch {
+      /* nada */
+    }
+  };
   const on = status.state === 'on';
 
   useEffect(() => {
     void firmwareManifest().then(setManifest);
+    // Si ya hay una placa conectada, se elige su modelo solo.
+    const offInfo = rover.onStatus((st) => st.info?.board && chooseBoard(st.info.board));
     void rover.auto();
     const off = rover.onEvent((e) => {
       if (e.t === 'btn' && e.k === 'short') void say('¡Me presionaste! Un toque corto repite lo último que dije.', { face: 'happy', noRepeat: true });
       else if (e.t === 'btn' && e.k === 'long') void listenAndAnswer();
     });
-    return off;
+    return () => {
+      off();
+      offInfo();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const install = async (manual = false) => {
     setLog([]);
-    const ok = await flashFirmware(setFlash, (line) => setLog((l) => [...l.slice(-80), line.trim()].filter(Boolean)), { manual });
+    const ok = await flashFirmware(setFlash, (line) => setLog((l) => [...l.slice(-80), line.trim()].filter(Boolean)), { manual, build });
     if (ok) {
       // Al reiniciar, la placa saluda: se conecta sola por USB.
       setTimeout(() => void rover.connectUsb().then((c) => c && greet()), 2500);
@@ -46,6 +69,8 @@ export function RoverSetup() {
   };
 
   const outdated = info && manifest && info.fw && info.fw !== manifest.version;
+  // Antes de la 1.1.0 la pantalla de la KNOMI salía con los colores invertidos.
+  const oldColors = info && info.fw && info.fw < '1.1.0';
 
   return (
     <div className="rs">
@@ -87,15 +112,30 @@ export function RoverSetup() {
             <span className="rs-num">1</span> Instalar el firmware
           </h2>
           <p>
-            Conecta la placa con su cable USB-C a esta computadora y presiona instalar. Funciona en <b>Chrome</b> o <b>Edge</b>. Tarda menos de un minuto.
-            {manifest && (
+            Elige tu placa, conéctala con su cable USB a esta computadora y presiona instalar. Funciona en <b>Chrome</b> o <b>Edge</b>. Tarda menos de un minuto.
+            {build && (
               <>
                 {' '}
-                Versión disponible: <b>{manifest.version}</b> ({(manifest.size / 1024 / 1024).toFixed(1)} MB).
+                Versión disponible: <b>{build.version}</b> ({(build.size / 1024 / 1024).toFixed(1)} MB).
               </>
             )}
           </p>
-          {outdated && <p className="rs-warn">La placa tiene la versión {info!.fw}: instala la {manifest!.version} para tener todo lo nuevo.</p>}
+          {builds.length > 1 && (
+            <div className="rs-boards" role="radiogroup" aria-label="Modelo de placa">
+              {builds.map((b) => (
+                <button key={b.id} role="radio" aria-checked={b.id === build?.id} className={b.id === build?.id ? 'on' : ''} onClick={() => chooseBoard(b.id)}>
+                  <b>{b.name}</b>
+                  <small>{b.chip}</small>
+                </button>
+              ))}
+            </div>
+          )}
+          {outdated && (
+            <p className="rs-warn">
+              La placa tiene la versión {info!.fw}: instala la {manifest!.version} para tener todo lo nuevo.
+              {oldColors && ' Esta versión corrige los colores de la pantalla (antes se veían claros y dorados) y el brillo de la KNOMI.'}
+            </p>
+          )}
           <div className="rs-row">
             <button className="btn mars" disabled={!usbSupported() || (flash !== null && !['done', 'error'].includes(flash.stage))} onClick={() => void install()}>
               ⬇️ Instalar en la placa
@@ -257,6 +297,14 @@ export function RoverSetup() {
               🔤 Código en pantalla
             </button>
           </div>
+          {on && info && (
+            <p className="rs-note">
+              ¿La cara se ve clara con ojos dorados? Los colores están invertidos en tu pantalla:{' '}
+              <button className="btn ghost small" onClick={() => rover.send({ t: 'invert', on: info.inv ? 0 : 1 })}>
+                🎨 Invertir colores
+              </button>
+            </p>
+          )}
           <label className="rs-range">
             <span>Brillo de la pantalla</span>
             <input

@@ -29,6 +29,7 @@ export type RoverCmd =
   | { t: 'pulse'; c: string }
   | { t: 'card'; title: string; sub?: string; ms?: number }
   | { t: 'bl'; v: number }
+  | { t: 'invert'; on: 0 | 1 }
   | { t: 'wifi'; ssid: string; pass: string }
   | { t: 'forget' }
   | { t: 'app'; url: string }
@@ -37,6 +38,10 @@ export type RoverCmd =
 export interface RoverInfo {
   fw: string;
   id: string;
+  /** Modelo de placa (knomi, esp32c3-round, esp32-devkit…). */
+  board: string;
+  /** Inversión de color de la pantalla. */
+  inv: boolean;
   wifi: 'ok' | 'connecting' | 'portal' | 'off';
   ssid: string;
   ip: string;
@@ -173,6 +178,8 @@ class RoverLink {
       const info: RoverInfo = {
         fw: String(msg.fw ?? ''),
         id: String(msg.id ?? '').slice(0, 8),
+        board: String(msg.board ?? 'knomi').slice(0, 24),
+        inv: msg.inv === undefined ? true : Boolean(msg.inv),
         wifi: (['ok', 'connecting', 'portal', 'off'].includes(String(msg.wifi)) ? msg.wifi : 'off') as RoverInfo['wifi'],
         ssid: String(msg.ssid ?? '').slice(0, 40),
         ip: String(msg.ip ?? '').slice(0, 40),

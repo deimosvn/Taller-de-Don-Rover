@@ -1,9 +1,11 @@
 {
+  "id": "knomi",
   "name": "Don Rover · BIGTREETECH KNOMI v1",
-  "version": "1.0.0",
+  "chip": "ESP32",
+  "version": "1.1.0",
   "file": "donrover-knomi.bin",
   "address": 0,
-  "size": 1197552,
-  "sha256": "9cc6eff27b78686349b6a447c1930d30ec3498900b2ca5a3ecba611f2ad2af9c",
-  "built": "2026-11-15T22:44:09Z"
+  "size": 1192576,
+  "sha256": "acd265c4397db02392fea46e5674b7769b10c2f66e998b2b2831e17f6303ff32",
+  "built": "2026-11-16T20:32:09Z"
 }

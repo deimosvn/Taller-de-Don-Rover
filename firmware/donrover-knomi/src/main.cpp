@@ -1,4 +1,5 @@
-// Don Rover · asistente físico del Taller de Don Rover para la placa BIGTREETECH KNOMI v1.
+// Don Rover · asistente físico del Taller de Don Rover (BIGTREETECH KNOMI v1 y otras placas
+// ESP32 con pantalla redonda GC9A01; ver platformio.ini).
 //
 // La pantalla redonda muestra la cara de Don Rover. La computadora del profesor (la plataforma
 // en el navegador) habla por las bocinas, escucha con el micrófono y le dice a la placa qué cara
@@ -12,15 +13,27 @@
 //   {"t":"look","x":-40,"y":10}
 //   {"t":"ring","p":350,"c":"#FFC93C"}  {"t":"pulse","c":"#B69CFF"}
 //   {"t":"card","title":"ABCD","sub":"…","ms":8000}
-//   {"t":"bl","v":200}  {"t":"wifi","ssid","pass"}  {"t":"forget"}  {"t":"app","url"}  {"t":"ping"}
+//   {"t":"bl","v":200}  {"t":"invert","on":1}  {"t":"wifi","ssid","pass"}  {"t":"forget"}
+//   {"t":"app","url"}  {"t":"ping"}  {"t":"reboot"}
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
+#if defined(TOUCH_CST816S)
+#include <Wire.h>
+#endif
 
 #include "face.h"
 #include "net.h"
 
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"
+
+#ifndef BOARD_ID
+#define BOARD_ID "knomi"
+#endif
+#ifndef DISPLAY_INVERT
+#define DISPLAY_INVERT 1
+#endif
 
 static String line;
 static volatile uint32_t lastHost[3] = {0, 0, 0};
@@ -43,9 +56,13 @@ static void emit(const String &json) {
   net::send(json);
 }
 
+static bool inverted = DISPLAY_INVERT;
+
 static String hello() {
   const String st = net::status();
-  String out = "{\"t\":\"hi\",\"fw\":\"" FW_VERSION "\",\"name\":\"Don Rover\",\"board\":\"knomi1\",\"face\":\"";
+  String out = "{\"t\":\"hi\",\"fw\":\"" FW_VERSION "\",\"name\":\"Don Rover\",\"board\":\"" BOARD_ID "\",\"inv\":";
+  out += inverted ? "1" : "0";
+  out += ",\"face\":\"";
   out += exprName(face::expr());
   out += "\"";
   if (st.length() > 2) out += "," + st.substring(1);
@@ -80,6 +97,15 @@ static void handle(const String &raw, Source src) {
     face::pulse(c[0] ? face::parseColor(c, 0) : 0);
   } else if (!strcmp(t, "card")) {
     face::card(String(doc["title"] | ""), String(doc["sub"] | ""), doc["ms"] | 0);
+  } else if (!strcmp(t, "invert")) {
+    // Para módulos que se ven con los colores al revés: se guarda en la placa.
+    inverted = doc["on"].as<int>() != 0 || doc["on"].as<bool>();
+    face::invert(inverted);
+    Preferences p;
+    p.begin("donrover", false);
+    p.putBool("inv", inverted);
+    p.end();
+    emit(hello());
   } else if (!strcmp(t, "bl")) {
     face::brightness(constrain((int)(doc["v"] | 200), 10, 255));
   } else if (!strcmp(t, "wifi")) {
@@ -124,9 +150,37 @@ static void readSerial() {
   }
 }
 
-/** Botón de la cabeza (BOOT, GPIO0): corto = ayuda / repetir · largo = hablar con Don Rover. */
+#if defined(TOUCH_CST816S)
+/* Pantalla táctil CST816S (ESP32-2424S012): tocar la cara es como presionar el botón. */
+static bool touchReady = false;
+
+static void touchBegin() {
+  pinMode(TOUCH_RST, OUTPUT);
+  digitalWrite(TOUCH_RST, LOW);
+  delay(10);
+  digitalWrite(TOUCH_RST, HIGH);
+  delay(60);
+  touchReady = Wire.begin(TOUCH_SDA, TOUCH_SCL, 400000);
+}
+
+static bool touchDown() {
+  static uint32_t at = 0;
+  static bool last = false;
+  if (!touchReady || millis() - at < 25) return last;
+  at = millis();
+  // Registro 0x02: número de dedos. Si el chip está dormido no contesta (= sin toque).
+  Wire.beginTransmission(0x15);
+  Wire.write(0x02);
+  if (Wire.endTransmission(false) != 0 || Wire.requestFrom(0x15, 1) != 1) return last = false;
+  return last = (Wire.read() & 0x0F) > 0;
+}
+#else
+static bool touchDown() { return false; }
+#endif
+
+/** Botón de Don Rover (BOOT): corto = ayuda / repetir · largo = hablar con Don Rover. */
 static void readButton() {
-  const bool down = digitalRead(PIN_BUTTON) == LOW;
+  const bool down = digitalRead(PIN_BUTTON) == LOW || touchDown();
   const uint32_t now = millis();
   if (down && !pressed) {
     pressed = true;
@@ -158,7 +212,16 @@ void setup() {
   Serial.setRxBufferSize(2048);
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
-  face::begin();
+  {
+    Preferences p;
+    p.begin("donrover", true);
+    inverted = p.getBool("inv", DISPLAY_INVERT);
+    p.end();
+  }
+  face::begin(inverted);
+#if defined(TOUCH_CST816S)
+  touchBegin();
+#endif
   net::begin(handle);
   face::card("Hola!", "Soy Don Rover. Conectame a la plataforma.", 3500);
   delay(200);

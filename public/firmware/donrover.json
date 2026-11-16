@@ -1,0 +1,61 @@
+{
+  "name": "Don Rover",
+  "version": "1.1.0",
+  "builds": [
+    {
+      "id": "knomi",
+      "name": "BIGTREETECH KNOMI v1",
+      "chip": "ESP32",
+      "version": "1.1.0",
+      "file": "donrover-knomi.bin",
+      "address": 0,
+      "size": 1192576,
+      "sha256": "acd265c4397db02392fea46e5674b7769b10c2f66e998b2b2831e17f6303ff32",
+      "built": "2026-11-16T20:32:09Z"
+    },
+    {
+      "id": "esp32c3-round",
+      "name": "ESP32-2424S012 (ESP32-C3 con pantalla redonda)",
+      "chip": "ESP32-C3",
+      "version": "1.1.0",
+      "file": "donrover-esp32c3-round.bin",
+      "address": 0,
+      "size": 1211008,
+      "sha256": "823dfd207c52dba758a3884bd6f1e105475c7bead4184ef203d8fda53f8cbaaa",
+      "built": "2026-11-16T20:32:58Z"
+    },
+    {
+      "id": "esp32-devkit",
+      "name": "ESP32 DevKit V1 + módulo GC9A01",
+      "chip": "ESP32",
+      "version": "1.1.0",
+      "file": "donrover-esp32-devkit.bin",
+      "address": 0,
+      "size": 1179184,
+      "sha256": "25b4d4086ab38d7d8e44b80afcdd177c92449deb7343bda4c67f1f972e8d0350",
+      "built": "2026-11-16T20:44:25Z"
+    },
+    {
+      "id": "esp32c3-mini",
+      "name": "ESP32-C3 SuperMini + módulo GC9A01",
+      "chip": "ESP32-C3",
+      "version": "1.1.0",
+      "file": "donrover-esp32c3-mini.bin",
+      "address": 0,
+      "size": 1197584,
+      "sha256": "4ab78139c38ceb1c9f101b5730f4d3b86e1f708c2064739f0eda798fb87d688c",
+      "built": "2026-11-16T20:44:40Z"
+    },
+    {
+      "id": "esp32s3-n16r8",
+      "name": "ESP32-S3 DevKitC N16R8 + módulo GC9A01",
+      "chip": "ESP32-S3",
+      "version": "1.1.0",
+      "file": "donrover-esp32s3-n16r8.bin",
+      "address": 0,
+      "size": 1122880,
+      "sha256": "753a03fbed2ba6d904f95e48dd240338d7a0062443384927a5aad5d17c4d24ed",
+      "built": "2026-11-16T20:45:25Z"
+    }
+  ]
+}

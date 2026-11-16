@@ -1,12 +1,15 @@
 // Instalador del firmware de Don Rover desde el navegador (Chrome o Edge, por USB), con la
-// herramienta oficial de Espressif (esptool-js). La imagen ya viene unida (bootloader,
-// particiones y app) y se escribe en la dirección 0x0. Lo publica `pio run` en
-// public/firmware/ (ver firmware/donrover-knomi/merge_bin.py).
+// herramienta oficial de Espressif (esptool-js). Hay una imagen por placa, ya unida
+// (bootloader, particiones y app), que se escribe en la dirección 0x0. Las publica `pio run`
+// en public/firmware/ con el manifiesto donrover.json (ver firmware/donrover-knomi/merge_bin.py).
 
 import { rover } from './link';
 
-export interface FirmwareManifest {
+/** Una imagen del firmware para un modelo de placa. */
+export interface FirmwareBuild {
+  id: string;
   name: string;
+  chip: 'ESP32' | 'ESP32-C3' | 'ESP32-S3' | string;
   version: string;
   file: string;
   address: number;
@@ -15,13 +18,37 @@ export interface FirmwareManifest {
   built: string;
 }
 
-export async function firmwareManifest(): Promise<FirmwareManifest | null> {
+export interface FirmwareManifest {
+  name: string;
+  version: string;
+  builds: FirmwareBuild[];
+}
+
+const fetchJson = async <T,>(path: string): Promise<T | null> => {
   try {
-    const res = await fetch(new URL('firmware/donrover-knomi.json', document.baseURI).toString(), { cache: 'no-store' });
-    return res.ok ? ((await res.json()) as FirmwareManifest) : null;
+    const res = await fetch(new URL(path, document.baseURI).toString(), { cache: 'no-store' });
+    return res.ok ? ((await res.json()) as T) : null;
   } catch {
     return null;
   }
+};
+
+export async function firmwareManifest(): Promise<FirmwareManifest | null> {
+  const all = await fetchJson<FirmwareManifest>('firmware/donrover.json');
+  if (all && Array.isArray(all.builds) && all.builds.length) return all;
+  // Despliegues anteriores: solo la imagen de la KNOMI.
+  const knomi = await fetchJson<Omit<FirmwareBuild, 'id' | 'chip'>>('firmware/donrover-knomi.json');
+  return knomi ? { name: 'Don Rover', version: knomi.version, builds: [{ ...knomi, id: 'knomi', chip: 'ESP32', name: 'BIGTREETECH KNOMI v1' }] } : null;
+}
+
+/** ¿El chip que contestó (descripción de esptool) es el de esta imagen? */
+export function chipMatches(description: string, chip: string): boolean {
+  const d = description.toUpperCase();
+  if (chip === 'ESP32-C3') return d.startsWith('ESP32-C3');
+  if (chip === 'ESP32-S3') return d.startsWith('ESP32-S3');
+  // ESP32 clásico: "ESP32-D0WD-V3", "ESP32-PICO-D4"… (no C2/C3/C6, S2/S3, H2 ni P4).
+  if (chip === 'ESP32') return /^ESP32(?!-(C\d|S[23]|H\d|P\d))/.test(d);
+  return d.startsWith(chip.toUpperCase());
 }
 
 export interface FlashProgress {
@@ -36,6 +63,8 @@ export interface FlashProgress {
 export interface FlashOptions {
   /** Modo manual: el usuario mantiene BOOT al conectar el cable (sin reinicio automático). */
   manual?: boolean;
+  /** Imagen de la placa elegida (por omisión, la KNOMI). */
+  build?: FirmwareBuild | null;
 }
 
 /** Instala el firmware: pide el puerto, descarga la imagen, la escribe y reinicia la placa. */
@@ -61,8 +90,8 @@ export async function flashFirmware(onProgress: (p: FlashProgress) => void, log:
     const port = await serial.requestPort({});
 
     onProgress({ stage: 'download', progress: 0, text: 'Descargando el firmware…' });
-    const manifest = await firmwareManifest();
-    const res = await fetch(new URL(`firmware/${manifest?.file ?? 'donrover-knomi.bin'}`, document.baseURI).toString(), { cache: 'no-store' });
+    const build = opts.build ?? (await firmwareManifest())?.builds[0] ?? null;
+    const res = await fetch(new URL(`firmware/${build?.file ?? 'donrover-knomi.bin'}`, document.baseURI).toString(), { cache: 'no-store' });
     if (!res.ok) throw new Error('No se encontró el archivo del firmware en la plataforma.');
     const bytes = new Uint8Array(await res.arrayBuffer());
     // esptool-js recibe la imagen como texto binario (un carácter por byte).
@@ -81,11 +110,14 @@ export async function flashFirmware(onProgress: (p: FlashProgress) => void, log:
     });
     const chip = await loader.main(opts.manual ? 'no_reset' : 'default_reset');
     log(`Chip detectado: ${chip}`);
-    if (!/ESP32(?!-S|-C|-H|-P)/.test(chip)) throw new Error(`Esta placa tiene un ${chip}; el firmware es para la KNOMI v1 (ESP32).`);
+    const want = build?.chip ?? 'ESP32';
+    if (!chipMatches(chip, want)) {
+      throw new Error(`La placa conectada tiene un ${chip}, pero elegiste ${build?.name ?? 'KNOMI v1'} (${want}). Elige el modelo correcto arriba.`);
+    }
 
     onProgress({ stage: 'write', progress: 0, text: 'Instalando el firmware (no desconectes el cable)…' });
     await loader.writeFlash({
-      fileArray: [{ data, address: manifest?.address ?? 0 }],
+      fileArray: [{ data, address: build?.address ?? 0 }],
       flashSize: 'keep',
       flashMode: 'keep',
       flashFreq: 'keep',
@@ -98,7 +130,7 @@ export async function flashFirmware(onProgress: (p: FlashProgress) => void, log:
     await loader.after('hard_reset');
     await transport.disconnect();
     transport = null;
-    onProgress({ stage: 'done', progress: 1, text: `¡Listo! Don Rover ${manifest?.version ?? ''} quedó instalado.`.replace('  ', ' ') });
+    onProgress({ stage: 'done', progress: 1, text: `¡Listo! Don Rover ${build?.version ?? ''} quedó instalado en tu ${build?.name ?? 'placa'}.`.replace('  ', ' ') });
     return true;
   } catch (err) {
     const msg = (err as Error)?.message ?? String(err);

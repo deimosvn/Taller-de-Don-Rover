@@ -14,8 +14,11 @@ const char *exprName(Expr e);
 
 namespace face {
 
-/** Enciende la pantalla y la luz de fondo. */
-void begin();
+/** Enciende la pantalla y la luz de fondo. `inverted`: inversión de color del panel IPS. */
+void begin(bool inverted);
+
+/** Cambia la inversión de color (si un módulo se ve con los colores al revés). */
+void invert(bool on);
 
 /** Cambia la expresión; con holdMs > 0 vuelve sola a la neutral después de ese tiempo. */
 void setExpr(Expr e, uint32_t holdMs = 0);

@@ -1,6 +1,7 @@
 #include "face.h"
 
 #include <TFT_eSPI.h>
+#include <esp_heap_caps.h>
 
 static TFT_eSPI tft;
 static TFT_eSprite spr(&tft);
@@ -111,15 +112,74 @@ uint16_t parseColor(const char *hex, uint16_t fallback) {
   return rgb(strtoul(hex + 1, nullptr, 16));
 }
 
-void brightness(uint8_t v) { ledcWrite(0, v); }
+/* ---------------- luz de fondo ---------------- */
 
-void begin() {
-  mu = xSemaphoreCreateMutex();
+#if defined(BACKLIGHT_AW9346)
+// KNOMI v1: el LED de la pantalla lo maneja un AW9346 (16 niveles). Se enciende con un pulso
+// alto y cada pulso bajo corto (0.5–500 µs) baja un nivel; al pasar del 1 vuelve al 16.
+// Igual que el firmware oficial de BIGTREETECH (src/lvgl_hal.cpp).
+static int8_t blLevel = -1;
+
+static void blSet(int8_t to) {
+  to = constrain(to, 0, 16);
+  if (blLevel == to) return;
+  if (to == 0) {
+    digitalWrite(PIN_BACKLIGHT, LOW);
+    delay(3);  // más de 2.5 ms: apagado
+    blLevel = 0;
+    return;
+  }
+  if (blLevel <= 0) {
+    digitalWrite(PIN_BACKLIGHT, HIGH);
+    delayMicroseconds(25);  // más de 20 µs: encendido al máximo
+    blLevel = 16;
+  }
+  int8_t from = blLevel;
+  if (from < to) from += 16;
+  const int8_t pulses = from - to;
+  for (int8_t i = 0; i < pulses; i++) {
+    digitalWrite(PIN_BACKLIGHT, LOW);
+    delayMicroseconds(1);
+    digitalWrite(PIN_BACKLIGHT, HIGH);
+    delayMicroseconds(1);
+  }
+  blLevel = to;
+}
+
+static void blBegin() {
+  pinMode(PIN_BACKLIGHT, OUTPUT);
+  digitalWrite(PIN_BACKLIGHT, LOW);
+  delay(3);
+  blLevel = 0;
+}
+
+void brightness(uint8_t v) { blSet((v * 16 + 127) / 255); }
+#else
+// Módulos GC9A01 sueltos: el pin BLK enciende un transistor, así que el brillo es PWM.
+static void blBegin() {
+  if (PIN_BACKLIGHT < 0) return;
   ledcSetup(0, 5000, 8);
   ledcAttachPin(PIN_BACKLIGHT, 0);
-  brightness(0);
+  ledcWrite(0, 0);
+}
+
+void brightness(uint8_t v) {
+  if (PIN_BACKLIGHT >= 0) ledcWrite(0, v);
+}
+#endif
+
+void invert(bool on) {
+  Lock l;
+  tft.invertDisplay(on);
+}
+
+void begin(bool inverted) {
+  mu = xSemaphoreCreateMutex();
+  blBegin();
   tft.init();
   tft.setRotation(0);
+  // Sin esto el panel IPS muestra los colores al revés (fondo claro y ojos dorados).
+  tft.invertDisplay(inverted);
   tft.fillScreen(TFT_BLACK);
 
   C_PLATE = rgb(0x241C4E);
@@ -144,20 +204,26 @@ void begin() {
   C_AMBER = rgb(0xFFC93C);
   C_GREY = rgb(0x6B6590);
 
+  // Con PSRAM: sprite de 16 bits ahí. Sin PSRAM: 16 bits solo si sobra memoria interna
+  // (el Wi-Fi y el TLS también la necesitan); si no, 8 bits (256 colores).
   spr.setColorDepth(16);
   spr.setAttribute(PSRAM_ENABLE, true);
-  if (!spr.createSprite(240, 240)) {
-    // Sin PSRAM: sprite de 8 bits (cabe en la memoria interna).
+  const bool roomy = psramFound() || heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) > 240 * 240 * 2 + 40000;
+  if (!roomy || !spr.createSprite(240, 240)) {
     spr.setColorDepth(8);
     spr.createSprite(240, 240);
   }
   // Empieza dormido: la primera conexión lo despierta.
   cur = Expr::Sleep;
   lastTick = millis();
+#if defined(BACKLIGHT_AW9346)
+  brightness(200);
+#else
   for (int v = 0; v <= 200; v += 8) {
     brightness(v);
     delay(8);
   }
+#endif
 }
 
 void setExpr(Expr e, uint32_t holdMs) {

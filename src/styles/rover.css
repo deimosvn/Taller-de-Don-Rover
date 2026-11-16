@@ -620,3 +620,31 @@
     grid-template-columns: 1fr;
   }
 }
+.rs-boards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+}
+.rs-boards button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 248, 236, 0.18);
+  background: rgba(255, 248, 236, 0.06);
+  color: var(--cream);
+  cursor: pointer;
+}
+.rs-boards button b {
+  font: 600 0.92rem var(--font-display);
+}
+.rs-boards button small {
+  font: 600 0.75rem var(--font-mono);
+  color: rgba(255, 248, 236, 0.6);
+}
+.rs-boards button.on {
+  border-color: var(--mars-400);
+  background: rgba(240, 138, 87, 0.18);
+  box-shadow: 0 0 0 2px rgba(240, 138, 87, 0.35);
+}
