@@ -754,3 +754,44 @@
 .pt-compare-note b { color: var(--ink); }
 .pt-pill.aware { margin-top: 16px; background: #eef6ff; color: #17497a; }
 .pt-kids .pt-kids-grid .pt-polaroid img { height: 190px; }
+
+/* ---------- muro de fotos de los talleres ---------- */
+.pt-wall { display: grid; grid-template-columns: 430px 1fr; gap: 40px; align-items: center; }
+.pt-wall-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 30px; }
+.pt-wall-grid .pt-polaroid img { height: 270px; animation: pt-kenburns 14s ease-in-out infinite alternate; }
+.pt-wall-grid .pt-polaroid { overflow: hidden; }
+.pt-wall-grid .pt-polaroid:nth-child(2) img { animation-delay: -4s; }
+.pt-wall-grid .pt-polaroid:nth-child(3) img { animation-delay: -8s; }
+.pt-wall-grid .pt-polaroid:nth-child(4) img { animation-delay: -11s; }
+@keyframes pt-kenburns {
+  from { transform: scale(1); }
+  to { transform: scale(1.08) translate(-1.5%, -1%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pt-wall-grid .pt-polaroid img { animation: none; }
+}
+
+/* ---------- cita de un niño sobre su foto ---------- */
+.pt-polaroid { position: relative; }
+.pt-quote {
+  position: absolute;
+  top: -22px;
+  right: -26px;
+  padding: 12px 18px;
+  border-radius: 22px 22px 22px 6px;
+  background: var(--mars);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  quotes: '«' '»';
+  box-shadow: 0 12px 26px rgba(240, 96, 58, 0.4);
+  transform: rotate(4deg);
+  animation: pt-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  animation-delay: var(--d, 0s);
+  white-space: nowrap;
+  z-index: 2;
+}
+@keyframes pt-pop {
+  from { opacity: 0; transform: rotate(4deg) scale(0.4); }
+}
