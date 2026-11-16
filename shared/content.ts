@@ -261,14 +261,14 @@ export const PHASE_LABELS: Record<Phase, string> = {
 export const PHASE_FLOW: Phase[] = ['lobby', 'crews', 'scan', 'briefing', 'discovery', 'challenge', 'event', 'results', 'debrief'];
 
 export const CLASS_PLAN: { from: string; to: string; stage: string; es: string; text: string }[] = [
-  { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR, crean su astronauta y aparecen en la colonia.' },
-  { from: '03', to: '05', stage: 'CREW ASSIGNMENT', es: 'Tripulaciones', text: 'IX forma tripulaciones de cuatro y asigna las especialidades.' },
-  { from: '05', to: '08', stage: 'WORLD SCANNER', es: 'Escáner', text: 'Se fotografía un objeto del salón y la IA desbloquea la misión.' },
-  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien va a su estación en Marte y completa la tarea de su especialidad.' },
-  { from: '15', to: '22', stage: 'CREW CHALLENGE', es: 'Reto de tripulación', text: 'Los cuatro roles combinan sus datos y votan una decisión.' },
-  { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Evento global', text: 'Toda la clase enfrenta una emergencia y decide cuánto compartir.' },
-  { from: '30', to: '35', stage: 'MISSION RESULTS', es: 'Resultados', text: 'La colonia cambia según las decisiones de cada tripulación.' },
-  { from: '35', to: '40', stage: 'DEBRIEF', es: 'Debrief', text: 'IX explica lo aprendido y desbloquea un nuevo edificio.' },
+  { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR con su celular y arman su astronauta.' },
+  { from: '03', to: '05', stage: 'CREW ASSIGNMENT', es: 'Tripulación', text: 'IX le da a cada quien una especialidad: energía, soporte vital, comida o hábitat.' },
+  { from: '05', to: '08', stage: 'MISSION SCAN', es: 'Misión', text: 'IX revisa el clima espacial real de la NASA y el estado de la colonia, y escribe la misión.' },
+  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien va a su estación en el Marte 3D, resuelve su tarea y descubre su dato secreto.' },
+  { from: '15', to: '22', stage: 'CREW CHALLENGE', es: 'Reto', text: 'Combinan sus datos, votan una decisión y escriben la bitácora.' },
+  { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Emergencia', text: 'Llega una emergencia: comparten recursos y cada especialidad juega su minijuego.' },
+  { from: '30', to: '35', stage: 'MISSION RESULTS', es: 'Resultados', text: 'La colonia cambia según sus decisiones y se desbloquean edificios.' },
+  { from: '35', to: '40', stage: 'DEBRIEF', es: 'Debrief', text: 'Don Rover e IX explican lo aprendido y dejan una pregunta para conversar.' },
 ];
 
 /* ------------------------------------------------------------------ */

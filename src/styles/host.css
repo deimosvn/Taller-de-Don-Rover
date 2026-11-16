@@ -364,6 +364,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  margin-bottom: 14px;
 }
 .status-head h3 {
   font-size: 1.55rem;
@@ -372,6 +373,7 @@
 .status-meters {
   display: grid;
   gap: 12px;
+  margin-bottom: 10px;
 }
 .status-line {
   display: flex;
@@ -806,7 +808,13 @@ button.chip {
   gap: 14px;
 }
 .crew-card {
+  position: relative;
   padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--cream);
+  border: 2px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink);
+  text-align: center;
   animation: popIn 0.5s both;
 }
 .crew-card header {
