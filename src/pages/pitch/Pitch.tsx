@@ -402,7 +402,7 @@ const SLIDES: Slide[] = [
     id: 'ninos',
     title: 'Lo probamos con niños',
     who: 'Equipo',
-    seconds: 35,
+    seconds: 40,
     planet: { pos: 'off' },
     render: () => (
       <div className="pt-kids">
@@ -439,39 +439,12 @@ const SLIDES: Slide[] = [
             🪐 Más conciencia de lo que implica vivir en Marte
           </In>
         </div>
-        <div className="pt-kids-grid">
-          <Polaroid src="celular-mundo-3d.webp" alt="Un niño juega en su celular el mundo 3D" caption="Su astronauta en 3D" d={0.3} tilt={-4} />
-          <Polaroid src="celular-minijuego.webp" alt="Minijuego de conectar cables en el celular" caption="Minijuego en equipo" d={0.45} tilt={3} />
-          <Polaroid src="celular-astronauta.webp" alt="Celular con el astronauta en Marte" caption="Explorando Marte" d={0.6} tilt={-2} />
-          <Polaroid src="celular-prueba.webp" alt="Un niño muestra su astronauta en el celular y dice que le gustó mucho" caption="¡Listo para la misión!" d={0.75} tilt={4} quote="¡Me gustó mucho!" />
-        </div>
-      </div>
-    ),
-  },
-  {
-    id: 'taller',
-    title: 'Así fueron los talleres',
-    who: 'Equipo',
-    seconds: 20,
-    planet: { pos: 'off' },
-    render: () => (
-      <div className="pt-wall">
-        <div className="pt-wall-head">
-          <Kicker>Taller de Don Rover · en vivo</Kicker>
-          <In d={0.1}>
-            <h2>
-              Así fueron <em>los talleres.</em>
-            </h2>
-          </In>
-          <In d={0.2}>
-            <p className="pt-tag small">La consola en la pantalla del salón y cada niño en su celular.</p>
-          </In>
-        </div>
-        <div className="pt-wall-grid">
-          <Polaroid src="taller-salon-consola.webp" alt="La consola de Don Rover en la pantalla del salón durante el taller" caption="La consola en el salón" d={0.25} tilt={-3} />
-          <Polaroid src="taller-4-astronautas.webp" alt="Pantalla del taller con 4 astronautas a bordo" caption="¡4 astronautas a bordo!" d={0.4} tilt={2} />
-          <Polaroid src="taller-colonia-3d.webp" alt="La colonia en 3D en el monitor durante el taller" caption="La colonia que salvaron" d={0.55} tilt={3} />
-          <Polaroid src="taller-planeta-3d.webp" alt="El planeta Marte en 3D con la colonia en el monitor" caption="MARS-01 en 3D" d={0.7} tilt={-2} />
+        {/* Fotos completas de los talleres, en abanico. */}
+        <div className="pt-kids-fan">
+          <Polaroid src="nino-me-gusto.webp" alt="Un niño muestra su astronauta en el celular con el pulgar arriba" caption="¡Listo para la misión!" d={0.3} tilt={-4} quote="¡Me gustó mucho!" />
+          <Polaroid src="nino-mundo-3d.webp" alt="Niños jugando el mundo 3D de Don Rover en sus celulares" caption="Su astronauta en 3D" d={0.45} tilt={3} />
+          <Polaroid src="nino-minijuego.webp" alt="Un niño resuelve el minijuego de conectar cables" caption="Minijuego en equipo" d={0.6} tilt={-2} />
+          <Polaroid src="nino-explorando.webp" alt="Un niño explora Marte con su astronauta en el celular" caption="Explorando Marte" d={0.75} tilt={4} />
         </div>
       </div>
     ),
@@ -480,7 +453,7 @@ const SLIDES: Slide[] = [
     id: 'como',
     title: 'Cómo funciona',
     who: 'Diego',
-    seconds: 70,
+    seconds: 85,
     planet: { pos: 'off' },
     render: () => <HowItWorks />,
   },

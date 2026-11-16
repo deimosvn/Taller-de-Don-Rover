@@ -284,7 +284,7 @@
 }
 
 /* ---------- fotos ---------- */
-.pt-kids { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 50px; align-items: center; }
+.pt-kids { display: grid; grid-template-columns: 540px 1fr; gap: 40px; align-items: center; }
 .pt-kids-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 26px; }
 .pt-polaroid {
   margin: 0;
@@ -755,22 +755,6 @@
 .pt-pill.aware { margin-top: 16px; background: #eef6ff; color: #17497a; }
 .pt-kids .pt-kids-grid .pt-polaroid img { height: 190px; }
 
-/* ---------- muro de fotos de los talleres ---------- */
-.pt-wall { display: grid; grid-template-columns: 430px 1fr; gap: 40px; align-items: center; }
-.pt-wall-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px 30px; }
-.pt-wall-grid .pt-polaroid img { height: 270px; animation: pt-kenburns 14s ease-in-out infinite alternate; }
-.pt-wall-grid .pt-polaroid { overflow: hidden; }
-.pt-wall-grid .pt-polaroid:nth-child(2) img { animation-delay: -4s; }
-.pt-wall-grid .pt-polaroid:nth-child(3) img { animation-delay: -8s; }
-.pt-wall-grid .pt-polaroid:nth-child(4) img { animation-delay: -11s; }
-@keyframes pt-kenburns {
-  from { transform: scale(1); }
-  to { transform: scale(1.08) translate(-1.5%, -1%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pt-wall-grid .pt-polaroid img { animation: none; }
-}
-
 /* ---------- cita de un niño sobre su foto ---------- */
 .pt-polaroid { position: relative; }
 .pt-quote {
@@ -795,3 +779,14 @@
 @keyframes pt-pop {
   from { opacity: 0; transform: rotate(4deg) scale(0.4); }
 }
+
+/* ---------- fotos completas de los niños, en abanico ---------- */
+.pt-kids-fan { display: flex; align-items: center; justify-content: center; padding-top: 20px; }
+.pt-kids-fan .pt-polaroid { width: 214px; flex: none; margin-left: -22px; }
+.pt-kids-fan .pt-polaroid:first-child { width: 262px; margin-left: 0; z-index: 2; }
+.pt-kids-fan .pt-polaroid:nth-child(2) { margin-top: 70px; }
+.pt-kids-fan .pt-polaroid:nth-child(3) { margin-top: -40px; }
+.pt-kids-fan .pt-polaroid:nth-child(4) { margin-top: 60px; }
+.pt-kids-fan .pt-polaroid img { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; }
+.pt-kids-fan .pt-polaroid span { font-size: 17px; }
+.pt-kids-fan .pt-quote { top: -26px; right: -40px; font-size: 26px; }
