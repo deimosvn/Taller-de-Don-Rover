@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="600" viewBox="0 0 1100 600" role="img" aria-label="BIGTREETECH KNOMI v1 · todo integrado">
+<rect x="1" y="1" width="1098" height="598" rx="22" fill="#FFFBF5" stroke="#E7D9CB" stroke-width="2"/>
+<text x="32" y="50" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2A120D">BIGTREETECH KNOMI v1 · todo integrado</text>
+<text x="32" y="78" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#6B3F33">Entorno de PlatformIO: knomi · no hay que soldar ni cablear: conecta el USB-C y listo</text>
+<rect x="40" y="115" width="170" height="74" rx="14" fill="#455A64"/>
+<text x="125.0" y="146.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">USB-C</text>
+<text x="125.0" y="168.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">5 V + datos</text>
+<rect x="40" y="235" width="170" height="74" rx="14" fill="#607D8B"/>
+<text x="125.0" y="266.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">USB-serie</text>
+<text x="125.0" y="288.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">115200 baudios</text>
+<rect x="40" y="345" width="170" height="66" rx="14" fill="#8D6E63"/>
+<text x="125.0" y="372.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Conector JST</text>
+<text x="125.0" y="394.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">VIN / GND · 5 V</text>
+<rect x="40" y="440" width="170" height="66" rx="14" fill="#E65100"/>
+<text x="125.0" y="467.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Botón BOOT</text>
+<text x="125.0" y="489.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">toque o sostener</text>
+<rect x="380" y="215" width="250" height="150" rx="14" fill="#1F3A5F"/>
+<text x="505.0" y="284.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">ESP32-WROVER-E</text>
+<text x="505.0" y="306.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">16 MB flash · 8 MB PSRAM</text>
+<text x="505.0" y="322.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">240 MHz · Wi-Fi</text>
+<rect x="780" y="120" width="280" height="100" rx="14" fill="#241C4E"/>
+<text x="920.0" y="164.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Pantalla GC9A01</text>
+<text x="920.0" y="186.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">1.28″ · 240 × 240 · SPI 80 MHz</text>
+<rect x="780" y="300" width="280" height="80" rx="14" fill="#00838F"/>
+<text x="920.0" y="334.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">AW9346 · luz de fondo</text>
+<text x="920.0" y="356.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">16 niveles por pulsos</text>
+<path d="M125.0 189 C125.0 212.0 125.0 212.0 125.0 235" fill="none" stroke="#455A64" stroke-width="4" stroke-linecap="round"/>
+<path d="M210 272.0 C295.0 272.0 295.0 290.0 380 290.0" fill="none" stroke="#607D8B" stroke-width="4" stroke-linecap="round"/>
+<path d="M210 378.0 C295.0 378.0 295.0 290.0 380 290.0" fill="none" stroke="#8D6E63" stroke-width="4" stroke-linecap="round"/>
+<path d="M210 473.0 C295.0 473.0 295.0 290.0 380 290.0" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+<path d="M630 290.0 C705.0 290.0 705.0 170.0 780 170.0" fill="none" stroke="#5E35B1" stroke-width="4" stroke-linecap="round"/>
+<path d="M630 290.0 C705.0 290.0 705.0 340.0 780 340.0" fill="none" stroke="#00838F" stroke-width="4" stroke-linecap="round"/>
+<rect x="99.4" y="198.0" width="67.2" height="21" rx="8" fill="#FFFBF5" stroke="#455A64" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="133.0" y="212.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#455A64" text-anchor="middle">D+ / D-</text>
+<rect x="234.8" y="255.0" width="120.4" height="21" rx="8" fill="#FFFBF5" stroke="#607D8B" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="295.0" y="269.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#607D8B" text-anchor="middle">TX0 / RX0 · EN</text>
+<rect x="216.2" y="316.0" width="97.6" height="21" rx="8" fill="#FFFBF5" stroke="#8D6E63" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="265.0" y="330.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#8D6E63" text-anchor="middle">5 V → 3.3 V</text>
+<rect x="229.0" y="385.5" width="52.0" height="21" rx="8" fill="#FFFBF5" stroke="#E65100" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="255.0" y="399.5" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#E65100" text-anchor="middle">GPIO0</text>
+<rect x="837.0" y="234.0" width="166.0" height="36" rx="8" fill="#FFFBF5" stroke="#5E35B1" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="920.0" y="248.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#5E35B1" text-anchor="middle">MOSI 23 · SCLK 18</text>
+<text x="920.0" y="263.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#5E35B1" text-anchor="middle">CS 5 · DC 19 · RST 4</text>
+<rect x="679.0" y="289.0" width="52.0" height="21" rx="8" fill="#FFFBF5" stroke="#00838F" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="705.0" y="303.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#00838F" text-anchor="middle">GPIO2</text>
+<text x="40" y="538" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#4E342E">• Pines tomados del firmware oficial de BIGTREETECH (rama firmware, src/pinout_knomi_v1.h).</text>
+<text x="40" y="559" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#4E342E">• La pantalla necesita la inversión de color encendida (firmware 1.1.0 o más nuevo).</text>
+</svg>

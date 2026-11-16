@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="600" viewBox="0 0 1100 600" role="img" aria-label="ESP32-2424S012 · pantalla redonda táctil integrada">
+<rect x="1" y="1" width="1098" height="598" rx="22" fill="#FFFBF5" stroke="#E7D9CB" stroke-width="2"/>
+<text x="32" y="50" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#2A120D">ESP32-2424S012 · pantalla redonda táctil integrada</text>
+<text x="32" y="78" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" fill="#6B3F33">Entorno de PlatformIO: esp32c3-round · la placa más barata que ya trae la pantalla (sin cables)</text>
+<rect x="40" y="150" width="170" height="90" rx="14" fill="#455A64"/>
+<text x="125.0" y="189.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">USB-C</text>
+<text x="125.0" y="211.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">USB nativo del C3</text>
+<rect x="380" y="210" width="250" height="150" rx="14" fill="#263238"/>
+<text x="505.0" y="279.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">ESP32-C3</text>
+<text x="505.0" y="301.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">4 MB flash · 160 MHz</text>
+<text x="505.0" y="317.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">Wi-Fi · sin PSRAM</text>
+<rect x="40" y="360" width="170" height="80" rx="14" fill="#E65100"/>
+<text x="125.0" y="394.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Botón BOOT</text>
+<text x="125.0" y="416.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">GPIO9</text>
+<rect x="780" y="110" width="280" height="100" rx="14" fill="#241C4E"/>
+<text x="920.0" y="154.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Pantalla GC9A01</text>
+<text x="920.0" y="176.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">1.28″ · 240 × 240</text>
+<rect x="780" y="250" width="280" height="70" rx="14" fill="#00838F"/>
+<text x="920.0" y="279.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Luz de fondo</text>
+<text x="920.0" y="301.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">transistor · PWM</text>
+<rect x="780" y="360" width="280" height="90" rx="14" fill="#2E7D32"/>
+<text x="920.0" y="399.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle">Táctil CST816S</text>
+<text x="920.0" y="421.0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12.5" fill="#FFFFFF" opacity="0.85" text-anchor="middle">tocar la cara = botón</text>
+<path d="M210 195.0 C295.0 195.0 295.0 285.0 380 285.0" fill="none" stroke="#455A64" stroke-width="4" stroke-linecap="round"/>
+<path d="M210 400.0 C295.0 400.0 295.0 285.0 380 285.0" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+<path d="M630 285.0 C705.0 285.0 705.0 160.0 780 160.0" fill="none" stroke="#5E35B1" stroke-width="4" stroke-linecap="round"/>
+<path d="M630 285.0 C705.0 285.0 705.0 285.0 780 285.0" fill="none" stroke="#00838F" stroke-width="4" stroke-linecap="round"/>
+<path d="M630 285.0 C705.0 285.0 705.0 405.0 780 405.0" fill="none" stroke="#2E7D32" stroke-width="4" stroke-linecap="round"/>
+<rect x="238.6" y="214.0" width="112.8" height="21" rx="8" fill="#FFFBF5" stroke="#455A64" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="295.0" y="228.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#455A64" text-anchor="middle">D+ 19 / D- 18</text>
+<rect x="269.0" y="316.5" width="52.0" height="21" rx="8" fill="#FFFBF5" stroke="#E65100" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="295.0" y="330.5" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#E65100" text-anchor="middle">GPIO9</text>
+<rect x="641.0" y="166.5" width="128.0" height="36" rx="8" fill="#FFFBF5" stroke="#5E35B1" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="705.0" y="180.5" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#5E35B1" text-anchor="middle">SCLK 6 · MOSI 7</text>
+<text x="705.0" y="195.5" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#5E35B1" text-anchor="middle">CS 10 · DC 2</text>
+<rect x="679.0" y="259.0" width="52.0" height="21" rx="8" fill="#FFFBF5" stroke="#00838F" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="705.0" y="273.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#00838F" text-anchor="middle">GPIO3</text>
+<rect x="658.6" y="341.0" width="112.8" height="36" rx="8" fill="#FFFBF5" stroke="#2E7D32" stroke-opacity="0.35" stroke-width="1.2"/>
+<text x="715.0" y="355.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#2E7D32" text-anchor="middle">SDA 4 · SCL 5</text>
+<text x="715.0" y="370.0" font-family="'JetBrains Mono', Consolas, 'Courier New', monospace" font-size="12.5" font-weight="700" fill="#2E7D32" text-anchor="middle">RST 1 · INT 0</text>
+<text x="40" y="538" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#4E342E">• Pines de la definición pública de la placa (rzeldent/platformio-espressif32-sunton).</text>
+<text x="40" y="559" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13" fill="#4E342E">• El reinicio de la pantalla va al botón RST de la placa: no usa un GPIO.</text>
+</svg>
