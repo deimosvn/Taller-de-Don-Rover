@@ -12,11 +12,11 @@ import type { RoleId, SystemId } from '../../../shared/types';
 import { Astronaut } from '../../components/art';
 import { QR, SystemMeter, useCountUp } from '../../components/ui';
 import { nasaApod, nasaNeo, spaceWeather, type Apod, type NeoToday } from '../../lib/nasa';
-import { ask, type Answer } from '../../rover/assistant';
-import { rover } from '../../rover/link';
+import { ask, listenAndAnswer, type Answer } from '../../rover/assistant';
+import { rover, transportLabel, usbSupported, type RoverStatus } from '../../rover/link';
 import { RoverFace } from '../../rover/RoverFace';
-import { useVoice } from '../../rover/RoverPanel';
-import { say, stop } from '../../rover/voice';
+import { useRoverStatus, useVoice } from '../../rover/RoverPanel';
+import { repeat, say, stop, voiceState } from '../../rover/voice';
 import { DEMO_SNAPSHOT } from '../../world/colony/snapshot';
 import { ROLE_AVATARS } from '../../world/react/missionZones';
 import { PlanetView } from '../../world/react/PlanetView';
@@ -193,6 +193,65 @@ interface Ctx {
   started: boolean;
   start: () => void;
   voice: ReturnType<typeof useVoice>;
+  board: RoverStatus;
+}
+
+/**
+ * Conectar el Don Rover físico desde la presentación (USB o Wi-Fi/nube con el código de la
+ * placa). Así su cara y su boca se mueven en la placa cuando habla en pantalla.
+ */
+function BoardControl({ board, compact = false }: { board: RoverStatus; compact?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState(() => rover.saved.id || rover.saved.ip || '');
+  const [busy, setBusy] = useState(false);
+  const on = board.state === 'on';
+  const run = async (fn: () => Promise<boolean>) => {
+    setBusy(true);
+    const ok = await fn().catch(() => false);
+    setBusy(false);
+    // Si no se pudo, se queda abierto con el motivo y la opción de Wi-Fi.
+    setOpen(!ok);
+  };
+  const usb = () => void run(() => rover.connectUsb({ ask: true }));
+  const label = on ? `Don Rover físico · ${transportLabel(board.via)}` : board.state === 'connecting' ? 'Conectando la placa…' : compact ? 'Conectar placa' : '🔌 Conectar Don Rover físico';
+  return (
+    <div className={`pt-board-ctl ${compact ? 'compact' : ''}`}>
+      <button
+        className={`pt-board-chip ${board.state}`}
+        onClick={() => (on || board.state === 'connecting' ? setOpen((o) => !o) : usbSupported() && !compact ? usb() : setOpen((o) => !o))}
+        title={board.detail}
+      >
+        <i />
+        {label}
+      </button>
+      {open && (
+        <div className="pt-board-pop" onKeyDown={(e) => e.stopPropagation()}>
+          <p>{board.detail}</p>
+          {usbSupported() && (
+            <button className="pt-board-btn" disabled={busy} onClick={usb}>
+              🔌 Por USB
+            </button>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void run(() => rover.connectWifi(code));
+            }}
+          >
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código (A1B2C3) o IP" aria-label="Código o IP de la placa" />
+            <button className="pt-board-btn" disabled={busy || !code.trim()}>
+              📶 Wi-Fi
+            </button>
+          </form>
+          {on && (
+            <button className="pt-board-btn ghost" onClick={() => void rover.disconnect()}>
+              Desconectar
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const SLIDES: Slide[] = [
@@ -202,10 +261,11 @@ const SLIDES: Slide[] = [
     who: 'Don Rover',
     seconds: 40,
     planet: { pos: 'hero', focus: null },
-    render: ({ started, start, fact, voice }) => (
+    render: ({ started, start, fact, voice, board }) => (
       <div className="pt-cover">
         <In className="pt-cover-face">
-          <RoverFace expr={voice.face} mouth={voice.mouth} size={330} linked={rover.status.state === 'on'} pulse={!started && !voice.speaking ? '#F59A63' : null} />
+          <RoverFace expr={voice.face} mouth={voice.mouth} size={330} linked={board.state === 'on'} pulse={!started && !voice.speaking ? '#F59A63' : null} />
+          <BoardControl board={board} />
         </In>
         <div className={`pt-cover-copy ${started ? 'started' : ''}`}>
           <Kicker>NASA Space Apps Challenge 2026</Kicker>
@@ -588,10 +648,10 @@ const SLIDES: Slide[] = [
     who: 'Equipo',
     seconds: 15,
     planet: { pos: 'hero', focus: null },
-    render: ({ voice }) => (
+    render: ({ voice, board }) => (
       <div className="pt-cover">
         <In className="pt-cover-face">
-          <RoverFace expr={voice.speaking ? voice.face : 'star'} mouth={voice.mouth} size={300} linked={rover.status.state === 'on'} />
+          <RoverFace expr={voice.speaking ? voice.face : 'star'} mouth={voice.mouth} size={300} linked={board.state === 'on'} />
         </In>
         <div className="pt-cover-copy">
           <In d={0.1}>
@@ -723,7 +783,7 @@ function RoverDemo({ voice }: { voice: ReturnType<typeof useVoice> }) {
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<{ q: string; a: Answer } | null>(null);
   const suggestions = ['¿Por qué la radiación es peligrosa para el hábitat?', '¿Cómo está el clima espacial hoy?', '¿Qué asteroides pasan cerca hoy?'];
-  const linked = rover.status.state === 'on';
+  const linked = useRoverStatus().state === 'on';
   const go = async (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
@@ -823,8 +883,27 @@ export function Pitch() {
   const [now, setNow] = useState(Date.now());
   const [chrome, setChrome] = useState(true);
   const voice = useVoice();
+  const board = useRoverStatus();
   const liveRef = useRef(live);
   liveRef.current = live;
+
+  // Si la placa se conecta (o reconecta) a mitad del diálogo, se pone al día: misma cara y,
+  // si Don Rover está hablando, la boca se mueve en la placa también.
+  useEffect(
+    () =>
+      rover.onEvent((e) => {
+        if (e.t === 'hi') {
+          const v = voiceState();
+          rover.send({ t: 'face', e: v.speaking ? v.face : 'happy', ms: v.speaking ? 0 : 2500 });
+          if (v.speaking) rover.send({ t: 'talk', on: 1 });
+        } else if (e.t === 'btn') {
+          // Botón de la cabeza: corto = repetir · sostenido = preguntarle con el micrófono.
+          if (e.k === 'short') void repeat();
+          else void listenAndAnswer();
+        }
+      }),
+    [],
+  );
 
   // Escala del escenario de 1600 × 900 a la pantalla.
   useEffect(() => {
@@ -880,9 +959,14 @@ export function Pitch() {
     setStartedAt(Date.now());
     setNow(Date.now());
     void document.documentElement.requestFullscreen?.().catch(() => {});
+    // La placa mira al público antes de hablar (say() la despierta si estaba dormida).
+    rover.send({ t: 'look', x: 0, y: 0 });
     if (!liveRef.current.loaded) await new Promise((r) => setTimeout(r, 2500));
     const fact = nasaFact(liveRef.current);
+    // say() mueve la cara y la boca en pantalla y en la placa (talk + golpes de cada palabra).
     await say(`${OPENING} ${fact.spoken}`, { face: 'happy' });
+    // Al terminar, la pantalla redonda muestra el dato de la NASA.
+    if (rover.connected) rover.send({ t: 'card', title: fact.big, sub: fact.unit, ms: 9000 });
   }, []);
 
   const slide = SLIDES[index];
@@ -908,13 +992,14 @@ export function Pitch() {
           </div>
         </div>
         <section key={slide.id} className={`pt-slide pt-s-${slide.id}`} aria-roledescription="diapositiva" aria-label={`${index + 1} de ${SLIDES.length}: ${slide.title}`}>
-          {slide.render({ live, fact, started: startedAt !== null, start: () => void start(), voice })}
+          {slide.render({ live, fact, started: startedAt !== null, start: () => void start(), voice, board })}
         </section>
         <footer className="pt-foot">
           <span className="pt-brand">
-            <RoverFace expr={voice.face} mouth={voice.mouth} size={36} linked={rover.status.state === 'on'} />
+            <RoverFace expr={voice.face} mouth={voice.mouth} size={36} linked={board.state === 'on'} />
             Don Rover
           </span>
+          {index > 0 && <BoardControl board={board} compact />}
           <span className={`pt-who who-${slide.who.replace(' ', '-').toLowerCase()}`}>🎤 {slide.who}</span>
           <span className="pt-dots">
             {SLIDES.map((s, i) => (

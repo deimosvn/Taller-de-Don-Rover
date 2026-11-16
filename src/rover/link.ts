@@ -106,6 +106,9 @@ export const USB_FILTERS = [{ usbVendorId: 0x1a86 }, { usbVendorId: 0x10c4 }, { 
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Canal entre pestañas del mismo navegador para compartir el puerto USB de la placa. */
+const usbBus: BroadcastChannel | null = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('donrover-usb') : null;
+
 /* ---------------- enlace ---------------- */
 
 type Listener<T> = (v: T) => void;
@@ -322,11 +325,25 @@ class RoverLink {
       this.set({ state: 'off', via: null, detail: 'No se eligió ningún puerto USB.' });
       return false;
     }
+    // Un puerto USB solo lo puede abrir una pestaña: se le pide a las demás que lo suelten
+    // (la más reciente se queda con Don Rover, p. ej. la presentación sobre la consola).
+    if (usbBus) {
+      usbBus.postMessage({ t: 'release' });
+      await sleep(500);
+      if (gen !== this.gen) return false;
+    }
     try {
       await port.open({ baudRate: 115200 });
-    } catch (err) {
-      this.set({ state: 'off', via: null, detail: `No se pudo abrir el puerto (¿otro programa lo usa?): ${(err as Error).message}` });
-      return false;
+    } catch (first) {
+      // La otra pestaña puede tardar un poco más en soltarlo: un reintento.
+      await sleep(900);
+      try {
+        if (gen !== this.gen) return false;
+        await port.open({ baudRate: 115200 });
+      } catch {
+        this.set({ state: 'off', via: null, detail: `No se pudo abrir el puerto (¿otro programa lo usa?): ${(first as Error).message}` });
+        return false;
+      }
     }
     if (gen !== this.gen) return false;
     this.port = port;
@@ -527,3 +544,10 @@ const LABEL: Record<Transport, string> = { usb: 'USB', lan: 'Wi-Fi (red local)',
 export const transportLabel = (t: Transport | null) => (t ? LABEL[t] : '');
 
 export const rover = new RoverLink();
+
+// Coordinación entre pestañas: la que va a abrir el USB avisa y las demás lo sueltan.
+usbBus?.addEventListener('message', (e: MessageEvent) => {
+  if ((e.data as { t?: string } | null)?.t === 'release' && rover.status.via === 'usb' && rover.status.state !== 'off') {
+    void rover.disconnect('Otra pestaña de la plataforma tomó a Don Rover por USB.');
+  }
+});
