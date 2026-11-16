@@ -716,3 +716,41 @@
 .pt-board-btn.ghost { background: rgba(42, 18, 13, 0.06); color: var(--ink); }
 .pt-board-btn:disabled { opacity: 0.5; cursor: default; }
 .pt-cover-face { flex-direction: column; }
+
+/* ---------- talleres: teórico vs Don Rover ---------- */
+.pt-compare {
+  margin-top: 26px;
+  padding: 24px 26px 20px;
+  border-radius: 26px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pt-compare-row { display: flex; flex-direction: column; gap: 8px; }
+.pt-compare-label { font-family: var(--font-display); font-size: 22px; color: var(--muted); }
+.pt-compare-label b { color: var(--ink); }
+.pt-compare-row.win .pt-compare-label b { color: var(--mars); }
+.pt-bar { position: relative; display: flex; align-items: center; gap: 12px; height: 34px; }
+.pt-bar i { display: block; height: 100%; border-radius: 12px; transform-origin: left center; animation: pt-grow 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.pt-bar i.base { width: 52%; background: #d8cfc9; animation-delay: 0.5s; }
+.pt-bar i.win { width: 93.6%; background: linear-gradient(90deg, #ffb06e, var(--mars)); box-shadow: 0 8px 22px rgba(240, 96, 58, 0.35); animation-delay: 0.9s; }
+.pt-bar em {
+  position: absolute;
+  right: 6%;
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(120, 40, 10, 0.4);
+  animation: pt-in 0.6s 2s both;
+}
+@keyframes pt-grow {
+  from { transform: scaleX(0); }
+}
+.pt-compare-note { margin: 2px 0 0; font-size: 21px; color: var(--muted); }
+.pt-compare-note b { color: var(--ink); }
+.pt-pill.aware { margin-top: 16px; background: #eef6ff; color: #17497a; }
+.pt-kids .pt-kids-grid .pt-polaroid img { height: 190px; }

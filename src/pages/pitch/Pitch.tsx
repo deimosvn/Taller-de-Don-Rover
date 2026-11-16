@@ -401,14 +401,37 @@ const SLIDES: Slide[] = [
     render: () => (
       <div className="pt-kids">
         <div>
-          <Kicker>Probado en la vida real</Kicker>
+          <Kicker>Lo probamos con niños</Kicker>
           <In d={0.1}>
-            <h2>Lo probamos con niños.</h2>
+            <h2>
+              Dos talleres STEM <em>sobre Marte.</em>
+            </h2>
           </In>
-          <In d={0.2}>
-            <p className="pt-tag small">Cada quien desde su celular, en equipo.</p>
+          <In d={0.25} className="pt-compare">
+            <div className="pt-compare-row">
+              <span className="pt-compare-label">
+                📚 <b>Taller teórico</b>
+              </span>
+              <div className="pt-bar">
+                <i className="base" />
+              </div>
+            </div>
+            <div className="pt-compare-row win">
+              <span className="pt-compare-label">
+                🚀 <b>Taller de Don Rover</b>
+              </span>
+              <div className="pt-bar">
+                <i className="win" />
+                <em>+80 %</em>
+              </div>
+            </div>
+            <p className="pt-compare-note">
+              Retuvieron <b>hasta un 80 % más</b> de lo que aprendieron en el taller.
+            </p>
           </In>
-          <Polaroid src="proyector-4-astronautas.webp" alt="La consola del profesor en una pantalla con 4 astronautas a bordo" caption="La consola en una pantalla real" d={0.35} tilt={-2} />
+          <In d={0.6} className="pt-pill aware">
+            🪐 Más conciencia de lo que implica vivir en Marte
+          </In>
         </div>
         <div className="pt-kids-grid">
           <Polaroid src="celular-mundo-3d.webp" alt="Un niño juega en su celular el mundo 3D" caption="Su astronauta en 3D" d={0.3} tilt={-4} />
