@@ -648,3 +648,207 @@
   background: rgba(240, 138, 87, 0.18);
   box-shadow: 0 0 0 2px rgba(240, 138, 87, 0.35);
 }
+
+/* ------------------------------------------------------------------ */
+/* Don Rover flotante (todas las secciones)                             */
+/* ------------------------------------------------------------------ */
+
+.rdock {
+  position: fixed;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+  font-family: inherit;
+}
+.rdock.right { right: 16px; }
+.rdock.left { left: 16px; align-items: flex-start; }
+.rdock > * { pointer-events: auto; }
+
+.rdock-bubble {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 22px rgba(240, 138, 87, 0.35);
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+  padding: 0;
+  animation: rdock-float 4s ease-in-out infinite;
+}
+.rdock-bubble:active { cursor: grabbing; }
+.rdock-bubble:focus-visible { outline: 3px solid #7fdbff; outline-offset: 3px; }
+.rdock-bubble.thinking { box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 26px rgba(255, 201, 60, 0.7); }
+.rdock-bubble.speaking { box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 26px rgba(127, 219, 255, 0.7); }
+@keyframes rdock-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rdock-bubble { animation: none; }
+}
+
+.rdock-peek {
+  position: absolute;
+  bottom: 50%;
+  right: calc(100% + 10px);
+  width: max-content;
+  max-width: min(260px, 60vw);
+  padding: 8px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: #fff8ec;
+  color: #2a120d;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rdock.left .rdock-peek { right: auto; left: calc(100% + 10px); border-radius: 14px 14px 14px 4px; }
+
+.rdock-panel {
+  width: min(380px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background: #fffaf4;
+  color: #2a120d;
+  border: 1px solid rgba(240, 138, 87, 0.35);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: rdock-in 0.18s ease-out;
+}
+@keyframes rdock-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+
+.rdock-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 12px;
+  background: linear-gradient(135deg, #ffe7d4, #fff3e8);
+  border-bottom: 1px solid rgba(42, 18, 13, 0.08);
+}
+.rdock-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rdock-title b { font-size: 1rem; }
+.rdock-title small { color: #8a6253; font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rdock-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 0;
+  background: rgba(42, 18, 13, 0.06);
+  color: #2a120d;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.rdock-icon:hover { background: rgba(42, 18, 13, 0.12); }
+
+.rdock-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rdock-hello p { margin: 0; color: #6b3f33; line-height: 1.45; font-size: 0.92rem; }
+.rdock-msg {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: 16px;
+  font-size: 0.92rem;
+  line-height: 1.42;
+}
+.rdock-msg p { margin: 0; }
+.rdock-msg.me { align-self: flex-end; background: #f08a57; color: #fff; border-bottom-right-radius: 4px; }
+.rdock-msg.rover { align-self: flex-start; background: #ffffff; border: 1px solid rgba(42, 18, 13, 0.1); box-shadow: 0 2px 8px rgba(42, 18, 13, 0.06); border-bottom-left-radius: 4px; }
+.rdock-follow { margin-top: 6px !important; color: #c06a12; font-size: 0.85rem; }
+.rdock-refs { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rdock-refs li { display: flex; flex-direction: column; gap: 4px; }
+.rdock-refs img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; }
+.rdock-refs a { color: #1f6fb2; font-size: 0.8rem; text-decoration: none; line-height: 1.3; }
+.rdock-refs a:hover { text-decoration: underline; }
+.rdock-refs a span {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(31, 111, 178, 0.1);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.rdock-msg.typing { display: flex; gap: 5px; padding: 12px 14px; }
+.rdock-msg.typing i { width: 7px; height: 7px; border-radius: 50%; background: #ffc93c; animation: rdock-dot 1s infinite ease-in-out; }
+.rdock-msg.typing i:nth-child(2) { animation-delay: 0.15s; }
+.rdock-msg.typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes rdock-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-4px); }
+}
+
+.rdock-quick { display: flex; gap: 6px; padding: 8px 12px 0; overflow-x: auto; scrollbar-width: none; }
+.rdock-quick::-webkit-scrollbar { display: none; }
+.rdock-quick button {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 138, 87, 0.45);
+  background: #fff1e6;
+  color: #8a3b17;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rdock-quick button:disabled { opacity: 0.5; cursor: default; }
+
+.rdock-ask { display: flex; gap: 6px; padding: 10px 12px 12px; }
+.rdock-ask input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #e6cdbd;
+  background: #ffffff;
+  color: #2a120d;
+  font-size: 16px;
+}
+.rdock-mic, .rdock-send {
+  width: 44px;
+  flex: none;
+  border-radius: 12px;
+  border: 0;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.rdock-mic { background: rgba(107, 79, 214, 0.12); color: #2a120d; }
+.rdock-mic.on { background: #b69cff; }
+.rdock-send { background: #f08a57; color: #fff; font-weight: 700; }
+.rdock-send:disabled { opacity: 0.45; cursor: default; }
+.rdock-clear {
+  align-self: center;
+  margin: -4px 0 8px;
+  border: 0;
+  background: none;
+  color: #a07a6a;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+@media (max-width: 480px) {
+  .rdock.right { right: 10px; }
+  .rdock.left { left: 10px; }
+  .rdock-bubble { width: 60px; height: 60px; }
+  .rdock-panel { height: min(520px, calc(100vh - 120px)); }
+}

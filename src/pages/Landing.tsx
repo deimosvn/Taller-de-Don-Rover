@@ -962,6 +962,7 @@ function Closing() {
           </nav>
           <nav className="lp-foot-col" aria-label="Explorar">
             <b>Explorar</b>
+            <a href="#/pitch">🎤 Presentación</a>
             <a href="#/donrover">Don Rover físico</a>
             <a href="#/mundo">Planeta 3D</a>
             <a href="#/minijuegos">Minijuegos</a>

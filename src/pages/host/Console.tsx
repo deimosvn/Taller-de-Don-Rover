@@ -11,11 +11,8 @@ import { Countdown, Icon, LogoMark } from '../../components/ui';
 import { isMuted, setMuted, sfx } from '../../lib/sound';
 import { toggleFullscreen, useWakeLock } from '../../lib/pwa';
 import type { NetStatus } from '../../net/hostNet';
-import { listenAndAnswer } from '../../rover/assistant';
 import { useRoverNarrator } from '../../rover/narrator';
-import { RoverFace } from '../../rover/RoverFace';
-import { RoverCaptions, RoverPanel, useRoverStatus, useVoice } from '../../rover/RoverPanel';
-import { stopListening } from '../../rover/voice';
+import { RoverCaptions, RoverPanel, useRoverStatus } from '../../rover/RoverPanel';
 import { MISSION_ZONE } from '../../world/react/missionZones';
 import { PlanetView } from '../../world/react/PlanetView';
 import { useHostSnapshot } from '../../world/react/useHostSnapshot';
@@ -217,22 +214,18 @@ function IxDrawer({ view, onClose }: { view: HostView; onClose: () => void }) {
   );
 }
 
-/** Don Rover en pequeño: su cara y el micrófono. Al tocar la cara se abren todos sus controles. */
-function RoverBubble() {
-  const voice = useVoice();
+/**
+ * Voz y placa de Don Rover. Su cara, el micrófono y el chat viven en el Don Rover flotante de
+ * toda la app (RoverDock), que en la consola se acomoda a la izquierda de esta barra.
+ */
+function RoverTool() {
   const status = useRoverStatus();
   const [open, setOpen] = useState(false);
-  const talk = () => {
-    if (voice.listening) stopListening();
-    else void listenAndAnswer();
-  };
   return (
-    <div className={`hc-rover ${voice.speaking ? 'is-speaking' : ''}`}>
-      <button className="hc-rover-face" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="Don Rover: voz, conexión y preguntas">
-        <RoverFace expr={voice.face} mouth={voice.mouth} size={54} linked={status.state === 'on'} pulse={voice.listening ? '#B69CFF' : null} />
-      </button>
-      <button className={`hc-rover-mic ${voice.listening ? 'is-on' : ''}`} onClick={talk} disabled={voice.thinking} aria-pressed={voice.listening} title="Hazle una pregunta a Don Rover">
-        {voice.listening ? '⏹' : voice.thinking ? '…' : '🎙️'}
+    <div className="hc-rovertool">
+      <button className={`hc-tool ${status.state === 'on' ? 'is-on' : ''}`} onClick={() => setOpen((v) => !v)} aria-expanded={open} title="Don Rover: voz y placa">
+        <span aria-hidden="true">🤖</span>
+        <span>Don Rover</span>
       </button>
       {open && (
         <div className="hc-rover-pop">
@@ -399,7 +392,6 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
       <RoverCaptions />
 
       <footer className="hc-dock">
-        <RoverBubble />
         <div className="hc-tools" role="toolbar" aria-label="Herramientas del profe">
           {view.phase === 'lobby' && !party && (
             <button className="hc-tool" disabled={view.players.length >= view.maxPlayers} onClick={() => run({ type: 'addBots', count: view.maxPlayers - view.players.length })} title="Completar con bots de práctica">
@@ -453,6 +445,7 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
             </button>
           )}
           <span className="hc-tools-sep" aria-hidden="true" />
+          <RoverTool />
           <button className="hc-tool" onClick={() => setWorldOpen(true)} title="Explorar la colonia en 3D con toda la clase">
             <Icon name="map" size={20} />
             <span>3D</span>

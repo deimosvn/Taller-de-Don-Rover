@@ -281,6 +281,8 @@ sequenceDiagram
   P-->>A: voz por las bocinas y subtítulos
 ```
 
+Además, **Don Rover flota en todas las secciones** de la plataforma: se le puede escribir o hablar, guarda la conversación y consulta datos reales de la NASA (clima espacial, asteroides cercanos, la foto del día y estudios científicos). En la consola del profe ocupa su lugar en la barra de abajo.
+
 ---
 
 <a id="como-se-usa"></a>
@@ -322,6 +324,7 @@ La consola muestra una sola tarjeta por etapa sobre el planeta 3D, que viaja a d
 | [`#/entrenador`](https://tallerdedonrover.vercel.app/#/entrenador) | Retos personalizados con física real; IX explica por qué falló o funcionó. También se abre desde el modo libre con el botón **Entrenar**. |
 | [`#/donrover`](https://tallerdedonrover.vercel.app/#/donrover) | Instalar el firmware en la placa con un clic, conectarla por USB o Wi-Fi y probar caras, voz y micrófono. |
 | [`#/mundo`](https://tallerdedonrover.vercel.app/#/mundo) · [`#/minijuegos`](https://tallerdedonrover.vercel.app/#/minijuegos) | El planeta 3D para recorrerlo libremente, y todos los minijuegos para probarlos sin una partida. |
+| [`#/pitch`](https://tallerdedonrover.vercel.app/#/pitch) | La presentación del proyecto para el hackatón, con Don Rover, capturas, fotos de los talleres y datos reales de la NASA. |
 
 ---
 
@@ -448,6 +451,121 @@ Todas usan la misma pantalla redonda **GC9A01** y el mismo firmware, con un ento
 | Botón de Don Rover | — | BOOT (0) | BOOT (9) y táctil | BOOT (0) | BOOT (9) | BOOT (0) |
 
 **Lista de compras (versión con módulo):** una placa de la tabla · un módulo **GC9A01 de 1.28″** con pines VCC, GND, SCL, SDA, RES, DC, CS y BLK · 8 cables hembra-hembra · un cable USB **de datos**. Opcional: una carcasa impresa en 3D como la de las fotos.
+
+### 🔋 Don Rover portátil: batería, micrófono y bocina
+
+La KNOMI es el camino más rápido porque viene armada. Si prefieres **construir a Don Rover desde cero** y que sea portátil, este diseño usa un **ESP32-DevKitC** (programado con Arduino), la **pantalla redonda**, un **micrófono**, una **bocina** y una **batería**. Las imágenes son diagramas ilustrados y están en [`docs/hardware/`](docs/hardware/).
+
+<p align="center">
+  <img src="docs/hardware/don-rover-bloques.svg" alt="Diagrama de bloques: batería, cargador, elevador, ESP32, pantalla, micrófono, amplificador, bocina y botón" width="100%">
+</p>
+
+<details>
+<summary><b>🧾 Materiales</b></summary>
+<br>
+
+| Cant. | Componente | Para qué sirve | Nota |
+| :---: | --- | --- | --- |
+| 1 | **ESP32-DevKitC de 38 pines**; ideal la **ESP32-DevKitC-VE** (módulo WROVER-E con PSRAM) | El cerebro: Wi-Fi, pantalla y audio | Sin PSRAM (módulo WROOM) también funciona. |
+| 1 | **Pantalla redonda GC9A01** 1.28" 240×240 (SPI) | La cara de Don Rover | Funciona a 3.3 V |
+| 1 | **Micrófono I2S INMP441** | Escuchar preguntas | Funciona a 3.3 V |
+| 1 | **Amplificador I2S MAX98357A** | Hablar | Funciona a 5 V; da hasta 3 W |
+| 1 | **Bocina** de 4–8 Ω y 2–3 W (≈ 40 mm) | El sonido | |
+| 1 | **Batería LiPo** 3.7 V de 1 celda, 1000–2000 mAh, **con protección** | Que sea portátil | Con conector JST |
+| 1 | **Cargador TP4056 USB-C** con protección (DW01) | Cargar la batería | |
+| 1 | **Elevador MT3608** ajustado a 5.1 V (o un módulo fijo de 5 V y 1 A o más) | Subir de 3.7 V a 5 V | |
+| 1 | **Diodo Schottky** SS14 o 1N5817 | Evita que el USB del ESP32 alimente al elevador | |
+| 1 | **Interruptor** deslizable | Encender y apagar | |
+| 1 | **Botón** pulsador | Corto: repetir · largo: preguntar | |
+| 2 + 1 | **Resistencias de 100 kΩ** y **capacitor de 100 nF** | Medir la carga de la batería | |
+| 1 | **Capacitor electrolítico** de 470 µF y 10 V | Estabiliza los 5 V del amplificador | |
+| — | Cables, protoboard o placa perforada y carcasa (impresa en 3D o una caja) | | |
+
+</details>
+
+<details open>
+<summary><b>🔌 Diagrama de conexiones</b></summary>
+<br>
+
+<img src="docs/hardware/don-rover-conexiones.svg" alt="Diagrama de conexiones pin por pin entre el ESP32-DevKitC, la pantalla GC9A01, el micrófono INMP441, el amplificador MAX98357A, la bocina, el botón y la batería" width="100%">
+
+| Módulo | Pin del módulo | Va al ESP32 |
+| --- | --- | --- |
+| **Pantalla GC9A01** | VCC · GND | 3V3 · GND |
+| | SCL · SDA | GPIO18 · GPIO23 |
+| | CS · DC · RST | GPIO5 · GPIO19 · GPIO4 |
+| | BLK (luz de la pantalla) | GPIO22 |
+| **Botón** | un lado · el otro | GPIO0 · GND (es el mismo pin que el botón BOOT de la placa) |
+| **Micrófono INMP441** | VDD · GND · L/R | 3V3 · GND · GND (canal izquierdo) |
+| | SD · SCK · WS | GPIO35 · GPIO32 · GPIO33 |
+| **Amplificador MAX98357A** | VIN · GND | 5V · GND |
+| | DIN · LRC · BCLK | GPIO25 · GPIO26 · GPIO27 |
+| | GAIN · SD | sin conectar (9 dB y canal mixto) |
+| **Bocina** | + · − | + y − del MAX98357A (**ninguno va a GND**) |
+| **Batería** | punto medio del divisor 100k/100k | GPIO34 (lectura analógica, ADC1) |
+
+- La pantalla y el botón usan **los mismos pines que el entorno `esp32-devkit`** del firmware, así que se instala sin cambiar el código.
+- La luz de la pantalla va a **GPIO22** y no a GPIO2: GPIO2 es un pin de arranque y, si la pantalla lo deja en alto, la placa puede no entrar al modo de programación.
+- El orden de los pines de la pantalla cambia según el fabricante: **guíate por el nombre impreso**, no por la posición.
+- Mantén cortos los cables de la pantalla (menos de 10 cm), porque el bus SPI es rápido.
+- GPIO34 y GPIO35 solo pueden leer. Por eso se usan para el micrófono (SD) y la batería.
+
+</details>
+
+<details>
+<summary><b>🔋 Energía con batería</b></summary>
+<br>
+
+<img src="docs/hardware/don-rover-energia.svg" alt="Diagrama de energía: batería LiPo, cargador TP4056, interruptor, elevador MT3608 a 5.1 V, diodo SS14, divisor de batería a GPIO34 y capacitor de 470 µF" width="100%">
+
+1. La batería se conecta a **B+ y B−** del TP4056. El robot se carga por el **USB-C del cargador**.
+2. **OUT+** pasa por el **interruptor** y llega al **elevador MT3608**.
+3. **Antes de conectar el ESP32**, gira el tornillo del MT3608 hasta que el multímetro marque **5.1 V** en su salida.
+4. La salida del elevador pasa por el **diodo SS14** y va al pin **5V del ESP32** y al **VIN del amplificador**. El diodo evita que, cuando conectes el ESP32 por USB para programarlo, la corriente regrese al elevador.
+5. El **divisor de 100 kΩ + 100 kΩ** deja la mitad del voltaje de la batería en **GPIO34** (4.2 V llena → 2.1 V · 3.3 V vacía → 1.65 V), así se puede mostrar el nivel de batería.
+6. **Todas las tierras (GND) van unidas.**
+
+**Seguridad:** usa baterías LiPo **con protección**; nunca las perfores, las dobles ni las cargues sin vigilancia. **La batería nunca va directo** al pin 3V3 ni al 5V del ESP32: siempre pasa por el cargador, el elevador y el diodo. Ajusta el MT3608 a 5.1 V **antes** de conectarlo. Si mantienes el botón (GPIO0) presionado al encender, entra a modo programación: es normal.
+
+</details>
+
+<details>
+<summary><b>🛠️ Cómo queda armado, programarlo y probarlo</b></summary>
+<br>
+
+<img src="docs/hardware/don-rover-armado.svg" alt="Ilustración de Don Rover armado: cabeza con la pantalla redonda y orejas, botón en la antena, cuerpo con rejilla de la bocina, orificio del micrófono, USB-C de carga e interruptor" width="100%">
+
+**Programarlo:** usa el mismo firmware que la placa **ESP32 DevKit V1 + módulo GC9A01** (el chip es el mismo). Desde el navegador: [`#/donrover`](https://tallerdedonrover.vercel.app/#/donrover) → elige esa placa → **Instalar en la placa**. Con PlatformIO (el firmware usa el framework de Arduino):
+
+```bash
+cd firmware/donrover-knomi
+pio run -e esp32-devkit -t upload
+pio device monitor
+```
+
+Con el **IDE de Arduino**: placa «ESP32 Dev Module», PSRAM «Enabled» si tu placa es WROVER, particiones «Huge APP» y las librerías **TFT_eSPI**, **ArduinoJson 7** y **WebSockets** (Markus Sattler). En el `User_Setup.h` de TFT_eSPI copia los `#define` de la pantalla del entorno `esp32-devkit` de `platformio.ini` (`GC9A01_DRIVER`, `TFT_MOSI 23`, `TFT_SCLK 18`, `TFT_CS 5`, `TFT_DC 19`, `TFT_RST 4`) y define `PIN_BACKLIGHT 22` y `PIN_BUTTON 0`. Si la pantalla muestra rayas con cables largos, baja `SPI_FREQUENCY` a 40 MHz.
+
+**Micrófono y bocina:** hoy Don Rover **habla y escucha con la computadora del profe** y la placa mueve la cara y la boca. Con este diagrama el micrófono y la bocina **ya quedan conectados por I2S**, listos para que la siguiente versión del firmware hable y escuche por sí misma:
+
+```cpp
+// Pines I2S del Don Rover portátil (para la siguiente versión del firmware)
+#define I2S_MIC_SCK   32   // INMP441 SCK
+#define I2S_MIC_WS    33   // INMP441 WS
+#define I2S_MIC_SD    35   // INMP441 SD (solo entrada)
+#define I2S_SPK_BCLK  27   // MAX98357A BCLK
+#define I2S_SPK_LRC   26   // MAX98357A LRC
+#define I2S_SPK_DIN   25   // MAX98357A DIN
+#define PIN_BATTERY   34   // divisor 100k/100k (ADC1)
+```
+
+**Prueba rápida:**
+
+1. **Sin batería**, conecta el ESP32 por USB e instala el firmware. La pantalla muestra la cara de Don Rover y «¡Hola!».
+2. En **Don Rover físico** (`#/donrover`) presiona **Conectar por USB**: debe aparecer «Don Rover conectado».
+3. Presiona el botón: el **toque corto** repite lo último y el **sostenido** le hace una pregunta.
+4. Con el interruptor apagado, conecta la batería, el cargador y el elevador ya ajustado. Desconecta el USB, enciende el interruptor y Don Rover debe arrancar solo con la batería.
+
+</details>
 
 ### Instalar el firmware
 
@@ -585,6 +703,9 @@ El enrutador usa el hash de la URL (`src/lib/route.ts`), así que funciona en cu
 | `#/donrover` | `pages/rover/RoverSetup.tsx` | — |
 | `#/mundo` | `world/react/WorldExplorer.tsx` | — |
 | `#/minijuegos` | `pages/play/MinigameLab.tsx` | — |
+| `#/pitch` (o `#/presentacion`) | `pages/pitch/Pitch.tsx` | — |
+
+En todas las rutas, salvo la presentación, flota **Don Rover** (`src/rover/RoverDock.tsx`): se carga aparte para no frenar la portada.
 
 </details>
 
@@ -987,6 +1108,7 @@ firmware/
 public/              Manifiesto, íconos de la PWA y firmware publicado (public/firmware/)
 docs/
   img/               Banner, premio, fotos, capturas y diagramas de este README
+  hardware/          Diagramas del Don Rover portátil con ESP32, batería, micrófono y bocina (SVG)
   tools/             Generador de los diagramas de conexión (diagramas.py)
 supabase/schema.sql  Esquema de las tablas
 pwa/sw.js            Plantilla del service worker

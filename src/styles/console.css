@@ -1219,57 +1219,26 @@
 .hc-dock {
   position: absolute;
   z-index: 6;
-  left: 20px;
+  /* A la izquierda queda el hueco del Don Rover flotante (RoverDock), que se acomoda ahí. */
+  left: 104px;
   right: 20px;
   bottom: 18px;
   display: flex;
   align-items: center;
   gap: 14px;
 }
-.hc-rover {
+.hc-rovertool {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 6px 5px 5px;
-  border-radius: 999px;
-  background: var(--hc-glass);
-  box-shadow: var(--hc-shadow-sm);
-  backdrop-filter: blur(12px);
 }
-.hc-rover-face {
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-}
-.hc-rover.is-speaking .hc-rover-face {
-  animation: hcBob 0.8s ease-in-out infinite;
-}
-.hc-rover-mic {
-  width: 46px;
-  height: 46px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--hc-violet);
-  color: #fff;
-  font-size: 1.15rem;
-  cursor: pointer;
-  transition: transform 0.2s var(--hc-spring);
-}
-.hc-rover-mic:hover:not(:disabled) {
-  transform: scale(1.08);
-}
-.hc-rover-mic.is-on {
-  background: #e0412b;
-  animation: hcPulse 1s ease-in-out infinite;
+.hc-tool.is-on {
+  background: rgba(85, 219, 122, 0.18);
 }
 .hc-rover-pop {
   position: absolute;
-  left: 0;
-  bottom: calc(100% + 12px);
+  left: 50%;
+  bottom: calc(100% + 16px);
   width: 340px;
+  translate: -50% 0;
   animation: hcRise 0.3s var(--hc-ease) both;
 }
 .hc-rover-pop .rp {
@@ -1277,6 +1246,12 @@
   background: #2b1712;
   color: var(--cream);
   box-shadow: var(--hc-shadow);
+}
+/* El Don Rover flotante en la consola: más discreto sobre el fondo claro. */
+.rdock.is-docked .rdock-bubble {
+  box-shadow:
+    0 10px 24px -8px rgba(43, 23, 18, 0.55),
+    0 0 0 4px rgba(255, 251, 246, 0.85);
 }
 .hc-tools {
   display: flex;
@@ -1972,8 +1947,8 @@
 
 /* ---------------- pantallas más chicas ---------------- */
 
-/* Proyectores de 720 px de alto: todo más compacto para que cada etapa quepa sin desplazarse. */
-@media (max-height: 780px) {
+/* Pantallas bajas (proyectores de 720 px o una laptop con el navegador abierto): todo más compacto para que cada etapa quepa sin desplazarse. */
+@media (max-height: 840px) {
   .hc {
     font-size: 16px;
   }
