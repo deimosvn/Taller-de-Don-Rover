@@ -154,12 +154,12 @@ export class Outpost {
     return { res: node.res, amount: RESOURCES[node.res].yield };
   }
 
-  /** Punto de recursos con algo que recolectar más cercano. */
-  nearest(from: Vector3, out: Vector3): ResourceId | null {
+  /** Punto de recursos con algo que recolectar más cercano (de un tipo, si se pide). */
+  nearest(from: Vector3, out: Vector3, only?: ResourceId | null): ResourceId | null {
     let best = Infinity;
     let found: ResourceId | null = null;
     for (const node of this.nodes.values()) {
-      if (node.left <= 0) continue;
+      if (node.left <= 0 || (only && node.res !== only)) continue;
       const e = this.entities.get(node.uid);
       if (!e) continue;
       const d = e.root.position.distanceToSquared(from);

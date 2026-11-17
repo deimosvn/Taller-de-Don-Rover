@@ -1,23 +1,31 @@
-// Pantalla del proyector: barra superior, escenario de la etapa, estado global del planeta,
-// bitácora de IX, tripulaciones y el panel de control del profesor.
+// Pantalla del proyector, minimalista: el planeta 3D vive de fondo y viaja a donde pasa la
+// misión; encima hay una sola tarjeta con lo importante de la etapa, unos medidores discretos
+// a la derecha y una barra flotante con las herramientas del profe. Lo demás (bitácora de IX,
+// reporte, ajustes) se abre solo cuando se necesita.
 
 import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { MISSIONS, PACES, ROLES, ROLE_ORDER, SECTORS, SYSTEM_ORDER } from '../../../shared/content';
+import { MISSIONS, PACES, PHASE_FLOW, PHASE_LABELS, ROLES, SYSTEMS, SYSTEM_ORDER } from '../../../shared/content';
 import type { Ack, HostAction, HostView } from '../../../shared/types';
-import { Astronaut, IXOrb, MissionPatch } from '../../components/art';
-import { Countdown, Icon, Logo, PhaseStepper, SystemMeter } from '../../components/ui';
+import { Astronaut, IXOrb } from '../../components/art';
+import { Countdown, Icon, LogoMark } from '../../components/ui';
 import { isMuted, setMuted, sfx } from '../../lib/sound';
 import { toggleFullscreen, useWakeLock } from '../../lib/pwa';
 import type { NetStatus } from '../../net/hostNet';
-import { Report } from './Report';
-import { Scanner } from './Scanner';
-import { SettingsModal } from './SettingsModal';
+import { listenAndAnswer } from '../../rover/assistant';
 import { useRoverNarrator } from '../../rover/narrator';
-import { RoverCaptions, RoverPanel } from '../../rover/RoverPanel';
+import { RoverFace } from '../../rover/RoverFace';
+import { RoverCaptions, RoverPanel, useRoverStatus, useVoice } from '../../rover/RoverPanel';
+import { stopListening } from '../../rover/voice';
+import { MISSION_ZONE } from '../../world/react/missionZones';
+import { PlanetView } from '../../world/react/PlanetView';
+import { useHostSnapshot } from '../../world/react/useHostSnapshot';
+import { PartyStage, partyPrimary } from './PartyStage';
+import { Report } from './Report';
+import { SettingsModal } from './SettingsModal';
+import { BriefingStage, ChallengeStage, CrewsStage, DebriefStage, DiscoveryStage, EventStage, LobbyStage, MissionGenStage, ResultsStage } from './stages';
 
-/** La colonia en 3D en el proyector (three.js se descarga solo al abrirla). */
+/** La colonia en 3D a pantalla completa (three.js se descarga solo al abrirla). */
 const HostWorld = lazy(() => import('./HostWorld'));
-import { BriefingStage, ChallengeStage, CrewsStage, DebriefStage, DiscoveryStage, EventStage, LobbyStage, ResultsStage } from './stages';
 
 export type Run = (a: HostAction) => Ack;
 
@@ -29,151 +37,225 @@ function phaseTotal(v: HostView): number {
   return 60;
 }
 
-function usePhaseSounds(v: HostView) {
-  const prev = useRef({ phase: v.phase, stage: v.event?.stage, players: v.players.length, locked: 0 });
+/** Sonidos de la clase: cada etapa, cada astronauta que llega, cada decisión y los últimos segundos. */
+function useConsoleSounds(v: HostView) {
+  const prev = useRef({ phase: v.phase, stage: v.event?.stage, players: v.players.length, locked: 0, decoded: 0 });
   useEffect(() => {
     const p = prev.current;
     const locked = v.crews.filter((c) => c.status.locked).length;
-    if (p.phase !== v.phase) {
-      if (v.phase === 'briefing') sfx.unlock();
-      else if (v.phase === 'discovery' || v.phase === 'challenge') sfx.whoosh();
-      else if (v.phase === 'results') (v.results?.saved ? sfx.success : sfx.fail)();
-      else if (v.phase === 'crews') sfx.join();
+    const decoded = v.crews.reduce((n, c) => n + c.status.decoded, 0);
+    if (p.phase !== v.phase && !v.party) {
+      if (v.phase === 'results') {
+        sfx.drumroll(1.3);
+        setTimeout(() => (v.results?.saved ? sfx.fanfare : sfx.fail)(), 1400);
+      } else if (v.phase === 'crews') sfx.join();
+      else if (v.phase === 'event') sfx.alarm();
+      else sfx.phase();
     }
     if (v.phase === 'event' && p.stage !== v.event?.stage) {
-      if (v.event?.stage === 'alert') sfx.alarm();
-      else if (v.event?.stage === 'action') sfx.pop();
-      else if (v.event?.stage === 'done') (v.event.saved ? sfx.success : sfx.fail)();
+      if (v.event?.stage === 'action') sfx.go();
+      else if (v.event?.stage === 'done') (v.event.saved ? sfx.fanfare : sfx.fail)();
     }
-    if (v.players.length > p.players) sfx.pop();
+    if (v.players.length > p.players) sfx.join();
     if (locked > p.locked) sfx.lock();
-    prev.current = { phase: v.phase, stage: v.event?.stage, players: v.players.length, locked };
+    if (decoded > p.decoded) sfx.crafted();
+    prev.current = { phase: v.phase, stage: v.event?.stage, players: v.players.length, locked, decoded };
   }, [v]);
+
+  // Últimos 5 segundos del cronómetro: un pitido por segundo y silbato al final.
+  const timed = !v.party && (v.phase === 'discovery' || v.phase === 'challenge' || (v.phase === 'event' && v.event?.stage !== 'done'));
+  const deadline = timed && !v.paused ? v.deadline : null;
+  useEffect(() => {
+    if (!deadline) return;
+    let last = -1;
+    const id = setInterval(() => {
+      const s = Math.ceil((deadline - Date.now()) / 1000);
+      if (s === last) return;
+      last = s;
+      if (s > 0 && s <= 5) sfx.count();
+      else if (s === 0) sfx.whistle();
+    }, 200);
+    return () => clearInterval(id);
+  }, [deadline]);
 }
 
-function NetBadge({ net, view }: { net: NetStatus; view: HostView }) {
-  const color = net.state === 'online' ? 'var(--food)' : net.state === 'offline' ? 'var(--habitat)' : 'var(--energy)';
-  const humans = view.players.filter((p) => !p.isBot);
+/**
+ * En pantallas grandes (proyectores Full HD o más) la interfaz crece para leerse desde el fondo
+ * del salón. El diseño base es de 1440×900; el planeta 3D de fondo no se escala.
+ */
+function useConsoleZoom(): number {
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const fit = () => setZoom(Math.round(Math.max(1, Math.min(2.2, window.innerWidth / 1440, window.innerHeight / 900)) * 100) / 100);
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+  return zoom;
+}
+
+/* ---------------- fondo 3D ---------------- */
+
+/** Un solo planeta para toda la clase: la cámara viaja al lugar de cada etapa. */
+function Backdrop({ view }: { view: HostView }) {
+  const m = view.mission ? MISSIONS[view.mission.id] : null;
+  const patch =
+    view.phase === 'event' && m ? (m.id === 'darkness' ? { dark: true, storm: false } : { storm: true }) : view.phase === 'results' && m ? { newBuilding: m.unlock } : undefined;
+  const snapshot = useHostSnapshot(view, patch);
+  let focus: string | null = null;
+  if (view.party) focus = 'colony.mars01';
+  else if (m && ['briefing', 'discovery', 'challenge', 'event'].includes(view.phase)) focus = MISSION_ZONE[m.id];
+  else if (m && view.phase === 'results') focus = m.unlock === 'city' ? 'colony.hub' : `site.${m.unlock}`;
+  else if (view.phase === 'crews' || view.phase === 'debrief') focus = 'colony.mars01';
   return (
-    <div className="net-badge" title={net.detail}>
-      <span className="dot" style={{ '--c': color } as CSSProperties} />
-      <span>
-        <b>{humans.filter((p) => p.connected).length}</b>
-        <small>{net.state === 'online' ? 'en línea' : net.state === 'offline' ? 'sin red' : 'conectando'}</small>
-      </span>
+    <div className="hc-world" aria-hidden="true">
+      <PlanetView snapshot={snapshot} focus={focus} autoRotate={!focus} />
     </div>
   );
 }
 
-function StatusPanel({ view }: { view: HostView }) {
+/* ---------------- medidores y tripulación ---------------- */
+
+function Ring({ value, color, emoji, label, delta }: { value: number; color: string; emoji: string; label: string; delta: number | null }) {
+  const r = 20;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className={`hc-ring ${v < 30 ? 'is-low' : ''}`} title={`${label}: ${v}%`}>
+      <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
+        <circle cx="24" cy="24" r={r} fill="none" stroke="rgba(43,23,18,.1)" strokeWidth="5" />
+        <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} transform="rotate(-90 24 24)" />
+      </svg>
+      <span className="hc-ring-emoji" aria-hidden="true">
+        {emoji}
+      </span>
+      <b>{v}%</b>
+      {delta ? <i className={delta > 0 ? 'up' : 'down'}>{delta > 0 ? `+${delta}` : delta}</i> : null}
+      <span className="hc-sr">{label}</span>
+    </div>
+  );
+}
+
+function Hud({ view }: { view: HostView }) {
   const m = view.colony.meters;
   const showDelta = (view.phase === 'results' || view.phase === 'debrief') && view.results;
-  const min = Math.min(...SYSTEM_ORDER.map((s) => m[s]));
-  const status = min >= 50 ? ['ok', 'Colonia operativa'] : min >= 30 ? ['warn', 'Colonia en alerta'] : ['bad', 'Colonia en riesgo'];
+  const crew = view.crews[0];
+  const ids = crew ? crew.memberIds : view.players.map((p) => p.id);
+  const byId = new Map(view.players.map((p) => [p.id, p]));
   return (
-    <div className="status panel">
-      <div className="status-head">
-        <div>
-          <p className="eyebrow">Estado del planeta</p>
-          <h3>MARS-01</h3>
-        </div>
-        <span className="chip">Sol {view.colony.sol}</span>
-      </div>
-      <div className="status-meters">
+    <aside className="hc-hud" aria-label="Estado de la colonia">
+      <div className="hc-hud-card">
+        <p className="hc-hud-sol">
+          MARS-01 · <b>Sol {view.colony.sol}</b>
+        </p>
         {SYSTEM_ORDER.map((s) => (
-          <SystemMeter key={s} system={s} value={m[s]} delta={showDelta ? view.results!.metersAfter[s] - view.results!.metersBefore[s] : null} />
+          <Ring key={s} value={m[s]} color={SYSTEMS[s].color} emoji={SYSTEMS[s].emoji} label={SYSTEMS[s].name} delta={showDelta ? view.results!.metersAfter[s] - view.results!.metersBefore[s] : null} />
         ))}
       </div>
-      <div className={`status-line ${status[0]}`}>
-        <span className="dot" /> {status[1]}
-      </div>
-    </div>
+      {ids.length > 0 && (
+        <div className="hc-hud-card hc-hud-crew">
+          {ids.map((id) => {
+            const p = byId.get(id);
+            if (!p) return null;
+            const pr = view.progress[id];
+            const role = p.roles[0];
+            const lit = view.phase === 'discovery' ? pr?.decoded : view.phase === 'challenge' ? pr?.voted : view.phase === 'event' ? (pr?.taps ?? 0) > 0 || pr?.share !== null : false;
+            return (
+              <span key={id} className={`hc-mate ${lit ? 'is-lit' : ''} ${p.connected || p.isBot ? '' : 'is-off'}`} style={role ? ({ '--c': ROLES[role].color } as CSSProperties) : undefined} title={p.name}>
+                <Astronaut avatar={p.avatar} role={role ?? null} size={34} pose="still" />
+                <small>{p.name}</small>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </aside>
   );
 }
+
+/* ---------------- IX y Don Rover ---------------- */
 
 const IX_ICON: Record<string, string> = { hint: '💡', adapt: '🧠', info: '🛰️', alert: '🚨' };
 
-function IxFeed({ view }: { view: HostView }) {
-  const items = view.ix.slice(-6).reverse();
+function IxLine({ view, onOpen }: { view: HostView; onOpen: () => void }) {
+  const last = view.ix[view.ix.length - 1];
+  if (!last) return null;
   return (
-    <div className="ixfeed panel">
-      <div className="ixfeed-head">
-        <IXOrb size={44} mood={view.phase === 'event' ? 'alert' : 'idle'} />
-        <div>
-          <p className="eyebrow">Bitácora de IX</p>
-          <small className={`chip ${view.ai.enabled ? 'ok' : 'ix'}`}>{view.ai.enabled ? `Claude · ${view.ai.model}` : 'IA local + plantillas'}</small>
-        </div>
-      </div>
-      <ul>
-        {items.map((m) => (
-          <li key={m.id} className={`ix-${m.kind}`}>
-            <span aria-hidden="true">{IX_ICON[m.kind]}</span>
-            <p>{m.text}</p>
-          </li>
-        ))}
-      </ul>
+    <button className={`hc-ix ix-${last.kind}`} onClick={onOpen} title="Ver la bitácora de IX">
+      <IXOrb size={30} mood={last.kind === 'alert' ? 'alert' : 'talk'} />
+      <span key={last.id}>
+        {IX_ICON[last.kind]} {last.text}
+      </span>
+    </button>
+  );
+}
+
+function IxDrawer({ view, onClose }: { view: HostView; onClose: () => void }) {
+  return (
+    <div className="hc-drawer-back" onClick={onClose}>
+      <aside className="hc-drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Bitácora de IX">
+        <header>
+          <IXOrb size={46} mood="talk" />
+          <div>
+            <h3>Bitácora de IX</h3>
+            <small>{view.ai.enabled ? `IA: Claude · ${view.ai.model}` : 'IA local con plantillas'}</small>
+          </div>
+          <button className="hc-icon" onClick={onClose} aria-label="Cerrar">
+            <Icon name="x" size={18} />
+          </button>
+        </header>
+        <ul>
+          {[...view.ix].reverse().map((m) => (
+            <li key={m.id} className={`ix-${m.kind}`}>
+              <span aria-hidden="true">{IX_ICON[m.kind]}</span>
+              <p>{m.text}</p>
+            </li>
+          ))}
+        </ul>
+      </aside>
     </div>
   );
 }
 
-function CrewStrip({ view }: { view: HostView }) {
-  const byId = new Map(view.players.map((p) => [p.id, p]));
-  const target = Math.round(PACES[view.pace].action * 1.6);
+/** Don Rover en pequeño: su cara y el micrófono. Al tocar la cara se abren todos sus controles. */
+function RoverBubble() {
+  const voice = useVoice();
+  const status = useRoverStatus();
+  const [open, setOpen] = useState(false);
+  const talk = () => {
+    if (voice.listening) stopListening();
+    else void listenAndAnswer();
+  };
   return (
-    <div className="crewstrip" aria-label="Tripulación">
-      {view.crews.map((c) => {
-        const s = c.status;
-        let status = '';
-        if (view.phase === 'discovery') status = `${s.decoded}/${s.members} tareas listas`;
-        else if (view.phase === 'challenge') status = s.locked ? '🔒 Decisión tomada' : s.tie ? '⚖️ Empate' : `${s.voted}/${s.members} votos`;
-        else if (view.phase === 'event') status = view.event?.stage === 'share' ? `${s.shareVotes}/${s.members} votaron` : `${Math.round(s.action * 100)}% de acción`;
-        else if (c.outcome) status = `${c.outcome.scores.total} pts`;
-        return (
-          <div key={c.id} className={`crew-mini ${s.locked && view.phase === 'challenge' ? 'is-locked' : ''} ${c.outcome ? `tier-${c.outcome.tier}` : ''}`}>
-            <div className="crew-mini-head">
-              <b>{c.name}</b>
-              <span>{SECTORS[c.sectorId].emoji}</span>
-            </div>
-            <div className="crew-mini-avatars">
-              {c.memberIds.slice(0, 5).map((id) => {
-                const p = byId.get(id);
-                if (!p) return null;
-                const pr = view.progress[id];
-                const lit =
-                  view.phase === 'discovery' ? pr?.decoded : view.phase === 'challenge' ? pr?.voted : view.phase === 'event' ? (pr?.taps ?? 0) > 0 || pr?.share !== null : true;
-                return (
-                  <span key={id} className={`mini-av ${lit ? 'lit' : ''} ${p.connected ? '' : 'off'}`} title={p.name}>
-                    <Astronaut avatar={p.avatar} role={p.roles[0]} size={30} pose="still" />
-                    <small>{p.name}</small>
-                  </span>
-                );
-              })}
-            </div>
-            {view.phase === 'event' && view.event?.stage !== 'share' ? (
-              <div className="mini-bars">
-                {ROLE_ORDER.filter((r) => s.rolesPresent.includes(r)).map((r) => (
-                  <i key={r} style={{ '--c': ROLES[r].color, '--w': `${Math.min(100, (s.taps[r] / target) * 100)}%` } as CSSProperties} />
-                ))}
-              </div>
-            ) : (
-              <small className="crew-mini-status">{status || `${s.members} tripulantes`}</small>
-            )}
-          </div>
-        );
-      })}
+    <div className={`hc-rover ${voice.speaking ? 'is-speaking' : ''}`}>
+      <button className="hc-rover-face" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-label="Don Rover: voz, conexión y preguntas">
+        <RoverFace expr={voice.face} mouth={voice.mouth} size={54} linked={status.state === 'on'} pulse={voice.listening ? '#B69CFF' : null} />
+      </button>
+      <button className={`hc-rover-mic ${voice.listening ? 'is-on' : ''}`} onClick={talk} disabled={voice.thinking} aria-pressed={voice.listening} title="Hazle una pregunta a Don Rover">
+        {voice.listening ? '⏹' : voice.thinking ? '…' : '🎙️'}
+      </button>
+      {open && (
+        <div className="hc-rover-pop">
+          <RoverPanel compact />
+        </div>
+      )}
     </div>
   );
 }
+
+/* ---------------- consola ---------------- */
 
 export function Console({ view, net, act, onExit }: { view: HostView; net: NetStatus; act: Run; onExit: () => void }) {
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [worldOpen, setWorldOpen] = useState(false);
+  const [ixOpen, setIxOpen] = useState(false);
   const [muted, setMutedState] = useState(isMuted());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const zoom = useConsoleZoom();
   useWakeLock(true);
-  usePhaseSounds(view);
+  useConsoleSounds(view);
   // Don Rover: narra la misión, responde preguntas y mueve la cara de la placa.
   useRoverNarrator(view);
 
@@ -188,215 +270,242 @@ export function Console({ view, net, act, onExit }: { view: HostView; net: NetSt
     return r;
   };
 
+  const party = view.party;
   const mission = view.mission ? MISSIONS[view.mission.id] : null;
-  const timed = view.phase === 'discovery' || view.phase === 'challenge' || (view.phase === 'event' && view.event?.stage !== 'done');
-  const humans = view.players.filter((p) => !p.isBot).length;
+  const timed = !party && (view.phase === 'discovery' || view.phase === 'challenge' || (view.phase === 'event' && view.event?.stage !== 'done'));
+  const paused = party ? party.paused : view.paused;
+  const phaseIdx = PHASE_FLOW.indexOf(view.phase);
 
   let stage = null;
-  switch (view.phase) {
-    case 'lobby':
-      stage = <LobbyStage view={view} run={run} />;
-      break;
-    case 'crews':
-      stage = <CrewsStage view={view} />;
-      break;
-    case 'scan':
-      stage = <Scanner view={view} run={run} flash={flash} />;
-      break;
-    case 'briefing':
-      stage = <BriefingStage view={view} />;
-      break;
-    case 'discovery':
-      stage = <DiscoveryStage view={view} />;
-      break;
-    case 'challenge':
-      stage = <ChallengeStage view={view} />;
-      break;
-    case 'event':
-      stage = <EventStage view={view} />;
-      break;
-    case 'results':
-      stage = <ResultsStage view={view} />;
-      break;
-    case 'debrief':
-      stage = <DebriefStage view={view} />;
-      break;
+  if (party) stage = <PartyStage party={party} run={run} />;
+  else {
+    switch (view.phase) {
+      case 'lobby':
+        stage = <LobbyStage view={view} run={run} />;
+        break;
+      case 'crews':
+        stage = <CrewsStage view={view} />;
+        break;
+      case 'scan':
+        stage = <MissionGenStage view={view} run={run} />;
+        break;
+      case 'briefing':
+        stage = <BriefingStage view={view} />;
+        break;
+      case 'discovery':
+        stage = <DiscoveryStage view={view} />;
+        break;
+      case 'challenge':
+        stage = <ChallengeStage view={view} />;
+        break;
+      case 'event':
+        stage = <EventStage view={view} />;
+        break;
+      case 'results':
+        stage = <ResultsStage view={view} />;
+        break;
+      case 'debrief':
+        stage = <DebriefStage view={view} />;
+        break;
+    }
   }
 
-  let primary: { label: string; icon?: string; action: HostAction; cls?: string } | null = null;
-  switch (view.phase) {
-    case 'lobby':
-      primary = { label: 'Formar la tripulación', icon: 'users', action: { type: 'formCrews' } };
-      break;
-    case 'crews':
-      primary = { label: 'Generar la misión', icon: 'spark', action: { type: 'toScan' } };
-      break;
-    case 'briefing':
-      primary = { label: 'Empezar exploración', icon: 'arrow', action: { type: 'next' } };
-      break;
-    case 'discovery':
-      primary = { label: 'Ir al reto', icon: 'arrow', action: { type: 'next' } };
-      break;
-    case 'challenge':
-      primary = { label: 'Lanzar evento global', icon: 'alert', action: { type: 'next' }, cls: 'coral' };
-      break;
-    case 'event':
-      primary =
-        view.event?.stage === 'done'
-          ? { label: 'Ver resultados', icon: 'chart', action: { type: 'next' } }
-          : view.event?.stage === 'share'
-            ? { label: '¡Iniciar acción!', icon: 'bolt', action: { type: 'next' }, cls: 'coral' }
-            : view.event?.stage === 'action'
-              ? { label: 'Terminar evento', icon: 'check', action: { type: 'next' } }
-              : { label: 'Siguiente', icon: 'arrow', action: { type: 'next' } };
-      break;
-    case 'results':
-      primary = { label: 'Debrief de IX', icon: 'spark', action: { type: 'next' }, cls: 'ix' };
-      break;
-    case 'debrief':
-      primary = { label: 'Nueva misión', icon: 'refresh', action: { type: 'newMission' } };
-      break;
-  }
+  let primary: { label: string; icon?: string; action: HostAction; tone?: 'alert' | 'ix' } | null = null;
+  if (party) primary = partyPrimary(party);
+  else
+    switch (view.phase) {
+      case 'lobby':
+        primary = { label: 'Formar la tripulación', icon: 'users', action: { type: 'formCrews' } };
+        break;
+      case 'crews':
+        primary = { label: 'Generar la misión', icon: 'spark', action: { type: 'toScan' } };
+        break;
+      case 'briefing':
+        primary = { label: 'Salir a minar', icon: 'arrow', action: { type: 'next' } };
+        break;
+      case 'discovery':
+        primary = { label: 'Ir al reto', icon: 'arrow', action: { type: 'next' } };
+        break;
+      case 'challenge':
+        primary = { label: 'Lanzar la emergencia', icon: 'alert', action: { type: 'next' }, tone: 'alert' };
+        break;
+      case 'event':
+        primary =
+          view.event?.stage === 'done'
+            ? { label: 'Ver resultados', icon: 'chart', action: { type: 'next' } }
+            : view.event?.stage === 'share'
+              ? { label: '¡Iniciar acción!', icon: 'bolt', action: { type: 'next' }, tone: 'alert' }
+              : view.event?.stage === 'action'
+                ? { label: 'Terminar emergencia', icon: 'check', action: { type: 'next' } }
+                : { label: 'Siguiente', icon: 'arrow', action: { type: 'next' } };
+        break;
+      case 'results':
+        primary = { label: 'Debrief de IX', icon: 'spark', action: { type: 'next' }, tone: 'ix' };
+        break;
+      case 'debrief':
+        primary = { label: 'Nueva misión', icon: 'refresh', action: { type: 'newMission' } };
+        break;
+    }
+
+  const humans = view.players.filter((p) => !p.isBot);
+  const online = humans.filter((p) => p.connected).length;
 
   return (
-    <div className={`console space-bg phase-${view.phase}`}>
-      <div className="starfield" />
-      <header className="console-top">
-        <Logo size="sm" sub={false} />
-        {mission ? (
-          <div className="mission-chip">
-            <MissionPatch id={mission.id} size={46} />
-            <div>
-              <span className="eyebrow">{mission.code}</span>
-              <b>{mission.title}</b>
-            </div>
+    <div className={`hc phase-${view.phase} ${party ? 'is-party' : ''}`} style={{ '--hc-zoom': zoom } as CSSProperties}>
+      <Backdrop view={view} />
+      <div className="hc-veil" aria-hidden="true" />
+
+      <header className="hc-top">
+        <div className="hc-brand">
+          <LogoMark size={38} />
+          <div>
+            <small>{party ? 'Torneo marciano' : mission ? `Misión ${mission.code}` : view.className}</small>
+            <b>{party ? `Ronda ${party.round} de ${party.rounds}` : mission ? mission.titleEs : 'Taller de Don Rover'}</b>
           </div>
-        ) : (
-          <div className="mission-chip">
-            <div>
-              <span className="eyebrow">Colonia</span>
-              <b>{view.className}</b>
-            </div>
-          </div>
-        )}
-        <div className="top-stepper">
-          <PhaseStepper phase={view.phase} />
         </div>
-        <div className="top-right">
-          {timed && <Countdown deadline={view.deadline} paused={view.paused} pausedRemaining={view.pausedRemaining} total={phaseTotal(view)} size={68} />}
-          <div className="room-code">
-            <span className="eyebrow">Código</span>
+        {!party && (
+          <ol className="hc-phases" aria-label={`Etapa: ${PHASE_LABELS[view.phase]}`}>
+            {PHASE_FLOW.map((p, i) => (
+              <li key={p} className={i < phaseIdx ? 'is-done' : i === phaseIdx ? 'is-now' : ''}>
+                <i />
+                {i === phaseIdx && <span>{PHASE_LABELS[p]}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
+        <div className="hc-top-right">
+          {timed && <Countdown deadline={view.deadline} paused={view.paused} pausedRemaining={view.pausedRemaining} total={phaseTotal(view)} size={60} />}
+          <div className="hc-code" title={net.detail}>
+            <small>Código</small>
             <b className="mono">{view.code}</b>
+            <i className={`hc-net is-${net.state}`} aria-label={net.state === 'online' ? 'En línea' : net.state === 'offline' ? 'Sin red' : 'Conectando'} />
           </div>
-          <NetBadge net={net} view={view} />
+          {humans.length > 0 && (
+            <span className="hc-online" title="Celulares conectados">
+              📱 {online}
+            </span>
+          )}
         </div>
       </header>
 
-      <main className="console-main">
-        <section className="stage" key={view.phase}>
+      <main className="hc-main">
+        <section className="hc-stage" key={party ? `party-${party.stage}` : view.phase}>
           {stage}
         </section>
-        <aside className="rail">
-          <RoverPanel />
-          <StatusPanel view={view} />
-          {view.crews.length > 0 && view.phase !== 'lobby' && <CrewStrip view={view} />}
-          <IxFeed view={view} />
-        </aside>
+        {!party && <IxLine view={view} onOpen={() => setIxOpen(true)} />}
+        {!party && <Hud view={view} />}
       </main>
 
       <RoverCaptions />
-      <footer className="dock">
-        <div className="dock-left">
-          {view.phase === 'lobby' && (
-            <>
-              <button className="btn small ghost" disabled={view.players.length >= view.maxPlayers} onClick={() => run({ type: 'addBots', count: view.maxPlayers - view.players.length })}>
-                <Icon name="bot" size={18} /> Completar con bots
-              </button>
-              <span className="dock-note">
-                {view.players.length}/{view.maxPlayers} tripulantes · {humans ? `${humans} alumno${humans > 1 ? 's' : ''}` : 'si entra un alumno, un bot le cede su lugar'}
-              </span>
-            </>
-          )}
-          {view.phase === 'crews' && (
-            <button className="btn small ghost" onClick={() => run({ type: 'shuffleCrews' })}>
-              <Icon name="refresh" size={18} /> Re-mezclar
+
+      <footer className="hc-dock">
+        <RoverBubble />
+        <div className="hc-tools" role="toolbar" aria-label="Herramientas del profe">
+          {view.phase === 'lobby' && !party && (
+            <button className="hc-tool" disabled={view.players.length >= view.maxPlayers} onClick={() => run({ type: 'addBots', count: view.maxPlayers - view.players.length })} title="Completar con bots de práctica">
+              <Icon name="bot" size={20} />
+              <span>Bots</span>
             </button>
           )}
-          {timed && (
+          {view.phase === 'crews' && (
+            <button className="hc-tool" onClick={() => run({ type: 'shuffleCrews' })} title="Volver a repartir las especialidades">
+              <Icon name="refresh" size={20} />
+              <span>Mezclar</span>
+            </button>
+          )}
+          {(timed || (party && party.stage !== 'final')) && (
             <>
-              <button className="btn small ghost" onClick={() => run({ type: view.paused ? 'resume' : 'pause' })}>
-                <Icon name={view.paused ? 'play' : 'pause'} size={18} /> {view.paused ? 'Reanudar' : 'Pausa'}
+              <button className="hc-tool" onClick={() => run({ type: paused ? 'resume' : 'pause' })} title={paused ? 'Reanudar' : 'Pausa'}>
+                <Icon name={paused ? 'play' : 'pause'} size={20} />
+                <span>{paused ? 'Seguir' : 'Pausa'}</span>
               </button>
-              <button className="btn small ghost" onClick={() => run({ type: 'addTime', seconds: 30 })}>
-                <Icon name="plus" size={18} /> 30 s
-              </button>
+              {timed && (
+                <button className="hc-tool" onClick={() => run({ type: 'addTime', seconds: 30 })} title="Dar 30 segundos más">
+                  <Icon name="plus" size={20} />
+                  <span>30 s</span>
+                </button>
+              )}
             </>
           )}
-          {(view.phase === 'discovery' || view.phase === 'challenge' || view.phase === 'event') && (
+          {!party && (view.phase === 'discovery' || view.phase === 'challenge' || view.phase === 'event') && (
             <button
-              className="btn small ghost"
+              className="hc-tool"
               onClick={() => {
                 const r = run({ type: 'hint' });
                 if (r.ok) flash('IX envió una pista a los celulares.');
               }}
+              title="Pedir una pista a IX"
             >
-              <Icon name="bulb" size={18} /> Pista de IX
+              <Icon name="bulb" size={20} />
+              <span>Pista</span>
+            </button>
+          )}
+          {party && (
+            <button className="hc-tool" onClick={() => confirm('¿Terminar el torneo y volver al abordaje?') && run({ type: 'partyEnd' })} title="Terminar el torneo">
+              <Icon name="x" size={20} />
+              <span>Salir</span>
             </button>
           )}
           {view.phase === 'debrief' && (
-            <button className="btn small ghost" onClick={() => run({ type: 'toLobby' })}>
-              <Icon name="users" size={18} /> Nuevas tripulaciones
+            <button className="hc-tool" onClick={() => run({ type: 'toLobby' })} title="Volver al abordaje">
+              <Icon name="users" size={20} />
+              <span>Abordaje</span>
             </button>
           )}
-        </div>
-        <div className="dock-right">
-          <button className="btn small cream world-open" onClick={() => setWorldOpen(true)} title="Ver la colonia en 3D con toda la clase">
-            🌍 Colonia 3D
+          <span className="hc-tools-sep" aria-hidden="true" />
+          <button className="hc-tool" onClick={() => setWorldOpen(true)} title="Explorar la colonia en 3D con toda la clase">
+            <Icon name="map" size={20} />
+            <span>3D</span>
           </button>
-          {(view.phase === 'results' || view.phase === 'debrief' || view.crews.length > 0) && (
-            <button className="icon-btn" onClick={() => setReportOpen(true)} aria-label="Reporte del profesor" title="Reporte del profesor">
-              <Icon name="chart" />
+          {view.crews.length > 0 && (
+            <button className="hc-tool" onClick={() => setReportOpen(true)} title="Reporte del profe">
+              <Icon name="chart" size={20} />
+              <span>Reporte</span>
             </button>
           )}
-          <button className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Ajustes" title="Ajustes">
-            <Icon name="sliders" />
+          <button className="hc-tool" onClick={() => setSettingsOpen(true)} title="Ajustes">
+            <Icon name="sliders" size={20} />
           </button>
           <button
-            className="icon-btn"
+            className="hc-tool"
             onClick={() => {
               setMuted(!muted);
               setMutedState(!muted);
+              if (muted) setTimeout(() => sfx.pop(), 30);
             }}
-            aria-label={muted ? 'Activar sonido' : 'Silenciar'}
             title={muted ? 'Activar sonido' : 'Silenciar'}
+            aria-label={muted ? 'Activar sonido' : 'Silenciar'}
           >
-            <Icon name={muted ? 'mute' : 'volume'} />
+            <Icon name={muted ? 'mute' : 'volume'} size={20} />
           </button>
-          <button className="icon-btn" onClick={toggleFullscreen} aria-label="Pantalla completa" title="Pantalla completa">
-            <Icon name="expand" />
+          <button className="hc-tool" onClick={toggleFullscreen} title="Pantalla completa" aria-label="Pantalla completa">
+            <Icon name="expand" size={20} />
           </button>
-          <button
-            className="icon-btn"
-            onClick={() => confirm('¿Cerrar la sala? La colonia queda guardada en este navegador.') && onExit()}
-            aria-label="Cerrar sala"
-            title="Cerrar sala"
-          >
-            <Icon name="logout" />
+          <button className="hc-tool" onClick={() => confirm('¿Cerrar la sala? La colonia queda guardada en este navegador.') && onExit()} title="Cerrar la sala" aria-label="Cerrar la sala">
+            <Icon name="logout" size={20} />
           </button>
-          {primary && (
-            <button className={`btn big ${primary.cls ?? 'food'}`} onClick={() => run(primary!.action)} disabled={view.phase === 'lobby' && view.players.length === 0}>
-              {primary.label} {primary.icon && <Icon name={primary.icon} />}
-            </button>
-          )}
         </div>
+        {primary && (
+          <button
+            className={`hc-cta ${primary.tone ? `is-${primary.tone}` : ''}`}
+            onClick={() => {
+              sfx.select();
+              run(primary!.action);
+            }}
+            disabled={view.phase === 'lobby' && !party && view.players.length === 0}
+          >
+            {primary.label} {primary.icon && <Icon name={primary.icon} size={20} />}
+          </button>
+        )}
       </footer>
 
       {toast && (
-        <div className="toast card" role="status">
-          <IXOrb size={36} mood="talk" />
+        <div className="hc-toast" role="status">
+          <IXOrb size={30} mood="talk" />
           <span>{toast}</span>
         </div>
       )}
+      {ixOpen && <IxDrawer view={view} onClose={() => setIxOpen(false)} />}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <Report open={reportOpen} onClose={() => setReportOpen(false)} view={view} />
       {worldOpen && (

@@ -249,11 +249,11 @@ export const PACES: Record<Pace, { label: string; desc: string; discovery: numbe
 export const PHASE_LABELS: Record<Phase, string> = {
   lobby: 'Abordaje',
   crews: 'Tripulaciones',
-  scan: 'Escáner',
+  scan: 'IX crea la misión',
   briefing: 'Briefing',
-  discovery: 'Descubrimiento',
+  discovery: 'Minar y fabricar',
   challenge: 'Reto de tripulación',
-  event: 'Evento global',
+  event: 'Emergencia',
   results: 'Resultados',
   debrief: 'Debrief',
 };
@@ -264,7 +264,7 @@ export const CLASS_PLAN: { from: string; to: string; stage: string; es: string; 
   { from: '00', to: '03', stage: 'JOIN THE MISSION', es: 'Abordaje', text: 'Escanean el QR con su celular y arman su astronauta.' },
   { from: '03', to: '05', stage: 'CREW ASSIGNMENT', es: 'Tripulación', text: 'IX le da a cada quien una especialidad: energía, soporte vital, comida o hábitat.' },
   { from: '05', to: '08', stage: 'MISSION SCAN', es: 'Misión', text: 'IX revisa el clima espacial real de la NASA y el estado de la colonia, y escribe la misión.' },
-  { from: '08', to: '15', stage: 'DISCOVERY', es: 'Descubrimiento', text: 'Cada quien va a su estación en el Marte 3D, resuelve su tarea y descubre su dato secreto.' },
+  { from: '08', to: '15', stage: 'MINE & CRAFT', es: 'Minar y fabricar', text: 'Cada quien mina regolito, hielo y hematita en el Marte 3D y fabrica su pieza en su estación. Así descubre su dato secreto.' },
   { from: '15', to: '22', stage: 'CREW CHALLENGE', es: 'Reto', text: 'Combinan sus datos, votan una decisión y escriben la bitácora.' },
   { from: '22', to: '30', stage: 'GLOBAL EVENT', es: 'Emergencia', text: 'Llega una emergencia: comparten recursos y cada especialidad juega su minijuego.' },
   { from: '30', to: '35', stage: 'MISSION RESULTS', es: 'Resultados', text: 'La colonia cambia según sus decisiones y se desbloquean edificios.' },

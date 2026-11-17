@@ -15,6 +15,8 @@ import { decodeSignaling } from '../../net/protocol';
 import { PlayerNet, type PlayerNetState } from '../../net/playerNet';
 import { AvatarBuilder } from './AvatarBuilder';
 import { PhaseScreen } from './screens';
+import { PartyScreen } from './PartyScreen';
+import { resetBag } from './bag';
 
 const CODE_RE = /^[A-Z]{4}$/;
 
@@ -155,6 +157,29 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
     const t = setTimeout(() => setToast(null), toast.kind === 'hint' ? 7000 : 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // La mochila de minerales es de una sola exploración: la siguiente misión empieza vacía.
+  useEffect(() => {
+    if (view && view.phase !== 'discovery') resetBag();
+  }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Torneo marciano: se juega en esta pantalla (sin el mundo 3D) y la XP se guarda una sola vez.
+  const party = view?.party ?? null;
+  useEffect(() => {
+    if (party) setShow3d(false);
+  }, [party?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!party || party.stage !== 'final' || !view) return;
+    const mine = party.players.find((x) => x.id === view.me.id);
+    const p = profileRef.current;
+    const s = p.sessions[code];
+    const key = `party:${party.id}`;
+    if (!mine || !mine.xp || !s || s.credited.includes(key)) return;
+    s.credited.push(key);
+    p.xp += mine.xp;
+    updateProfile(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [party?.stage, party?.id, code]);
 
   // Guardar XP e insignias en el dispositivo (una vez por misión)
   useEffect(() => {
@@ -385,8 +410,10 @@ export function PlayApp({ initialCode, sig }: { initialCode: string; sig: string
         </div>
       )}
 
-      <main className="play-main" key={view?.phase ?? 'none'}>
-        {view ? (
+      <main className="play-main" key={view?.party ? 'party' : (view?.phase ?? 'none')}>
+        {view?.party ? (
+          <PartyScreen view={view} net={netRef.current} />
+        ) : view ? (
           <PhaseScreen
             view={view}
             act={act}

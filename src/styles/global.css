@@ -263,9 +263,6 @@ svg {
 .btn.food {
   --c: var(--food);
 }
-.btn.coral {
-  --c: var(--habitat);
-}
 .btn.ix {
   --c: var(--ix);
 }
@@ -871,6 +868,8 @@ textarea.input {
   top: max(16px, env(safe-area-inset-top));
   transform: translateX(-50%);
   z-index: 90;
+  /* Con left: 50% el ancho automático solo alcanzaría la mitad de la pantalla. */
+  width: max-content;
   max-width: min(560px, calc(100vw - 32px));
   display: flex;
   align-items: center;

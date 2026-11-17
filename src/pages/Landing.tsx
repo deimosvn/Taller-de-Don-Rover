@@ -275,7 +275,7 @@ function StepPhone() {
       <div className="lp-mini-role" aria-hidden="true">
         <span className="lp-mini-pill">⚡ Energía</span>
         <Astronaut avatar={ROLE_AVATARS.power} role="power" size={64} pose="still" />
-        <p className="lp-mini-task">Tu estación: paneles solares</p>
+        <p className="lp-mini-task">⛏️ Mina y fabrica: red eléctrica</p>
         <p className="lp-mini-secret">🔒 Dato secreto desbloqueado</p>
       </div>
     </PhoneFrame>
@@ -318,7 +318,7 @@ function HowItWorks() {
     {
       n: '2',
       title: 'Cada quien recibe su especialidad',
-      text: 'Energía, soporte vital, comida o hábitat. Cada especialidad tiene una tarea en el Marte 3D y un dato secreto que nadie más tiene.',
+      text: 'Energía, soporte vital, comida o hábitat. Cada especialidad mina recursos en el Marte 3D, fabrica una pieza para la colonia y descubre un dato secreto que nadie más tiene.',
       art: <StepPhone />,
     },
     {
@@ -370,7 +370,7 @@ const WHO = {
       ['🧭', 'Abre «Crear misión» en la computadora del salón y elige la edad (7–9, 10–12 o 12–15 años) y el tiempo (40 o 10 minutos).'],
       ['📱', 'Proyecta el QR. Los alumnos entran con su celular escaneándolo o con el código de 4 letras.'],
       ['🛰️', 'Presiona «Generar la misión»: IX revisa el clima espacial real de la NASA y el estado de la colonia, y escribe la misión.'],
-      ['⏯️', 'Avanza las fases con un solo botón. Pausa, da +30 segundos o pide una pista de IX cuando se atoren.'],
+      ['⏯️', 'Avanza las fases con un solo botón. Pausa, da +30 segundos o pide una pista de IX. ¿Sobra tiempo? Abre el «Torneo marciano» de todos contra todos.'],
       ['📊', 'Al final, el debrief resume lo aprendido. Descarga el reporte: la colonia se guarda para la próxima clase.'],
     ],
     shot: { kind: 'laptop' as const, src: 'landing/consola.webp', alt: 'Consola del profe en el briefing de la misión The Final Colony, con el planeta, el estado de la colonia y la tripulación' },
@@ -381,8 +381,8 @@ const WHO = {
     steps: [
       ['📷', 'Escanea el QR del proyector o escribe el código de 4 letras en tu celular.'],
       ['🧑‍🚀', 'Escribe tu nombre y arma tu astronauta: traje, casco, visor y un accesorio.'],
-      ['🗺️', 'Recibe tu especialidad y camina a tu estación en el Marte 3D con el joystick.'],
-      ['🔓', 'Resuelve tu tarea y descubre tu dato secreto. ¡Nadie más lo tiene!'],
+      ['🗺️', 'Recibe tu especialidad y sal al Marte 3D con el joystick.'],
+      ['⛏️', 'Mina regolito, hielo y hematita y fabrica tu pieza en tu estación. Así descubres tu dato secreto: ¡nadie más lo tiene!'],
       ['🗳️', 'Compártelo con tu tripulación, voten y salven la colonia en la emergencia. Ganas XP e insignias.'],
     ],
     shot: { kind: 'phone' as const, src: 'landing/celular.webp', alt: 'Celular con un astronauta en el Marte 3D, el joystick y los botones' },

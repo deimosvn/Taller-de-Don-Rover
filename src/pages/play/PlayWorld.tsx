@@ -11,6 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { MISSIONS, ROLES } from '../../../shared/content';
+import { MINERALS, RECIPES, canCraft, nextMineral } from '../../../shared/crafting';
 import { MISSION_PROBLEMS } from '../../../shared/minigames';
 import type { PlayerView } from '../../../shared/types';
 import type { PlayerNet } from '../../net/playerNet';
@@ -18,6 +19,9 @@ import { DEMO_SNAPSHOT, type WorldSnapshot } from '../../world/colony/snapshot';
 import { WorldCanvas } from '../../world/react/WorldCanvas';
 import { WorldPlay, type WorldBanner } from '../../world/react/WorldPlay';
 import type { Bearing, InteractEvent, WorldEngine } from '../../world/WorldEngine';
+import { vibrate } from '../../lib/pwa';
+import { sfx } from '../../lib/sound';
+import { addMineral, bagKey, useBag } from './bag';
 import { StoryProblem, problemOpen } from './MissionProblem';
 import { TapGame } from './screens';
 import { RoleTask } from './RoleTask';
@@ -117,6 +121,40 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
   const taskOpen = Boolean(task?.open);
   const active = Boolean(prob && (storyOpen || action)) || taskOpen;
   const taskRole = task ? ROLES[task.role] : null;
+  // Minar y fabricar: la receta de su pieza y lo que lleva en la mochila.
+  const recipe = task && missionId ? RECIPES[missionId][task.role] : null;
+  const key = task && missionId ? bagKey(missionId, task.role) : '';
+  const bagState = useBag(key || 'none', task?.points ?? 0, recipe ?? RECIPES.greenhouse.power);
+  const bag = key ? bagState.bag : null;
+  const crafted = Boolean(key && bagState.crafted);
+  const ready = Boolean(recipe && bag && canCraft(recipe, bag));
+  const mining = Boolean(taskOpen && task && !task.done && recipe && bag && !crafted && !ready);
+  const want = mining && recipe && bag ? nextMineral(recipe, bag) : null;
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 1800);
+    return () => clearTimeout(t);
+  }, [notice]);
+  const [rock, setRock] = useState<Bearing | null>(null);
+
+  // Los depósitos de regolito, hielo y hematita aparecen en el mundo (no se construye nada).
+  useEffect(() => {
+    engine?.enableOutpost({ afford: () => false, built: () => {}, placing: () => {} });
+  }, [engine]);
+
+  // Brújula hacia el depósito más cercano del mineral que falta.
+  useEffect(() => {
+    if (!engine || !mining || !want) {
+      setRock(null);
+      return;
+    }
+    const tick = () => setRock(engine.nearestResource(want));
+    tick();
+    const id = setInterval(tick, 450);
+    return () => clearInterval(id);
+  }, [engine, mining, want]);
+
   const evTitle = view.event?.title ?? 'Emergencia';
   const evVerb = view.event?.action.verb ?? 'Ayuda a la colonia';
   const evEmoji = view.event?.action.emoji ?? '🚨';
@@ -173,6 +211,26 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
   }, [active]);
 
   const onInteract = (ev: InteractEvent) => {
+    if (ev.defId.startsWith('resource.')) {
+      if (!taskOpen || !recipe || !key) {
+        setNotice('Los depósitos se minan durante la exploración de la misión.');
+        return true;
+      }
+      const got = engine?.outpost?.collect(ev.uid);
+      if (!got) {
+        setNotice('Depósito agotado: vuelve a crecer en un rato. Busca otro.');
+        return true;
+      }
+      sfx.mine();
+      setTimeout(() => sfx.pickup(), 140);
+      vibrate(18);
+      const pts = addMineral(key, recipe, got.res, got.amount);
+      if (pts) net?.sendTask(pts);
+      const need = recipe.needs[got.res] ?? 0;
+      const have = Math.min(need, (bag?.[got.res] ?? 0) + got.amount);
+      setNotice(`+${got.amount} ${MINERALS[got.res].emoji} ${MINERALS[got.res].name}${need ? ` · ${have}/${need}` : ' (tu pieza no lo necesita)'}`);
+      return true;
+    }
     if (ev.defId !== 'prop.station') return false;
     setPanel(action ? 'twist' : taskOpen ? 'task' : storyOpen ? 'story' : null);
     setGuide(false);
@@ -181,13 +239,22 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
 
   const need = needsYou(view);
   const go = () => setGuide(true);
-  const bannerKey = action ? 'twist' : taskOpen && task && !task.done ? `task:${task.title}` : need ? `need:${need.text}` : storyOpen && !solved && prob ? `story:${prob.title}` : '';
+  const bannerKey = action ? 'twist' : taskOpen && task && !task.done ? `task:${task.title}:${crafted}:${ready}` : need ? `need:${need.text}` : storyOpen && !solved && prob ? `story:${prob.title}` : '';
   const banner: WorldBanner | null = useMemo(
     () =>
       action
         ? { text: `🚨 ${evTitle}: ${evEmoji} ${evVerb}`, tone: 'alert', action: 'Ir a la misión', onAction: go }
-        : taskOpen && task && !task.done && taskRole
-          ? { text: `${taskRole.emoji} Tu tarea: ${task.title}. Camina a tu estación (${task.place}) e interactúa con ella.`, tone: 'info', action: 'Ir a la misión', onAction: go }
+        : taskOpen && task && !task.done && taskRole && recipe
+          ? {
+              text: crafted
+                ? `${recipe.emoji} Fabricaste ${recipe.item}. Espera a que tu tripulación termine sus piezas.`
+                : ready
+                  ? `${recipe.emoji} ¡Tienes todo! Ve a tu estación (${task.place}) y fabrica ${recipe.item}.`
+                  : `⛏️ Mina los minerales de tu pieza (${recipe.emoji} ${recipe.item}) y luego fabrícala en tu estación.`,
+              tone: 'info',
+              action: 'Ir a la misión',
+              onAction: go,
+            }
           : need
           ? { text: need.text, tone: need.tone, action: 'Abrir panel', onAction: onClose }
           : storyOpen && !solved && prob
@@ -207,8 +274,8 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
   const objective = target ? (
     <>
       <div className="wp-quest">
-        <span>{target.label}</span>
-        {target.badge && <b>{target.badge}</b>}
+        <span>{mining && want && recipe && bag ? `⛏️ ${MINERALS[want].emoji} ${MINERALS[want].name} ${Math.min(bag[want], recipe.needs[want] ?? 0)}/${recipe.needs[want]}` : target.label}</span>
+        {mining && rock ? <b>{Math.round(rock.distance)} m</b> : target.badge && <b>{target.badge}</b>}
       </div>
       <button className={`wp-go ${guide ? 'on' : ''}`} onClick={() => setGuide((g) => !g)} aria-pressed={guide}>
         🧭 {guide ? 'Ocultar flecha' : 'Ir a la misión'}
@@ -216,9 +283,34 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
     </>
   ) : null;
 
-  // Flecha guía: apunta a la estación (respecto de la cámara) hasta que el alumno llega.
+  // Flecha guía: mientras falten minerales apunta al depósito más cercano (también si el alumno
+  // está junto a su estación: primero hay que minar); después, a la estación.
+  const rockNear = Boolean(mining && rock && rock.distance <= 4.2);
   const arrow =
-    target && bearing && (guide || near) ? (
+    mining && want && rock && (guide || rockNear || near) ? (
+      <div className={`wp-guide ${rockNear ? 'arrived' : ''}`} role="status" aria-live="polite">
+        {rockNear ? (
+          <>
+            <span className="wp-guide-pin" aria-hidden="true">
+              ⛏️
+            </span>
+            <b>Llegaste al depósito</b>
+            <small>Interactúa con la roca ({'E'} o toca el botón) para minar.</small>
+          </>
+        ) : (
+          <>
+            <span className="wp-guide-arrow" aria-hidden="true" style={{ transform: `rotate(${rock.angle - Math.PI / 2}rad)` }}>
+              ➜
+            </span>
+            <b>{Math.round(rock.distance)} m</b>
+            <small>
+              {near ? 'Primero a minar: ' : ''}
+              {MINERALS[want].emoji} {MINERALS[want].name} más cercano
+            </small>
+          </>
+        )}
+      </div>
+    ) : target && bearing && (guide || near) ? (
       <div className={`wp-guide ${near ? 'arrived' : ''}`} role="status" aria-live="polite">
         {near ? (
           <>
@@ -249,7 +341,7 @@ export default function PlayWorld({ view, net, onClose, guide: guideInit = false
           if (import.meta.env.DEV) (window as unknown as { __world?: unknown }).__world = e;
         }}
       >
-        <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Panel de misión" banner={banner} objective={objective} onInteract={onInteract}>
+        <WorldPlay engine={engine} snapshot={world} onExit={onClose} exitLabel="Panel de misión" banner={banner} objective={objective} onInteract={onInteract} notice={notice}>
           {!panel && arrow}
           {panel === 'task' && taskOpen && (
             <section className="wp-panel wp-problem" role="dialog" aria-label="Tu tarea">

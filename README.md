@@ -86,7 +86,7 @@ Es una **plataforma de aprendizaje multijugador construida alrededor de la IA**.
     </td>
     <td width="33%" valign="top">
       <h3>🧑‍🚀 Para los alumnos</h3>
-      Arman su astronauta y entran al <b>Marte 3D</b> en su celular. Resuelven la tarea de su especialidad, combinan datos con su tripulación, votan y salvan la colonia en una emergencia con minijuegos.
+      Arman su astronauta y entran al <b>Marte 3D</b> en su celular. <b>Minan</b> regolito, hielo y hematita, <b>fabrican</b> la pieza de su especialidad, combinan datos con su tripulación, votan y salvan la colonia en una emergencia. Con tiempo extra, juegan el <b>Torneo marciano</b> de todos contra todos.
     </td>
     <td width="33%" valign="top">
       <h3>🤖 Don Rover</h3>
@@ -135,12 +135,20 @@ flowchart LR
     <td colspan="2" align="center"><sub><b>Portada:</b> el planeta y la colonia MARS-01 en 3D, todo generado por código (sin modelos externos)</sub></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/img/capturas/consola-briefing.jpg" alt="Consola del profe en el briefing de la misión The Final Colony"></td>
+    <td width="50%"><img src="docs/img/capturas/consola-briefing.jpg" alt="Consola del profe en el briefing: una sola tarjeta, el planeta 3D de fondo y los medidores de la colonia"></td>
+    <td width="50%"><img src="docs/img/capturas/consola-exploracion.jpg" alt="Consola del profe mientras la tripulación mina y fabrica: cada pieza con su receta y su avance"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Briefing:</b> una sola tarjeta y el planeta 3D de fondo, que viaja a donde pasa la misión</sub></td>
+    <td align="center"><sub><b>Minar y fabricar:</b> cada especialidad mina recursos de Marte y fabrica su pieza</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/img/capturas/torneo.jpg" alt="Torneo marciano: la pista alrededor de la colonia con la ficha de cada jugador y los resultados de la ronda"></td>
     <td width="50%"><img src="docs/img/capturas/consola-reto.jpg" alt="Consola del profe en el reto de la tripulación, con los subtítulos de Don Rover"></td>
   </tr>
   <tr>
-    <td align="center"><sub><b>Briefing:</b> IX generó la misión con datos de la NASA y explica por qué la eligió</sub></td>
-    <td align="center"><sub><b>Reto:</b> Don Rover lo narra en voz alta, con subtítulos grandes</sub></td>
+    <td align="center"><sub><b>Torneo marciano:</b> minijuegos de todos contra todos y una pista con sorpresas</sub></td>
+    <td align="center"><sub><b>Reto:</b> votan una decisión y Don Rover la narra con subtítulos</sub></td>
   </tr>
   <tr>
     <td><img src="docs/img/capturas/entrenador-plan.jpg" alt="Entrenador: controles de paneles solares, baterías y modo ahorro antes de la tormenta de polvo"></td>
@@ -154,14 +162,23 @@ flowchart LR
 
 <table>
   <tr>
-    <td><img src="docs/img/capturas/alumno-3d.jpg" alt="Celular en el modo libre, con el botón Entrenar, el joystick y el inventario"></td>
-    <td><img src="docs/img/capturas/don-rover-fisico.jpg" alt="Página Don Rover físico: conectar la placa, darle Wi-Fi y probar sus caras"></td>
+    <td width="25%"><img src="docs/img/capturas/celular-minar.jpg" alt="Celular en el Marte 3D minando hielo: el aviso de la mochila dice +2 de hielo"></td>
+    <td width="25%"><img src="docs/img/capturas/celular-fabricar.jpg" alt="Celular en la estación: la receta completa y el botón para fabricar la pieza"></td>
+    <td width="25%"><img src="docs/img/capturas/celular-torneo.jpg" alt="Celular en el torneo: la minería exprés, con rocas para tocar"></td>
+    <td width="25%"><img src="docs/img/capturas/alumno-3d.jpg" alt="Celular en el modo libre, con el botón Entrenar, el joystick y el inventario"></td>
   </tr>
   <tr>
-    <td align="center"><sub><b>Celular:</b> modo libre en el Marte 3D</sub></td>
-    <td align="center"><sub><b>Don Rover físico:</b> conectar la placa, darle el Wi-Fi y probar sus caras</sub></td>
+    <td align="center"><sub><b>Minar</b> en el Marte 3D</sub></td>
+    <td align="center"><sub><b>Fabricar</b> en la estación</sub></td>
+    <td align="center"><sub><b>Torneo:</b> minería exprés</sub></td>
+    <td align="center"><sub><b>Modo libre</b></sub></td>
   </tr>
 </table>
+
+<p align="center">
+  <img src="docs/img/capturas/don-rover-fisico.jpg" alt="Página Don Rover físico: conectar la placa, darle Wi-Fi y probar sus caras" width="640"><br>
+  <sub><b>Don Rover físico:</b> conectar la placa, darle el Wi-Fi y probar sus caras</sub>
+</p>
 
 ---
 
@@ -207,7 +224,7 @@ flowchart TB
   end
   subgraph dos["2 · Explorar y decidir"]
     direction LR
-    BR["📜 Briefing<br/>estudio real"] --> DI["🔍 Descubrimiento<br/>tarea en el 3D"] --> RE["🗳️ Reto<br/>combinar datos y votar"]
+    BR["📜 Briefing<br/>estudio real"] --> DI["⛏️ Minar y fabricar<br/>recursos de Marte"] --> RE["🗳️ Reto<br/>combinar datos y votar"]
   end
   subgraph tres["3 · Emergencia y cierre"]
     direction LR
@@ -215,6 +232,35 @@ flowchart TB
   end
   uno --> dos --> tres
 ```
+
+### ⛏️ Minar y fabricar con recursos de Marte
+
+En la exploración, cada especialidad fabrica la pieza que resuelve su parte de la misión con lo que hay en el planeta. Es lo que la NASA llama **ISRU**: usar los recursos del lugar en vez de traerlos de la Tierra.
+
+| Mineral | Dónde está | Por golpe de pico |
+| --- | --- | :---: |
+| 🟧 Regolito | El suelo suelto, en todas partes | 3 |
+| 🧊 Hielo | Hielo enterrado, que brilla azul | 2 |
+| 🔩 Hematita | Rocas oscuras de hierro, como las que encontró Opportunity | 2 |
+
+1. **Minar:** el celular muestra la receta (por ejemplo, *Muralla de regolito* = 6 🟧 + 2 🔩) y una flecha hacia el depósito más cercano del mineral que falta.
+2. **Fabricar:** con la receta completa, en su estación imprime la pieza en 3D.
+3. **Las piezas dependen unas de otras:** el hábitat protege a la energía, la energía mueve el soporte vital y el agua llega al invernadero. El proyector muestra cada pieza: *Minando → Lista para fabricar → Instalada*.
+
+Si el celular no puede mostrar 3D, se mina en un campo de rocas dentro de la misma tarjeta.
+
+### 🏆 Torneo marciano (todos contra todos)
+
+```mermaid
+flowchart LR
+  R["🎡 Ruleta<br/>elige el minijuego"] --> J["📱 Todos juegan<br/>a la vez"] --> P["🥇 Premios<br/>según el lugar"] --> A["🎲 Avanzan<br/>por la pista"] --> R
+  A -.->|"tras 5 rondas"| F["🏆 Podio y XP"]
+```
+
+- **8 minijuegos:** dos propios del torneo, ⛏️ *Minería exprés* y 🚀 *Aterrizaje perfecto* (con la gravedad real de Marte, 3.721 m/s²), y seis de la colonia: 🧹 paneles, 💧 fugas, ☀️ seguir al Sol, 📡 señal, 🔌 cables y 📻 radio.
+- **Premios por lugar:** energía ⚡ (10, 6, 4 y 2) y casillas para avanzar (5, 4, 3 y 2). Quien gana la ronda se lleva un cristal 💎.
+- **La pista** rodea la colonia MARS-01 con 20 casillas: ⚡ celdas de energía, 💎 cristales de hielo, ☄️ meteoritos, 🌪️ tormentas de polvo, 🛰️ señales de satélite y 🕳️ tubos de lava que sirven de atajo. Pasar por la base da +5 ⚡.
+- **Gana** quien junta más cristales (si empatan, más energía). Cada quien se lleva XP a su perfil según su lugar, y cada ronda cierra con un dato real de la NASA.
 
 ### Preguntarle algo a Don Rover
 
@@ -255,14 +301,18 @@ sequenceDiagram
 | **2** | Proyecta el **QR**: hasta **4 alumnos** entran con su celular. Si falta alguien, un bot de práctica ocupa su lugar y se lo cede cuando llega. |
 | **3** | Presiona **Formar la tripulación** y **Generar la misión**: IX revisa el clima espacial real y la colonia, y escribe la misión. |
 | **4** | Avanza las fases con el botón grande. Puedes pausar, dar **+30 s** o pedir una **Pista de IX**, y Don Rover la dice en voz alta. |
+| **🏆** | ¿Sobra tiempo? Desde el abordaje abre el **Torneo marciano**: 5 rondas de minijuegos de todos contra todos. |
+
+La consola muestra una sola tarjeta por etapa sobre el planeta 3D, que viaja a donde pasa la misión. En proyectores Full HD o más grandes, todo crece para leerse desde el fondo del salón.
 | **5** | Al final, el **debrief** resume lo aprendido. Descarga el **reporte CSV**: la colonia queda guardada para la siguiente clase. |
 
 ### 🧑‍🚀 Los alumnos
 
 1. Escanean el QR o escriben el código de 4 letras en `#/jugar`.
 2. Arman su astronauta y entran al **Marte 3D** (joystick y botones grandes en el celular).
-3. Caminan a la **estación de su especialidad**, resuelven su tarea y reciben un dato secreto.
+3. **Minan** regolito, hielo y hematita en el Marte 3D (una flecha los lleva al depósito que les falta) y **fabrican** en su estación la pieza de su especialidad. Al terminarla reciben un dato secreto.
 4. Combinan sus datos, **votan** y escriben la bitácora. En la **emergencia**, cada especialidad juega su minijuego.
+5. En el **Torneo marciano** todos juegan el mismo minijuego a la vez desde su celular y avanzan por la pista según su lugar.
 
 ### 🏗️ Sin código: modo libre, entrenador y Don Rover
 
@@ -564,17 +614,17 @@ Las fases (`Phase` en `shared/types.ts`) avanzan en este orden:
 | --- | --- | --- |
 | `lobby` | Abordaje | Los alumnos escanean el QR y arman su astronauta. Máximo **4 jugadores** (`MAX_PLAYERS`). |
 | `crews` | Tripulaciones | IX asigna una especialidad a cada quien. |
-| `scan` | Escáner | IX genera la misión: consulta el clima espacial (DONKI), revisa la colonia, busca estudios (NTRS y OSDR) y, con Claude, elige la misión y escribe la tarea de cada especialidad. |
+| `scan` | IX crea la misión | IX genera la misión: consulta el clima espacial (DONKI), revisa la colonia, busca estudios (NTRS y OSDR) y, con Claude, elige la misión y escribe la tarea de cada especialidad. |
 | `briefing` | Briefing | Narrativa de la misión y el estudio real de la NASA que la inspira. |
-| `discovery` | Descubrimiento | Cada alumno hace la tarea de su especialidad en su estación del mundo 3D y desbloquea su transmisión secreta (quiz). |
+| `discovery` | Minar y fabricar | Cada alumno mina en el mundo 3D los minerales que pide la receta de su pieza y la fabrica en su estación (`shared/crafting.ts`). Al terminarla desbloquea su transmisión secreta (quiz). |
 | `challenge` | Reto de tripulación | La tripulación combina sus datos, vota una decisión y escribe una bitácora. También resuelve el problema de la historia con minijuegos. |
-| `event` | Evento global | Emergencia en tres etapas: compartir recursos, acción (minijuegos por especialidad) y resultado. Se endurece si el Sol está activo de verdad. |
+| `event` | Emergencia | Emergencia en tres etapas: compartir recursos, acción (minijuegos por especialidad) y resultado. Se endurece si el Sol está activo de verdad. |
 | `results` | Resultados | El motor calcula el nivel de cada decisión (`best`, `ok`, `bad` o `critical`), actualiza los medidores de la colonia y desbloquea edificios. |
 | `debrief` | Debrief | IX resume lo aprendido, da reconocimientos y deja una pregunta para conversar. |
 
 **Ritmos** (`PACES` en `shared/content.ts`, en segundos):
 
-| Ritmo | Descubrimiento | Reto | Compartir | Acción |
+| Ritmo | Minar y fabricar | Reto | Compartir | Acción |
 | --- | :---: | :---: | :---: | :---: |
 | `class`: clase completa (~40 min) | 300 | 420 | 60 | 35 |
 | `demo`: demo rápida (~10 min) | 75 | 150 | 30 | 25 |
@@ -588,6 +638,8 @@ Las fases (`Phase` en `shared/types.ts`) avanzan en este orden:
 | `puzzles.ts` | Generadores de rompecabezas cooperativos por misión y dificultad |
 | `roleTasks.ts` | Tareas de cada especialidad con sus dependencias y las condiciones reales de la misión |
 | `minigames.ts` | Especificación de los minijuegos y de los problemas de cada misión (`MISSION_PROBLEMS`) |
+| `crafting.ts` | Minerales, rendimiento de cada depósito y las 24 recetas (misión × especialidad) de la fase de minar y fabricar |
+| `party.ts` | Torneo marciano: los 8 minijuegos, la pista, las casillas y las reglas de cada ronda (sin estado) |
 | `nasa.ts` | Temas de búsqueda por misión, condiciones de salud, dosis de radiación y protección |
 | `marsSim.ts` | Constantes físicas de Marte con su fuente (gravedad, luz, polvo, radiación, MOXIE, agua, cultivos) |
 | `trainer.ts` | Los seis simuladores del entrenador, sus escenarios con semilla y el perfil de habilidades |
@@ -837,6 +889,19 @@ Cada minijuego muestra un dato real de la NASA. Todos se pueden probar en `#/min
 </details>
 
 <details>
+<summary><b>🏆 Torneo marciano y ⛏️ minar y fabricar (detalles técnicos)</b></summary>
+<br>
+
+- **Torneo:** vive dentro de `HostEngine` (`party`) y solo se abre desde el abordaje, con 2 a 4 jugadores (los bots cuentan). Etapas: `spin` 4.2 s → `intro` 6 s → `play` (22 a 30 s según el juego) → `score` 7 s → `move` 6 s. El profe puede adelantar, pausar o terminar el torneo. No se guarda en el snapshot de la sala.
+- **Puntajes:** cada celular manda su puntaje acumulado (`partyScore`). El motor no acepta más puntos de los que haría alguien muy rápido (`rate` por segundo, con un margen de 2 a 6 segundos); el aterrizaje se califica una sola vez, al tocar el suelo.
+- **Bots:** juegan al ritmo de un niño que juega bien (`bot`, puntos por segundo de referencia de cada minijuego), cada uno con su propio nivel (de 0.35 a 1.1). En simulación, un niño que juega bien gana cerca de dos de cada tres torneos contra tres bots.
+- **Resultados de la ronda:** la tabla cuenta solo el premio del minijuego; la sorpresa de cada casilla se revela al avanzar por la pista.
+- **Minar y fabricar:** minar lo que pide la receta vale `MINE_POINTS` (12) y fabricar, lo que falta para `TASK_GOAL` (20), así que el motor, las dependencias entre especialidades y el avance del proyector funcionan igual que con cualquier tarea. La mochila vive en el celular (`src/pages/play/bag.ts`) y se reconstruye con los puntos si el alumno recarga la página. En el mundo 3D los depósitos son los del modo libre (`Outpost`).
+- **Consola del profe:** `src/pages/host/Console.tsx` (una tarjeta por etapa en `stages.tsx`, el torneo en `PartyStage.tsx`) con estilos en `src/styles/console.css`. En pantallas de más de 1440×900 la interfaz crece con `zoom` para leerse desde el fondo del salón; el planeta 3D de fondo no se escala.
+
+</details>
+
+<details>
 <summary><b>📶 PWA y almacenamiento local</b></summary>
 <br>
 
@@ -848,7 +913,7 @@ Cada minijuego muestra un dato real de la NASA. Todos se pueden probar en `#/min
   - Al activarse, borra las cachés `ixchel-*` viejas.
 - `vercel.json` sirve `sw.js` con `Cache-Control: no-cache`.
 - Utilidades (`src/lib/pwa.ts`): instalación, Wake Lock (pantalla siempre encendida), vibración, pantalla completa y detección de conexión.
-- Sonido sintetizado con **Web Audio** (`src/lib/sound.ts`), sin archivos de audio.
+- Sonido sintetizado con **Web Audio** (`src/lib/sound.ts`), sin archivos de audio: más de 30 efectos (cambio de etapa, cuenta regresiva, redoble y fanfarria, ruleta, monedas, cristales, meteoritos, pico e impresora 3D).
 - Sin internet funciona el modo demo con bots y todo el contenido propio.
 
 | Clave de `localStorage` | Contenido |
@@ -955,13 +1020,13 @@ vercel.json          Duración de funciones y cabeceras
 | 00–03 | 🚪 Abordaje | Escanean el QR y crean su astronauta |
 | 03–05 | 👥 Tripulación | IX asigna las especialidades |
 | 05–08 | 🛰️ Misión | IX genera la misión con datos reales de la NASA |
-| 08–15 | 🔍 Descubrimiento | Cada quien hace su tarea en el Marte 3D y descifra su transmisión |
+| 08–15 | ⛏️ Minar y fabricar | Cada quien mina recursos en el Marte 3D, fabrica su pieza y descifra su transmisión |
 | 15–22 | 🗳️ Reto | Combinan sus datos, votan y escriben la bitácora |
 | 22–30 | 🚨 Emergencia | Minijuegos por especialidad |
 | 30–35 | 📊 Resultados | La colonia cambia con sus decisiones |
 | 35–40 | 💬 Debrief | Don Rover e IX explican lo aprendido |
 
-También existe el ritmo **demo rápida**, de unos 10 minutos, para jueces y pruebas.
+También existe el ritmo **demo rápida**, de unos 10 minutos, para jueces y pruebas. Si sobra tiempo, el **Torneo marciano** dura de 5 a 8 minutos.
 
 ---
 

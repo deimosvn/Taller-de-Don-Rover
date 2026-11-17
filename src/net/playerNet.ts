@@ -316,6 +316,11 @@ export class PlayerNet {
     if (points > 0) this.send({ t: 'act', rid: 0, action: { type: 'task', points } });
   }
 
+  /** Puntaje acumulado del minijuego de la ronda del torneo (sin confirmación). */
+  sendPartyScore(round: number, score: number) {
+    this.send({ t: 'act', rid: 0, action: { type: 'partyScore', round, score } });
+  }
+
   sendFix(count: number) {
     if (count > 0) this.send({ t: 'act', rid: 0, action: { type: 'fix', count } });
   }

@@ -1,5 +1,6 @@
 // Tipos compartidos entre el servidor (motor de juego) y los clientes (proyector y celulares).
 
+import type { PartyView } from './party';
 import type { CrewHealth, MissionScience, ScienceHighlight, SpaceWeather } from './nasa';
 
 /** Datos reales de la NASA de la misión en curso. */
@@ -193,6 +194,8 @@ export interface HostCrew extends CrewSummary {
   status: CrewStatus;
   /** Avance de la tarea de cada especialidad en la exploración (0–1). */
   tasks: Record<RoleId, number>;
+  /** Puntos de cada especialidad (sin dependencias): dicen si va minando, fabricando o terminó. */
+  taskPoints: Record<RoleId, number>;
   outcome: CrewOutcome | null;
   health: CrewHealthStatus | null;
 }
@@ -335,6 +338,8 @@ export interface HostView {
   generator: MissionGenerator | null;
   /** Máximo de tripulantes por partida. */
   maxPlayers: number;
+  /** Torneo marciano en curso (todos contra todos), o null. */
+  party: PartyView | null;
 }
 
 export interface PlayerChallengeView {
@@ -442,6 +447,8 @@ export interface PlayerView {
     weather: SpaceWeather | null;
     health: (CrewHealth & CrewHealthStatus) | null;
   } | null;
+  /** Torneo marciano en curso (todos contra todos), o null. */
+  party: PartyView | null;
 }
 
 export type AnyView = HostView | PlayerView;
@@ -461,7 +468,11 @@ export type HostAction =
   | { type: 'kick'; playerId: string }
   | { type: 'newMission' }
   | { type: 'toLobby' }
-  | { type: 'setDifficulty'; difficulty: Difficulty };
+  | { type: 'setDifficulty'; difficulty: Difficulty }
+  /** Torneo marciano: empezar (con cuántas rondas), saltar a la siguiente etapa o terminar. */
+  | { type: 'partyStart'; rounds: number }
+  | { type: 'partyNext' }
+  | { type: 'partyEnd' };
 
 export type PlayerAction =
   | { type: 'quiz'; choice: number }
@@ -474,7 +485,9 @@ export type PlayerAction =
   | { type: 'task'; points: number }
   | { type: 'objectVote'; category: CategoryId }
   | { type: 'bonus'; choice: number }
-  | { type: 'avatar'; avatar: AvatarConfig };
+  | { type: 'avatar'; avatar: AvatarConfig }
+  /** Puntaje acumulado del minijuego de la ronda del torneo. */
+  | { type: 'partyScore'; round: number; score: number };
 
 export interface Ack<T = unknown> {
   ok: boolean;

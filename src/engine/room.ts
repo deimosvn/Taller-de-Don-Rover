@@ -66,6 +66,7 @@ import { HEALTH, MISSION_TOPICS, buildHealth, doseFor, healthFactor, healthKindF
 import { FIX_GOAL, MISSION_PROBLEMS } from '../../shared/minigames';
 import { ROLE_PLACE, ROLE_STATION, TASK_GOAL, TASK_LINKS, conditionsFrom, roleTaskText, taskProgress, type RoleTaskText } from '../../shared/roleTasks';
 import type { SpaceWeather } from '../../shared/nasa';
+import { PARTY_GAMES, PARTY_ORDER, PARTY_STAGE_SECONDS, PLACE_XP, at as partyAt, resolveRound, standingOrder, type PartyGameId, type PartyRoundLine, type PartyStageId, type PartyToken, type PartyView } from '../../shared/party';
 
 /** Una partida es una sola tripulación: máximo 4 astronautas, uno por especialidad. */
 export const MAX_PLAYERS = 4;
@@ -253,6 +254,26 @@ export interface RoomSnapshot {
   firstHumanAwarded: boolean;
 }
 
+/** Torneo marciano en curso (no se guarda: si la página se recarga, el torneo empieza de nuevo). */
+interface PartyRun {
+  id: string;
+  rounds: number;
+  round: number;
+  stage: PartyStageId;
+  game: PartyGameId;
+  played: PartyGameId[];
+  queue: PartyGameId[];
+  endsAt: number | null;
+  pausedLeft: number | null;
+  playStart: number;
+  scores: Record<string, number>;
+  allowance: Record<string, { left: number; at: number }>;
+  tokens: Record<string, PartyToken>;
+  last: PartyRoundLine[] | null;
+  /** Habilidad de cada bot en este torneo (0.45–0.95). */
+  skill: Record<string, number>;
+}
+
 const SNAPSHOT_KEY = 'ixchel.room';
 
 export function loadSnapshot(): RoomSnapshot | null {
@@ -299,6 +320,7 @@ export class HostEngine {
   generator: MissionGenerator | null = null;
   private genToken = 0;
   private firstHumanAwarded = false;
+  private party: PartyRun | null = null;
   private listeners = new Set<() => void>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private notifyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -583,6 +605,7 @@ export class HostEngine {
     const p = this.players.get(playerId);
     if (!p) return err('No existe ese astronauta.');
     this.players.delete(playerId);
+    if (this.party) delete this.party.tokens[playerId];
     for (const c of this.crews) c.memberIds = c.memberIds.filter((id) => id !== playerId);
     if (this.phase !== 'results' && this.phase !== 'debrief') this.crews = this.crews.filter((c) => c.memberIds.length > 0);
     return OK;
@@ -650,7 +673,20 @@ export class HostEngine {
 
   hostAction(a: HostAction): Ack {
     let res: Ack = OK;
+    if (this.party && (a.type === 'formCrews' || a.type === 'shuffleCrews' || a.type === 'toScan' || a.type === 'newMission')) {
+      return err('Termina el torneo para empezar una misión.');
+    }
     switch (a.type) {
+      case 'partyStart':
+        res = this.startParty(a.rounds);
+        break;
+      case 'partyNext':
+        res = this.partyAdvance();
+        break;
+      case 'partyEnd':
+        this.party = null;
+        this.pushIx('info', 'Torneo terminado. La tripulación puede seguir con una misión.');
+        break;
       case 'addBots':
         res = this.addBots(a.count);
         break;
@@ -664,7 +700,7 @@ export class HostEngine {
         res = this.generateMission();
         break;
       case 'next':
-        res = this.next();
+        res = this.party ? this.partyAdvance() : this.next();
         break;
       case 'pause':
         this.pause();
@@ -685,6 +721,7 @@ export class HostEngine {
         res = this.generateMission();
         break;
       case 'toLobby':
+        this.party = null;
         this.mission = null;
         this.objectVote = null;
         this.crews = [];
@@ -738,6 +775,14 @@ export class HostEngine {
   }
 
   private pause() {
+    if (this.party) {
+      const pr = this.party;
+      if (pr.endsAt !== null && pr.pausedLeft === null) {
+        pr.pausedLeft = Math.max(0, pr.endsAt - now());
+        pr.endsAt = null;
+      }
+      return;
+    }
     const active = this.activeDeadline();
     if (this.paused || !active) return;
     this.paused = true;
@@ -745,6 +790,15 @@ export class HostEngine {
   }
 
   private resume() {
+    if (this.party) {
+      const pr = this.party;
+      if (pr.pausedLeft !== null) {
+        pr.endsAt = now() + pr.pausedLeft;
+        if (pr.stage === 'play') pr.playStart += pr.pausedLeft; // el tiempo de juego no corre en pausa
+        pr.pausedLeft = null;
+      }
+      return;
+    }
     if (!this.paused) return;
     const end = now() + (this.pausedRemaining ?? 0);
     if (this.phase === 'event' && this.mission) this.mission.event.stageEndsAt = end;
@@ -1624,6 +1678,10 @@ export class HostEngine {
 
   private tick() {
     const t = now();
+    if (this.party) {
+      if (this.partyTick(t)) this.changed(false);
+      return;
+    }
     let dirty = this.runBots();
     if (!this.paused) {
       if (this.phase === 'challenge') {
@@ -1746,6 +1804,8 @@ export class HostEngine {
         if (!this.objectVote?.open || !this.objectVote.options.includes(a.category)) return err('La votación no está abierta.');
         p.objectVote = a.category;
         break;
+      case 'partyScore':
+        return this.partyScore(p, a.round, a.score);
       case 'task': {
         if (!m || !crew || this.phase !== 'discovery') return OK;
         const t = now();
@@ -1930,7 +1990,7 @@ export class HostEngine {
           },
         ]),
       ),
-      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome, health: this.crewHealth(c), tasks: this.crewTasks(c) })),
+      crews: this.crews.map((c) => ({ id: c.id, name: c.name, sectorId: c.sectorId, memberIds: c.memberIds, status: this.crewStatus(c), outcome: c.outcome, health: this.crewHealth(c), tasks: this.crewTasks(c), taskPoints: this.taskRaw(c) })),
       colony: this.colony,
       mission: this.missionPublic(),
       event: m && this.phase === 'event' ? { ...m.event } : m && (this.phase === 'results' || this.phase === 'debrief') ? { ...m.event } : null,
@@ -1954,6 +2014,7 @@ export class HostEngine {
       nasa: m?.nasa ?? null,
       generator: this.phase === 'scan' ? this.generator : null,
       maxPlayers: MAX_PLAYERS,
+      party: this.partyView(),
     };
   }
 
@@ -2060,6 +2121,7 @@ export class HostEngine {
               health: m.nasa.health && crew ? { ...m.nasa.health, ...this.crewHealth(crew)! } : null,
             }
           : null,
+      party: this.partyView(),
     };
   }
 
@@ -2087,6 +2149,201 @@ export class HostEngine {
       crew: ROLE_ORDER.filter((r) => present.has(r)).map((r) => ({ role: r, name: nameOf(r), progress: prog[r] })),
       open: this.phase === 'discovery',
       done: prog[role] >= 1,
+    };
+  }
+
+  /* ---------------- torneo marciano (todos contra todos) ---------------- */
+
+  private startParty(rounds: number): Ack {
+    if (this.phase !== 'lobby') return err('El torneo se juega desde el abordaje, antes de formar la tripulación.');
+    if (this.players.size < 2) return err('El torneo necesita al menos 2 jugadores: agrega bots desde la barra de abajo.');
+    const queue = shuffle(R, [...PARTY_ORDER]);
+    const game = queue.shift()!;
+    const tokens: Record<string, PartyToken> = {};
+    const skill: Record<string, number> = {};
+    for (const p of this.players.values()) {
+      tokens[p.id] = { pos: 0, energy: 0, crystals: 0 };
+      // Cada bot tiene su nivel (unos flojos, otros fuertes): un niño que juega bien gana cerca
+      // de dos de cada tres torneos contra bots, pero ninguno tiene la victoria asegurada.
+      if (p.isBot) skill[p.id] = 0.35 + R() * 0.75;
+    }
+    this.party = {
+      id: rid(6),
+      rounds: clamp(Math.round(rounds) || 5, 3, 10),
+      round: 1,
+      stage: 'spin',
+      game,
+      played: [game],
+      queue,
+      endsAt: now() + PARTY_STAGE_SECONDS.spin * 1000,
+      pausedLeft: null,
+      playStart: 0,
+      scores: {},
+      allowance: {},
+      tokens,
+      last: null,
+      skill,
+    };
+    this.pushIx('info', `🏆 Torneo marciano: ${this.party.rounds} rondas de todos contra todos. ¡Gana quien junte más cristales!`);
+    return OK;
+  }
+
+  /** Pasa a la siguiente etapa del torneo (la llama el reloj o el botón del profe). */
+  private partyAdvance(): Ack {
+    const pr = this.party;
+    if (!pr) return err('No hay torneo en curso.');
+    const t = now();
+    const timed = (seconds: number) => (pr.pausedLeft !== null ? ((pr.pausedLeft = seconds * 1000), null) : t + seconds * 1000);
+    switch (pr.stage) {
+      case 'spin':
+        pr.stage = 'intro';
+        pr.endsAt = timed(PARTY_STAGE_SECONDS.intro);
+        break;
+      case 'intro':
+        pr.stage = 'play';
+        pr.scores = {};
+        pr.allowance = {};
+        pr.playStart = t;
+        pr.endsAt = timed(PARTY_GAMES[pr.game].seconds);
+        break;
+      case 'play': {
+        // Quien entró a media partida también juega (con 0 puntos esta ronda).
+        for (const p of this.players.values()) pr.tokens[p.id] ??= { pos: 0, energy: 0, crystals: 0 };
+        if (pr.game === 'land') for (const id of Object.keys(pr.skill)) pr.scores[id] ??= this.botLanding(pr.skill[id]);
+        for (const id of Object.keys(pr.scores)) pr.scores[id] = Math.round(pr.scores[id]);
+        pr.last = resolveRound(pr.scores, pr.tokens);
+        pr.stage = 'score';
+        pr.endsAt = timed(PARTY_STAGE_SECONDS.score);
+        const win = pr.last.filter((l) => l.winner).map((l) => this.players.get(l.id)?.name ?? '');
+        if (win.length) this.pushIx('info', `🏆 Ronda ${pr.round} (${PARTY_GAMES[pr.game].name}): ganó ${win.join(' y ')}.`);
+        break;
+      }
+      case 'score':
+        pr.stage = 'move';
+        pr.endsAt = timed(PARTY_STAGE_SECONDS.move);
+        break;
+      case 'move':
+        if (pr.round >= pr.rounds) {
+          pr.stage = 'final';
+          pr.endsAt = null;
+          pr.pausedLeft = null;
+          const order = standingOrder(pr.tokens);
+          const champ = this.players.get(order[0])?.name;
+          if (champ) this.pushIx('info', `🥇 ${champ} ganó el torneo marciano.`);
+          break;
+        }
+        pr.round += 1;
+        if (!pr.queue.length) pr.queue = shuffle(R, PARTY_ORDER.filter((g) => g !== pr.game));
+        pr.game = pr.queue.shift()!;
+        pr.played.push(pr.game);
+        pr.stage = 'spin';
+        pr.endsAt = timed(PARTY_STAGE_SECONDS.spin);
+        break;
+      case 'final':
+        return err('El torneo ya terminó: vuelve al abordaje o juega otro.');
+    }
+    return OK;
+  }
+
+  private botLanding(skill: number): number {
+    return Math.round(clamp(skill * 100 - 20 + R() * 30, 0, 96));
+  }
+
+  private partyTick(t: number): boolean {
+    const pr = this.party;
+    if (!pr) return false;
+    let dirty = false;
+    if (pr.stage === 'play' && pr.endsAt !== null) {
+      const g = PARTY_GAMES[pr.game];
+      if (g.id !== 'land') {
+        for (const [id, sk] of Object.entries(pr.skill)) {
+          if (!this.players.has(id)) continue;
+          // Un bot juega como un niño que juega bien (más o menos, según su habilidad): así los
+          // alumnos pueden ganarles. Los puntos se acumulan con decimales y se redondean al mostrar.
+          pr.scores[id] = Math.min(g.max, (pr.scores[id] ?? 0) + g.bot * sk * (0.75 + R() * 0.5));
+        }
+        dirty = true;
+      }
+    }
+    if (pr.endsAt !== null && t >= pr.endsAt) {
+      this.partyAdvance();
+      dirty = true;
+    }
+    return dirty;
+  }
+
+  private partyScore(p: Player, round: number, score: number): Ack {
+    const pr = this.party;
+    if (!pr || pr.stage !== 'play' || pr.endsAt === null || round !== pr.round) return OK;
+    const g = PARTY_GAMES[pr.game];
+    const want = clamp(Math.floor(Number(score) || 0), 0, g.max);
+    const cur = pr.scores[p.id] ?? 0;
+    if (g.id === 'land') {
+      // El aterrizaje se califica una sola vez, al tocar el suelo.
+      if (pr.scores[p.id] === undefined) pr.scores[p.id] = want;
+    } else {
+      // Contra trampas: los puntos no pueden crecer más rápido que alguien muy hábil.
+      const t = now();
+      const al = pr.allowance[p.id] ?? { left: g.rate * 2, at: pr.playStart };
+      al.left = Math.min(g.rate * 6, al.left + ((t - al.at) / 1000) * g.rate);
+      al.at = t;
+      const inc = Math.max(0, Math.min(want - cur, Math.floor(al.left)));
+      al.left -= inc;
+      pr.allowance[p.id] = al;
+      pr.scores[p.id] = cur + inc;
+    }
+    this.changed(false);
+    return OK;
+  }
+
+  private partyView(): PartyView | null {
+    const pr = this.party;
+    if (!pr) return null;
+    for (const p of this.players.values()) pr.tokens[p.id] ??= { pos: 0, energy: 0, crystals: 0 };
+    // Mientras se anuncian los resultados de la ronda, la tabla cuenta solo el premio del
+    // minijuego: la sorpresa de cada casilla se revela al avanzar por la pista.
+    const shown: Record<string, PartyToken> = {};
+    for (const [id, tk] of Object.entries(pr.tokens)) {
+      const l = pr.stage === 'score' ? pr.last?.find((x) => x.id === id) : undefined;
+      shown[id] = l ? { pos: l.from, energy: l.energy, crystals: l.crystals } : tk;
+    }
+    const order = standingOrder(shown).filter((id) => this.players.has(id));
+    // Lugar en el torneo: los empates (mismos cristales y energía) comparten lugar.
+    const standing = new Map<string, number>();
+    order.forEach((id, i) => {
+      const prev = order[i - 1];
+      const same = prev && shown[prev].crystals === shown[id].crystals && shown[prev].energy === shown[id].energy;
+      standing.set(id, same ? standing.get(prev)! : i + 1);
+    });
+    return {
+      id: pr.id,
+      stage: pr.stage,
+      round: pr.round,
+      rounds: pr.rounds,
+      game: pr.game,
+      played: pr.played,
+      endsAt: pr.endsAt,
+      paused: pr.pausedLeft !== null,
+      pausedLeft: pr.pausedLeft,
+      players: order.map((id) => {
+        const p = this.players.get(id)!;
+        const tk = shown[id];
+        const st = standing.get(id) ?? order.length;
+        return {
+          id,
+          name: p.name,
+          avatar: p.avatar,
+          isBot: p.isBot,
+          connected: p.connected || p.isBot,
+          pos: tk.pos,
+          energy: tk.energy,
+          crystals: tk.crystals,
+          score: Math.round(pr.scores[id] ?? 0),
+          standing: st,
+          xp: pr.stage === 'final' ? partyAt(PLACE_XP, st) : 0,
+        };
+      }),
+      last: pr.last,
     };
   }
 

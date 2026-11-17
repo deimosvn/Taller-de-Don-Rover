@@ -1504,17 +1504,7 @@
   font-size: 0.95rem;
   line-height: 1.4;
 }
-.role-task-facts {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 4px;
-  font-size: 0.82rem;
-  opacity: 0.85;
-}
-.role-task-link,
-.role-task-feeds {
+.role-task-link {
   margin: 0;
   padding: 8px 10px;
   border-radius: 12px;

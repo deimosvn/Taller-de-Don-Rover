@@ -538,11 +538,11 @@ export class WorldEngine {
   }
 
   /** Brújula del explorador: punto de recursos más cercano, a qué distancia y hacia dónde. */
-  nearestResource(): (Bearing & { res: ResourceId }) | null {
+  nearestResource(only?: ResourceId | null): (Bearing & { res: ResourceId }) | null {
     const p = this.player;
     const o = this.outpost;
     if (!p || !o) return null;
-    const res = o.nearest(p.controller.feet, _v);
+    const res = o.nearest(p.controller.feet, _v, only);
     if (!res) return null;
     return { res, ...this.bearing(_v) };
   }

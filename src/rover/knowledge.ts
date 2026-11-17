@@ -95,6 +95,16 @@ export const KB: KnowledgeEntry[] = [
     face: 'happy',
   },
   {
+    keys: ['regolito', 'hematita', 'minar', 'miner', 'fabric', 'isru', 'recursos de marte', 'impresion 3d', 'imprim'],
+    answer: 'En Marte no hay tiendas: lo que se pueda, hay que fabricarlo con lo que hay ahí. La NASA lo llama ISRU, usar los recursos del lugar. Con el regolito, el suelo suelto, se imprimen muros y ladrillos en 3D; del hielo salen agua y oxígeno, y la hematita es una roca con mucho hierro. El rover Opportunity encontró bolitas de hematita, ¡los arándanos de Marte!',
+    face: 'wow',
+  },
+  {
+    keys: ['torneo', 'todos contra todos', 'competir', 'competencia', 'ruleta', 'cristales'],
+    answer: 'En el torneo marciano juegan todos contra todos. Una ruleta elige el minijuego, como la minería exprés o el aterrizaje perfecto; según tu lugar ganas energía y avanzas por la pista que rodea la colonia. Cada casilla trae una sorpresa: cristales de hielo, meteoritos o tubos de lava. ¡Gana quien junte más cristales!',
+    face: 'happy',
+  },
+  {
     keys: ['ix', 'inteligencia artificial', 'ia'],
     answer: 'IX es la inteligencia artificial de la colonia. Arma las misiones con datos reales de la NASA y da pistas cuando la tripulación se atora. Pero las decisiones las toman ustedes: IX narra y el motor del juego calcula qué pasa.',
     face: 'neutral',
